@@ -133,6 +133,12 @@ export class OrderBook {
    */
   add(input: NewLimitOrder): AddResult {
     const { id, ownerId, side, price, qty } = input;
+    if (typeof id !== "string" || id === "") {
+      return reject("INVALID_ID", `order id must be a non-empty string, got ${JSON.stringify(id)}`);
+    }
+    if (typeof ownerId !== "string" || ownerId === "") {
+      return reject("INVALID_OWNER", `ownerId must be a non-empty string, got ${JSON.stringify(ownerId)}`);
+    }
     if (this.byId.has(id)) return reject("DUPLICATE_ID", `Duplicate order id: ${id}`);
     if (side !== "buy" && side !== "sell") return reject("INVALID_SIDE", `Invalid side: ${String(side)}`);
     if (!Number.isSafeInteger(price) || price <= 0 || price > MAX_PRICE_CENTS) {

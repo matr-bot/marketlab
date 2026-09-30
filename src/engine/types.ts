@@ -28,6 +28,8 @@ export interface DepthLevel {
  * stale orders all the time), so they are returned as data, never thrown.
  */
 export type RejectReason =
+  | "INVALID_ID"
+  | "INVALID_OWNER"
   | "DUPLICATE_ID"
   | "INVALID_SIDE"
   | "INVALID_PRICE"

@@ -368,6 +368,30 @@ describe("OrderBook", () => {
       expect(book.size).toBe(1);
     });
 
+    it.each(["", 42, null, undefined])("rejects order id %j as INVALID_ID", (id) => {
+      const book = new OrderBook("SPY");
+      expect(reasonOf(book.add(order("buy", 100, 10, { id: id as string })))).toBe("INVALID_ID");
+      expect(book.size).toBe(0);
+    });
+
+    it.each(["", 7, null, undefined])("rejects ownerId %j as INVALID_OWNER", (ownerId) => {
+      const book = new OrderBook("SPY");
+      const result = book.add(order("buy", 100, 10, { ownerId: ownerId as string }));
+      expect(reasonOf(result)).toBe("INVALID_OWNER");
+      expect(book.size).toBe(0);
+      expect(book.ownerCount).toBe(0);
+    });
+
+    it("names the bad id or owner in the message", () => {
+      const book = new OrderBook("SPY");
+      expect(book.add(order("buy", 100, 10, { id: "" }))).toMatchObject({
+        message: 'order id must be a non-empty string, got ""',
+      });
+      expect(book.add(order("buy", 100, 10, { ownerId: "" }))).toMatchObject({
+        message: 'ownerId must be a non-empty string, got ""',
+      });
+    });
+
     it("rejects an invalid side", () => {
       const bad = order("buy", 100, 10, { side: "hold" as Side });
       expect(reasonOf(new OrderBook("SPY").add(bad))).toBe("INVALID_SIDE");

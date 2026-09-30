@@ -113,6 +113,8 @@ export class OrderBook {
   private readonly bids = new BookSide("buy");
   private readonly asks = new BookSide("sell");
   private readonly byId = new Map<OrderId, MutableOrder>();
+  /** Each owner's resting orders in arrival order. Owners with no orders are removed. */
+  private readonly byOwner = new Map<string, Map<OrderId, MutableOrder>>();
   private nextSeq = 0;
 
   constructor(
@@ -155,6 +157,12 @@ export class OrderBook {
     const order: MutableOrder = { id, ownerId, side, price, qty, seq: this.nextSeq++ };
     this.sideOf(side).insert(order);
     this.byId.set(id, order);
+    let owned = this.byOwner.get(ownerId);
+    if (!owned) {
+      owned = new Map();
+      this.byOwner.set(ownerId, owned);
+    }
+    owned.set(id, order);
     return { ok: true, order: { ...order } };
   }
 
@@ -164,7 +172,31 @@ export class OrderBook {
     if (!order) return { ok: false, reason: "UNKNOWN_ORDER", message: `Unknown order id: ${id}` };
     this.sideOf(order.side).remove(order);
     this.byId.delete(id);
+    const owned = this.byOwner.get(order.ownerId)!;
+    owned.delete(id);
+    if (owned.size === 0) this.byOwner.delete(order.ownerId);
     return { ok: true, order: { ...order } };
+  }
+
+  /**
+   * Cancel every resting order that belongs to `ownerId` (e.g. a market maker pulling its
+   * quotes before requoting). Returns the cancelled orders in arrival order.
+   */
+  cancelAll(ownerId: string): RestingOrder[] {
+    const cancelled = this.ordersOf(ownerId);
+    for (const order of cancelled) this.cancel(order.id);
+    return cancelled;
+  }
+
+  /** An owner's resting orders in arrival order (empty if none). */
+  ordersOf(ownerId: string): RestingOrder[] {
+    const owned = this.byOwner.get(ownerId);
+    return owned ? [...owned.values()].map((o) => ({ ...o })) : [];
+  }
+
+  /** Number of owners that currently have at least one resting order. */
+  get ownerCount(): number {
+    return this.byOwner.size;
   }
 
   /**

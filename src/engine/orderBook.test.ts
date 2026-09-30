@@ -226,6 +226,67 @@ describe("OrderBook", () => {
     });
   });
 
+  describe("orders by owner", () => {
+    it("lists an owner's orders across both sides in arrival order", () => {
+      const book = new OrderBook("SPY");
+      place(book, order("buy", 100, 10, { id: "m1", ownerId: "mm" }));
+      place(book, order("buy", 99, 10, { id: "n1", ownerId: "noise" }));
+      place(book, order("sell", 105, 10, { id: "m2", ownerId: "mm" }));
+      place(book, order("buy", 98, 10, { id: "m3", ownerId: "mm" }));
+      expect(book.ordersOf("mm").map((o) => o.id)).toEqual(["m1", "m2", "m3"]);
+      expect(book.ordersOf("noise").map((o) => o.id)).toEqual(["n1"]);
+      expect(book.ordersOf("nobody")).toEqual([]);
+      expect(book.ownerCount).toBe(2);
+    });
+
+    it("cancelAll removes only that owner's orders and returns them", () => {
+      const book = new OrderBook("SPY");
+      place(book, order("buy", 100, 10, { id: "m1", ownerId: "mm" }));
+      place(book, order("buy", 100, 5, { id: "n1", ownerId: "noise" }));
+      place(book, order("sell", 105, 10, { id: "m2", ownerId: "mm" }));
+      const cancelled = book.cancelAll("mm");
+      expect(cancelled.map((o) => o.id)).toEqual(["m1", "m2"]);
+      expect(book.size).toBe(1);
+      expect(book.bestAsk()).toBeNull();
+      expect(book.depth("buy")).toEqual([{ price: 100, qty: 5, orderCount: 1 }]);
+      expect(book.ordersOf("mm")).toEqual([]);
+      expect(book.ownerCount).toBe(1);
+      expectInvariants(book);
+    });
+
+    it("cancelAll for an owner with no orders is a no-op", () => {
+      const book = new OrderBook("SPY");
+      place(book, order("buy", 100, 10, { ownerId: "mm" }));
+      expect(book.cancelAll("nobody")).toEqual([]);
+      expect(book.size).toBe(1);
+    });
+
+    it("reflects partial fills and drops fully filled or cancelled orders", () => {
+      const book = new OrderBook("SPY");
+      place(book, order("buy", 100, 10, { id: "a", ownerId: "mm" }));
+      place(book, order("buy", 99, 10, { id: "b", ownerId: "mm" }));
+      place(book, order("buy", 98, 10, { id: "c", ownerId: "mm" }));
+      book.reduce("a", 4);
+      book.reduce("b", 10);
+      book.cancel("c");
+      expect(book.ordersOf("mm")).toEqual([expect.objectContaining({ id: "a", qty: 6 })]);
+    });
+
+    it("forgets an owner once their last order is gone", () => {
+      const book = new OrderBook("SPY");
+      place(book, order("buy", 100, 10, { id: "a", ownerId: "mm" }));
+      book.reduce("a", 10);
+      expect(book.ownerCount).toBe(0);
+    });
+
+    it("does not register an owner for a rejected order", () => {
+      const book = new OrderBook("SPY");
+      book.add(order("buy", -1, 10, { ownerId: "ghost" }));
+      expect(book.ownerCount).toBe(0);
+      expect(book.ordersOf("ghost")).toEqual([]);
+    });
+  });
+
   describe("reduce (engine-only, throws on misuse)", () => {
     it("removes the order when reduced to zero", () => {
       const book = new OrderBook("SPY");

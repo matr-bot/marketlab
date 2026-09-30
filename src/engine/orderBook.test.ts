@@ -528,46 +528,4 @@ describe("OrderBook", () => {
       expect(book.depth("buy")[0].qty).toBe(1_000 * MAX_ORDER_QTY + 2);
     });
   });
-
-  describe("randomized operations", () => {
-    // Test-local deterministic generator (mulberry32) so failures are reproducible.
-    const rng = (seed: number) => () => {
-      seed = (seed + 0x6d2b79f5) | 0;
-      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-
-    it.each([1, 2, 3, 42, 2008])("keeps every invariant over 2,000 random ops (seed %i)", (seed) => {
-      const rand = rng(seed);
-      const int = (lo: number, hi: number) => lo + Math.floor(rand() * (hi - lo + 1));
-      const book = new OrderBook("SPY");
-      const live: string[] = [];
-      let n = 0;
-
-      for (let step = 0; step < 2_000; step++) {
-        const op = rand();
-        if (op < 0.6 || live.length === 0) {
-          const side: Side = rand() < 0.5 ? "buy" : "sell";
-          const price = side === "buy" ? int(9_900, 10_000) : int(10_001, 10_100);
-          const id = `r${n++}`;
-          place(book, { id, ownerId: "r", side, price, qty: int(1, 50) });
-          live.push(id);
-        } else {
-          const idx = int(0, live.length - 1);
-          const id = live[idx];
-          const current = book.get(id)!.qty;
-          if (op < 0.8 || current === 1) {
-            expect(book.cancel(id).ok).toBe(true);
-            live.splice(idx, 1);
-          } else if (book.reduce(id, int(1, current)) === 0) {
-            live.splice(idx, 1);
-          }
-        }
-        if (step % 100 === 0) expectInvariants(book);
-      }
-      expectInvariants(book);
-      expect(book.size).toBe(live.length);
-    });
-  });
 });

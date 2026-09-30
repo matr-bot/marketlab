@@ -75,6 +75,13 @@ Browser UI (Next.js)
 - Multi-stock ready from day one: MarketRegistry holds one OrderBook per ticker.
 - /engine has zero React/DOM imports so it is testable in isolation.
 - Every fill records intended price vs executed price so slippage can be reported exactly.
+- Rejections return reason codes instead of throwing. Order flow (anything an agent or user
+  sends: add, cancel) returns `{ ok: false, reason, message }` with a `RejectReason` code, so
+  callers branch on data. Only engine misuse throws (e.g. `reduce` beyond an order's qty, an
+  invalid `depth` limit, a bad tick size in a constructor), because that is a bug in our code.
+- The worker sends one batched snapshot per frame to React, never individual trades. The
+  engine may produce thousands of events per second; the worker coalesces them and posts at
+  most one message per animation frame (quotes, depth, new candles, fills since last frame).
 
 ## Agents (Tier 1 set)
 Common interface: `onTick(marketState, rng) → Order[]`.

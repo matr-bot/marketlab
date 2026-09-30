@@ -100,6 +100,22 @@ describe("OrderBook", () => {
       expect(book.depth("sell", 2).map((l) => l.price)).toEqual([101, 102]);
     });
 
+    it("returns every level for depth(Infinity) and none for depth(0)", () => {
+      const book = new OrderBook("SPY");
+      for (const p of [101, 102, 103]) place(book, order("sell", p));
+      expect(book.depth("sell", Infinity)).toHaveLength(3);
+      expect(book.depth("sell", 5)).toHaveLength(3);
+      expect(book.depth("sell", 0)).toEqual([]);
+    });
+
+    it.each([-1, 1.5, NaN, -Infinity])("throws for an invalid depth limit %s", (maxLevels) => {
+      const book = new OrderBook("SPY");
+      for (const p of [101, 102, 103]) place(book, order("sell", p));
+      expect(() => book.depth("sell", maxLevels)).toThrow(
+        /maxLevels must be a non-negative integer or Infinity/,
+      );
+    });
+
     it("returns a snapshot that cannot mutate the book", () => {
       const book = new OrderBook("SPY");
       const placed = place(book, order("buy", 100, 5, { id: "a" })) as { qty: number };

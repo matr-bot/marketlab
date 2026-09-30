@@ -256,8 +256,11 @@ export class OrderBook {
     return level ? [...level.orders.values()].map((o) => ({ ...o })) : [];
   }
 
-  /** Aggregated levels for one side, best price first. */
+  /** Aggregated levels for one side, best price first. `maxLevels` is a count ≥ 0 or Infinity. */
   depth(side: Side, maxLevels = Infinity): DepthLevel[] {
+    if (maxLevels !== Infinity && !(Number.isSafeInteger(maxLevels) && maxLevels >= 0)) {
+      throw new RangeError(`maxLevels must be a non-negative integer or Infinity, got ${maxLevels}`);
+    }
     return this.sideOf(side).depth(maxLevels);
   }
 

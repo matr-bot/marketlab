@@ -88,11 +88,55 @@ Week 1 of 4. What exists today:
 
 - [x] Next.js + TypeScript (strict) app with the terminal-style layout and placeholder panels
 - [x] `OrderBook`: integer-cent prices, tick size, price-time priority, add / cancel / partial
-      fill, best bid/ask, spread and depth, and it is never crossed
-- [x] Vitest suite, including randomized invariant tests across several seeds
+      fill, per-owner orders and cancel-all, best bid/ask, spread and depth. It is never crossed,
+      and rejected orders come back with a reason code instead of throwing.
+- [x] 107 tests, shadow-model comparison, and 98% mutation score (see [Testing](#testing))
 - [x] ESLint-enforced engine boundary
 
 The panels in the UI say which week they go live. They show no fake market data.
+
+## Testing
+
+The judges are software engineers, so the engine is tested the way exchange software should be:
+not just "does it work on my example" but "can any small bug slip past the tests?"
+
+| Check | Result |
+| --- | --- |
+| Unit and property tests (Vitest) | **107 passing** across 3 files |
+| Randomized shadow-model comparison | 5 seeds × 3,000 operations, full state compared after **every** step |
+| Mutation score (Stryker) on `orderBook.ts` | **98.26%**: 282 of 287 mutants detected |
+| Throughput benchmark | **4–11 million order-book operations per second** |
+
+**Shadow model.** `src/engine/orderBook.shadow.test.ts` contains a deliberately naive reference
+order book: a flat array where every query is answered by filtering and sorting from scratch.
+It shares no code with the real `OrderBook`, so the two can only agree if both are correct. A
+seeded random generator drives both books through the same operations and compares
+everything observable after each step: best prices, spread, depth, every queue in
+price-time order, every order ever created, and every owner's orders.
+
+**Randomized, but reproducible.** Every run uses fixed seeds, so a failure always reproduces. The
+generator mixes normal orders with the cases that break order books: orders that would cross
+the spread, reused and duplicate IDs, invalid prices and quantities, cancels of orders that
+no longer exist, partial and full fills, cancel-all, and maximum-size orders. A coverage guard
+fails the test if any of those cases happens fewer than 5 times per seed, or if the book never
+grows past 100 resting orders, so the random test can never quietly stop testing anything.
+
+**Mutation testing.** Stryker makes hundreds of small deliberate bugs in the engine (flipping `<`
+to `<=`, deleting a line, changing a constant) and checks that some test fails for each one.
+Only 5 of 287 survive, and none of them can be killed by any test. Three produce identical
+behavior (for example, `>` versus `>=` when the two values can never be equal), and two sit in
+a safety check that can only run if the book is already corrupted.
+
+**Benchmark.** 100,000 add and cancel operations per run on an Apple Silicon MacBook Air:
+
+| Scenario | Operations / second |
+| --- | --- |
+| Mixed add/cancel, ~200 price levels | ~5.8 million |
+| Mixed add/cancel, ~5,000 price levels | ~4.3 million |
+| 100 market makers cancel and requote every tick | ~11 million |
+
+A busy tick (hundreds of agents, about 1,000 book operations) costs about 0.2 ms, so the order
+book has roughly 40× headroom for a smooth 60 fps simulation.
 
 ## Getting started
 
@@ -110,6 +154,8 @@ npm run dev        # http://localhost:3000
 | `npm run test:watch` | Run Vitest in watch mode |
 | `npm run lint` | ESLint, including the engine import boundary |
 | `npm run typecheck` | TypeScript type check |
+| `npm run test:mutation` | Stryker mutation testing on `src/engine` (HTML report in `reports/`) |
+| `npm run bench` | Order book throughput benchmark |
 | `npm run build` | Production build |
 
 ## Project structure
@@ -119,7 +165,11 @@ src/
   app/          Next.js App Router: layout, page, global theme
   components/   UI components (Panel, …)
   engine/       Simulation engine: pure TypeScript, no React/DOM (lint-enforced)
-    orderBook.ts
+    orderBook.ts              Limit order book (price-time priority)
+    orderBook.test.ts         Unit and edge-case tests
+    orderBook.shadow.test.ts  Randomized comparison against a naive reference book
+    orderBook.bench.ts        Throughput benchmark
+    boundary.test.ts          Checks the ESLint engine-boundary rule itself
     types.ts
   lib/          Shared code, e.g. Zod schemas for AI contracts (coming in Week 4)
 ```

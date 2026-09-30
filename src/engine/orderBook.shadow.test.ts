@@ -177,34 +177,94 @@ describe("OrderBook vs ShadowBook (randomized, compared after every step)", () =
   const TICK = 5;
   const OWNERS = ["mm1", "mm2", "noise", "whale", "user"] as const;
 
-  it.each([1, 2, 3, 42, 2008])("matches the shadow for 2,000 random operations (seed %i)", (seed) => {
+  /** Ways to make an otherwise valid order invalid, each with the reason it must produce. */
+  const CORRUPTIONS: ReadonlyArray<(o: NewLimitOrder, int: (lo: number, hi: number) => number) => NewLimitOrder> = [
+    (o, int) => ({ ...o, price: o.price + int(1, TICK - 1) }), // OFF_TICK
+    (o) => ({ ...o, price: MAX_PRICE_CENTS + TICK }), // INVALID_PRICE (over the cap)
+    (o) => ({ ...o, price: 0 }),
+    (o) => ({ ...o, price: -TICK }),
+    (o) => ({ ...o, price: o.price + 0.5 }),
+    (o) => ({ ...o, qty: 0 }), // INVALID_QTY
+    (o) => ({ ...o, qty: -3 }),
+    (o) => ({ ...o, qty: 2.5 }),
+    (o) => ({ ...o, qty: NaN }),
+    (o) => ({ ...o, qty: MAX_ORDER_QTY + 1 }),
+    (o) => ({ ...o, id: "" }), // INVALID_ID
+    (o) => ({ ...o, ownerId: "" }), // INVALID_OWNER
+    (o) => ({ ...o, side: "hold" as Side }), // INVALID_SIDE
+  ];
+
+  it.each([1, 2, 3, 42, 2008])("matches the shadow for 3,000 random operations (seed %i)", (seed) => {
     const rand = rng(seed);
     const int = (lo: number, hi: number) => lo + Math.floor(rand() * (hi - lo + 1));
     const pick = <T,>(xs: readonly T[]) => xs[Math.floor(rand() * xs.length)];
     const book = new OrderBook("SPY", TICK);
     const shadow = new ShadowBook(TICK);
     const allIds: string[] = [];
+    const seen = new Map<string, number>();
+    const count = (outcome: string) => seen.set(outcome, (seen.get(outcome) ?? 0) + 1);
     let n = 0;
+    let peak = 0;
 
-    for (let step = 0; step < 2_000; step++) {
+    const freshOrder = (): NewLimitOrder => {
+      // Mostly passive prices so the book builds depth; 15% aggressive enough to cross.
+      const side: Side = rand() < 0.5 ? "buy" : "sell";
+      const ticks = rand() < 0.15 ? int(-20, 0) : int(1, 60);
+      const price = side === "buy" ? MID - TICK * ticks : MID + TICK * ticks;
+      const qty = rand() < 0.05 ? int(1, MAX_ORDER_QTY) : int(1, 50);
+      return { id: `r${n++}`, ownerId: pick(OWNERS), side, price, qty };
+    };
+    const add = (input: NewLimitOrder, label: string) => {
+      if (typeof input.id === "string" && input.id !== "" && !allIds.includes(input.id)) allIds.push(input.id);
+      const expected = shadow.add(input);
+      expectSameAdd(book.add(input), expected);
+      count(`${label}:${expected.ok ? "ACCEPTED" : expected.reason}`);
+    };
+
+    for (let step = 0; step < 3_000; step++) {
       const live = shadow.orders;
       const op = rand();
-      if (op < 0.6 || live.length === 0) {
-        const side: Side = rand() < 0.5 ? "buy" : "sell";
-        const price = side === "buy" ? MID - TICK * int(1, 20) : MID + TICK * int(1, 20);
-        const input = { id: `r${n++}`, ownerId: pick(OWNERS), side, price, qty: int(1, 50) };
-        allIds.push(input.id);
-        expectSameAdd(book.add(input), shadow.add(input));
-      } else {
+      if (op < 0.45 || live.length === 0) {
+        add(freshOrder(), "add");
+      } else if (op < 0.53) {
+        // Reuse an id: live ids must be DUPLICATE_ID, ids of gone orders are free again.
+        const id = rand() < 0.5 ? pick(live).id : pick(allIds);
+        add({ ...freshOrder(), id }, "reuse");
+      } else if (op < 0.6) {
+        add(pick(CORRUPTIONS)(freshOrder(), int), "invalid");
+      } else if (op < 0.71) {
         const target = pick(live);
-        if (op < 0.8 || target.qty === 1) {
-          expectSameCancel(book.cancel(target.id), shadow.cancel(target.id));
-        } else {
-          const qty = int(1, target.qty);
-          expect(book.reduce(target.id, qty)).toBe(shadow.reduce(target.id, qty));
-        }
+        expectSameCancel(book.cancel(target.id), shadow.cancel(target.id));
+        count("cancel:live");
+      } else if (op < 0.75) {
+        const liveIds = new Set(live.map((r) => r.id));
+        const goneIds = allIds.filter((id) => !liveIds.has(id));
+        const id = goneIds.length > 0 && rand() < 0.7 ? pick(goneIds) : `never-${step}`;
+        expectSameCancel(book.cancel(id), shadow.cancel(id));
+        count("cancel:missing");
+      } else if (op < 0.99) {
+        const target = pick(live);
+        const qty = rand() < 0.3 ? target.qty : int(1, target.qty);
+        expect(book.reduce(target.id, qty)).toBe(shadow.reduce(target.id, qty));
+        count(qty === target.qty ? "fill:full" : "fill:partial");
+      } else {
+        const owner = pick(OWNERS);
+        expect(book.cancelAll(owner)).toEqual(shadow.cancelAll(owner));
+        count("cancelAll");
       }
       expectSameState(book, shadow, allIds, OWNERS);
+      peak = Math.max(peak, book.size);
     }
+
+    // Guard against a vacuous test: every interesting path must actually have happened.
+    for (const outcome of [
+      "add:ACCEPTED", "add:WOULD_CROSS", "reuse:DUPLICATE_ID", "reuse:ACCEPTED",
+      "invalid:OFF_TICK", "invalid:INVALID_PRICE", "invalid:INVALID_QTY", "invalid:INVALID_ID",
+      "invalid:INVALID_OWNER", "invalid:INVALID_SIDE", "cancel:live", "cancel:missing",
+      "fill:full", "fill:partial", "cancelAll",
+    ]) {
+      expect(seen.get(outcome) ?? 0, outcome).toBeGreaterThanOrEqual(5);
+    }
+    expect(peak, "peak resting orders").toBeGreaterThanOrEqual(100);
   });
 });

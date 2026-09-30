@@ -280,3 +280,161 @@ describe("OrderBook", () => {
     });
   });
 });
+
+describe("OrderBook edge cases", () => {
+  const MAX = Number.MAX_SAFE_INTEGER;
+
+  describe("spread on a one-sided book", () => {
+    it("is null with only bids", () => {
+      const book = new OrderBook("SPY");
+      book.add(order("buy", 100));
+      expect(book.bestBid()).toBe(100);
+      expect(book.bestAsk()).toBeNull();
+      expect(book.spread()).toBeNull();
+    });
+
+    it("is null with only asks", () => {
+      const book = new OrderBook("SPY");
+      book.add(order("sell", 105));
+      expect(book.bestBid()).toBeNull();
+      expect(book.spread()).toBeNull();
+    });
+  });
+
+  describe("add return value", () => {
+    it("returns the stored order with an increasing sequence number across both sides", () => {
+      const book = new OrderBook("SPY");
+      const a = book.add({ id: "a", ownerId: "mm", side: "buy", price: 100, qty: 5 });
+      const b = book.add({ id: "b", ownerId: "mm", side: "sell", price: 105, qty: 7 });
+      expect(a).toEqual({ id: "a", ownerId: "mm", side: "buy", price: 100, qty: 5, seq: 0 });
+      expect(b.seq).toBe(1);
+      expect(book.get("b")).toEqual(b);
+    });
+
+    it("does not change seq on a partial fill", () => {
+      const book = new OrderBook("SPY");
+      const placed = book.add(order("buy", 100, 10, { id: "a" }));
+      book.reduce("a", 3);
+      expect(book.get("a")?.seq).toBe(placed.seq);
+    });
+  });
+
+  describe("cancel after fills", () => {
+    it("cancels a partially filled order and removes only its remaining quantity", () => {
+      const book = new OrderBook("SPY");
+      book.add(order("buy", 100, 10, { id: "a" }));
+      book.add(order("buy", 100, 4, { id: "b" }));
+      book.reduce("a", 6);
+      expect(book.cancel("a")).toBe(true);
+      expect(book.depth("buy")).toEqual([{ price: 100, qty: 4, orderCount: 1 }]);
+      expect(book.bestOrder("buy")?.id).toBe("b");
+    });
+
+    it("removes the level when its only, partially filled order is cancelled", () => {
+      const book = new OrderBook("SPY");
+      book.add(order("sell", 105, 10, { id: "a" }));
+      book.reduce("a", 9);
+      book.cancel("a");
+      expect(book.bestAsk()).toBeNull();
+      expect(book.levelCount("sell")).toBe(0);
+    });
+
+    it("treats a fully filled order as gone: cancel is false, reduce throws, id is reusable", () => {
+      const book = new OrderBook("SPY");
+      book.add(order("buy", 100, 5, { id: "a" }));
+      book.reduce("a", 5);
+      expect(book.cancel("a")).toBe(false);
+      expect(() => book.reduce("a", 1)).toThrow(/Unknown order id/);
+      expect(() => book.add(order("buy", 100, 5, { id: "a" }))).not.toThrow();
+    });
+  });
+
+  describe("price level cleanup", () => {
+    it("removes a non-best level and leaves its neighbours intact", () => {
+      const book = new OrderBook("SPY");
+      for (const [id, p] of [["a", 100], ["b", 99], ["c", 98]] as const) {
+        book.add(order("buy", p, 10, { id }));
+      }
+      book.cancel("b");
+      expect(book.depth("buy").map((l) => l.price)).toEqual([100, 98]);
+      expect(book.ordersAt("buy", 99)).toEqual([]);
+      expectInvariants(book);
+    });
+
+    it("leaves no trace of an emptied level: ordersAt, depth and levelCount all agree", () => {
+      const book = new OrderBook("SPY");
+      book.add(order("sell", 105, 3, { id: "a" }));
+      book.add(order("sell", 105, 4, { id: "b" }));
+      book.cancel("a");
+      book.reduce("b", 4);
+      expect(book.ordersAt("sell", 105)).toEqual([]);
+      expect(book.depth("sell")).toEqual([]);
+      expect(book.levelCount("sell")).toBe(0);
+      expect(book.size).toBe(0);
+    });
+
+    it("starts a fresh level with zero totals when a price is reused", () => {
+      const book = new OrderBook("SPY");
+      book.add(order("buy", 100, 10, { id: "a" }));
+      book.cancel("a");
+      book.add(order("buy", 100, 3, { id: "b" }));
+      expect(book.depth("buy")).toEqual([{ price: 100, qty: 3, orderCount: 1 }]);
+    });
+
+    it("returns an empty list for a price that never had orders", () => {
+      expect(new OrderBook("SPY").ordersAt("buy", 100)).toEqual([]);
+    });
+  });
+
+  describe("tick size", () => {
+    it.each([1, 4, 6, 10_001, 10_004])("rejects %i on a 5-cent tick", (price) => {
+      expect(() => new OrderBook("SPY", 5).add(order("buy", price))).toThrow(/tick size/);
+    });
+
+    it.each([5, 10, 10_000])("accepts %i on a 5-cent tick", (price) => {
+      expect(() => new OrderBook("SPY", 5).add(order("buy", price))).not.toThrow();
+    });
+  });
+
+  describe("error messages name the problem", () => {
+    it("reports bad price, qty, tick size and reduce qty clearly", () => {
+      const book = new OrderBook("SPY");
+      expect(() => book.add(order("buy", 1.5))).toThrow(/price must be a positive integer number of cents, got 1.5/);
+      expect(() => book.add(order("buy", 100, 0))).toThrow(/qty must be a positive integer, got 0/);
+      expect(() => new OrderBook("SPY", 0)).toThrow(/tickSize must be a positive integer number of cents, got 0/);
+      book.add(order("buy", 100, 5, { id: "a" }));
+      expect(() => book.reduce("a", 6)).toThrow(/reduce qty must be an integer in 1\.\.5, got 6/);
+    });
+  });
+
+  describe("very large numbers (JS integers lose precision above 2^53 - 1)", () => {
+    it("accepts the largest safe integer price and quantity", () => {
+      const book = new OrderBook("SPY");
+      book.add(order("buy", MAX, MAX, { id: "a" }));
+      expect(book.get("a")).toMatchObject({ price: MAX, qty: MAX });
+    });
+
+    it.each([MAX + 1, 2 ** 60, 1e21])("rejects unsafe price %s", (price) => {
+      expect(() => new OrderBook("SPY").add(order("buy", price))).toThrow(RangeError);
+    });
+
+    it.each([MAX + 1, 2 ** 60, 1e21])("rejects unsafe quantity %s", (qty) => {
+      expect(() => new OrderBook("SPY").add(order("buy", 100, qty))).toThrow(RangeError);
+    });
+
+    it("rejects an unsafe tick size", () => {
+      expect(() => new OrderBook("SPY", MAX + 1)).toThrow(RangeError);
+    });
+
+    // KNOWN BUG (found in review): each order's qty is checked, but the level total is not.
+    // Two orders summing past 2^53 - 1 corrupt the level total permanently.
+    // `it.fails` passes while the bug exists; when it is fixed, change this to `it`.
+    it.fails("keeps level totals exact when orders at one price sum past 2^53 - 1", () => {
+      const book = new OrderBook("SPY");
+      book.add(order("buy", 100, MAX, { id: "huge" }));
+      book.add(order("buy", 100, 2, { id: "small" }));
+      book.cancel("huge");
+      expect(book.depth("buy")[0].qty).toBe(2);
+    });
+  });
+});

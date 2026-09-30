@@ -1,4 +1,14 @@
-import type { Cents, DepthLevel, OrderId, RestingOrder, Side } from "./types";
+import type {
+  AddResult,
+  CancelResult,
+  Cents,
+  DepthLevel,
+  OrderId,
+  RejectReason,
+  Rejection,
+  RestingOrder,
+  Side,
+} from "./types";
 
 export interface NewLimitOrder {
   id: OrderId;
@@ -88,7 +98,7 @@ class BookSide {
  * Limit order book for one ticker, with price-time priority.
  *
  * This is the passive data structure: it stores resting limit orders and answers queries.
- * It never matches. An order that would cross the spread is rejected, because routing
+ * It never matches. An order that would cross the spread is rejected (`WOULD_CROSS`), because routing
  * aggressive orders is the matching engine's job (build step 2). As a result the book is
  * never crossed: best bid < best ask whenever both exist.
  */
@@ -108,22 +118,26 @@ export class OrderBook {
     }
   }
 
-  /** Rest a limit order in the book. Returns a snapshot of the stored order. */
-  add(input: NewLimitOrder): RestingOrder {
+  /**
+   * Rest a limit order in the book. Never throws for bad input: invalid, duplicate or
+   * crossing orders come back as `{ ok: false, reason }`.
+   */
+  add(input: NewLimitOrder): AddResult {
     const { id, ownerId, side, price, qty } = input;
-    if (this.byId.has(id)) throw new Error(`Duplicate order id: ${id}`);
-    if (side !== "buy" && side !== "sell") throw new RangeError(`Invalid side: ${String(side)}`);
+    if (this.byId.has(id)) return reject("DUPLICATE_ID", `Duplicate order id: ${id}`);
+    if (side !== "buy" && side !== "sell") return reject("INVALID_SIDE", `Invalid side: ${String(side)}`);
     if (!Number.isSafeInteger(price) || price <= 0) {
-      throw new RangeError(`price must be a positive integer number of cents, got ${price}`);
+      return reject("INVALID_PRICE", `price must be a positive integer number of cents, got ${price}`);
     }
     if (price % this.tickSize !== 0) {
-      throw new RangeError(`price ${price} is not a multiple of tick size ${this.tickSize}`);
+      return reject("OFF_TICK", `price ${price} is not a multiple of tick size ${this.tickSize}`);
     }
     if (!Number.isSafeInteger(qty) || qty <= 0) {
-      throw new RangeError(`qty must be a positive integer, got ${qty}`);
+      return reject("INVALID_QTY", `qty must be a positive integer, got ${qty}`);
     }
     if (this.wouldCross(side, price)) {
-      throw new Error(
+      return reject(
+        "WOULD_CROSS",
         `${side} @ ${price} would cross the spread; aggressive orders must go through the matching engine`,
       );
     }
@@ -131,21 +145,24 @@ export class OrderBook {
     const order: MutableOrder = { id, ownerId, side, price, qty, seq: this.nextSeq++ };
     this.sideOf(side).insert(order);
     this.byId.set(id, order);
-    return { ...order };
+    return { ok: true, order: { ...order } };
   }
 
-  /** Remove a resting order. Returns false if the id is not in the book. */
-  cancel(id: OrderId): boolean {
+  /** Remove a resting order. Returns the removed order, or `UNKNOWN_ORDER` if it is not in the book. */
+  cancel(id: OrderId): CancelResult {
     const order = this.byId.get(id);
-    if (!order) return false;
+    if (!order) return { ok: false, reason: "UNKNOWN_ORDER", message: `Unknown order id: ${id}` };
     this.sideOf(order.side).remove(order);
     this.byId.delete(id);
-    return true;
+    return { ok: true, order: { ...order } };
   }
 
   /**
    * Reduce a resting order's quantity (a partial or full fill). The order keeps its time
    * priority. Removes the order when it reaches zero. Returns the remaining quantity.
+   *
+   * Only the matching engine calls this, with orders it just read from the book, so a bad
+   * id or quantity is a programming error and throws.
    */
   reduce(id: OrderId, qty: number): number {
     const order = this.byId.get(id);
@@ -220,4 +237,8 @@ export class OrderBook {
     if (opposite === null) return false;
     return side === "buy" ? price >= opposite : price <= opposite;
   }
+}
+
+function reject(reason: RejectReason, message: string): Rejection {
+  return { ok: false, reason, message };
 }

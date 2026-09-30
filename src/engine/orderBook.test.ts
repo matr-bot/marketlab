@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { OrderBook, type NewLimitOrder } from "./orderBook";
+import { MAX_ORDER_QTY, MAX_PRICE_CENTS, OrderBook, type NewLimitOrder } from "./orderBook";
 import type { AddResult, RestingOrder, Side } from "./types";
 
 let counter = 0;
@@ -267,10 +267,10 @@ describe("OrderBook", () => {
     it("includes a readable message with the offending value", () => {
       const book = new OrderBook("SPY");
       expect(book.add(order("buy", 1.5))).toMatchObject({
-        message: "price must be a positive integer number of cents, got 1.5",
+        message: "price must be an integer number of cents in 1..100000000, got 1.5",
       });
       expect(book.add(order("buy", 100, 0))).toMatchObject({
-        message: "qty must be a positive integer, got 0",
+        message: "qty must be an integer in 1..10000000, got 0",
       });
     });
 
@@ -393,11 +393,23 @@ describe("OrderBook", () => {
   describe("very large numbers (JS integers lose precision above 2^53 - 1)", () => {
     const MAX = Number.MAX_SAFE_INTEGER;
 
-    it.each([MAX + 1, 2 ** 60, 1e21])("rejects unsafe price %s", (price) => {
+    it("limits guarantee an order's notional value (price × qty) is an exact integer", () => {
+      expect(Number.isSafeInteger(MAX_PRICE_CENTS * MAX_ORDER_QTY)).toBe(true);
+    });
+
+    it("accepts an order exactly at the price and size limits", () => {
+      const book = new OrderBook("SPY");
+      expect(place(book, order("buy", MAX_PRICE_CENTS, MAX_ORDER_QTY))).toMatchObject({
+        price: MAX_PRICE_CENTS,
+        qty: MAX_ORDER_QTY,
+      });
+    });
+
+    it.each([MAX_PRICE_CENTS + 1, MAX + 1, 2 ** 60, 1e21])("rejects price %s as INVALID_PRICE", (price) => {
       expect(reasonOf(new OrderBook("SPY").add(order("buy", price)))).toBe("INVALID_PRICE");
     });
 
-    it.each([MAX + 1, 2 ** 60, 1e21])("rejects unsafe quantity %s", (qty) => {
+    it.each([MAX_ORDER_QTY + 1, MAX, MAX + 1, 1e21])("rejects quantity %s as INVALID_QTY", (qty) => {
       expect(reasonOf(new OrderBook("SPY").add(order("buy", 100, qty)))).toBe("INVALID_QTY");
     });
 
@@ -405,15 +417,14 @@ describe("OrderBook", () => {
       expect(() => new OrderBook("SPY", MAX + 1)).toThrow(RangeError);
     });
 
-    // KNOWN BUG (found in review): each order's qty is checked, but the level total is not.
-    // Two orders summing past 2^53 - 1 corrupt the level total permanently.
-    // `it.fails` passes while the bug exists; when it is fixed, change this to `it`.
-    it.fails("keeps level totals exact when orders at one price sum past 2^53 - 1", () => {
+    // Regression for the review finding: two orders summing past 2^53 - 1 used to corrupt
+    // the level total permanently. That order size is now rejected up front.
+    it("cannot be pushed into an inexact level total", () => {
       const book = new OrderBook("SPY");
-      place(book, order("buy", 100, MAX, { id: "huge" }));
+      expect(reasonOf(book.add(order("buy", 100, MAX, { id: "huge" })))).toBe("INVALID_QTY");
+      for (let i = 0; i < 1_000; i++) place(book, order("buy", 100, MAX_ORDER_QTY));
       place(book, order("buy", 100, 2, { id: "small" }));
-      book.cancel("huge");
-      expect(book.depth("buy")[0].qty).toBe(2);
+      expect(book.depth("buy")[0].qty).toBe(1_000 * MAX_ORDER_QTY + 2);
     });
   });
 

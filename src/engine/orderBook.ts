@@ -10,6 +10,13 @@ import type {
   Side,
 } from "./types";
 
+/** Highest accepted price: $1,000,000.00 per share. */
+export const MAX_PRICE_CENTS = 100_000_000;
+/** Largest accepted order size in shares. */
+export const MAX_ORDER_QTY = 10_000_000;
+// Why these limits: price × qty ≤ 1e15 < 2^53, so an order's notional value is always an
+// exact integer. A level total would need ~900 million max-size orders to lose precision.
+
 export interface NewLimitOrder {
   id: OrderId;
   ownerId: string;
@@ -126,14 +133,17 @@ export class OrderBook {
     const { id, ownerId, side, price, qty } = input;
     if (this.byId.has(id)) return reject("DUPLICATE_ID", `Duplicate order id: ${id}`);
     if (side !== "buy" && side !== "sell") return reject("INVALID_SIDE", `Invalid side: ${String(side)}`);
-    if (!Number.isSafeInteger(price) || price <= 0) {
-      return reject("INVALID_PRICE", `price must be a positive integer number of cents, got ${price}`);
+    if (!Number.isSafeInteger(price) || price <= 0 || price > MAX_PRICE_CENTS) {
+      return reject(
+        "INVALID_PRICE",
+        `price must be an integer number of cents in 1..${MAX_PRICE_CENTS}, got ${price}`,
+      );
     }
     if (price % this.tickSize !== 0) {
       return reject("OFF_TICK", `price ${price} is not a multiple of tick size ${this.tickSize}`);
     }
-    if (!Number.isSafeInteger(qty) || qty <= 0) {
-      return reject("INVALID_QTY", `qty must be a positive integer, got ${qty}`);
+    if (!Number.isSafeInteger(qty) || qty <= 0 || qty > MAX_ORDER_QTY) {
+      return reject("INVALID_QTY", `qty must be an integer in 1..${MAX_ORDER_QTY}, got ${qty}`);
     }
     if (this.wouldCross(side, price)) {
       return reject(

@@ -349,6 +349,12 @@ describe("OrderBook", () => {
       expect(book.add(order("buy", 100, 0))).toMatchObject({
         message: "qty must be an integer in 1..10000000, got 0",
       });
+      expect(book.add(order("buy", 100, 10, { side: "hold" as Side }))).toMatchObject({
+        message: "Invalid side: hold",
+      });
+      expect(new OrderBook("SPY", 5).add(order("buy", 101))).toMatchObject({
+        message: "price 101 is not a multiple of tick size 5",
+      });
     });
 
     it.each([1, 4, 6, 10_001, 10_004])("rejects %i on a 5-cent tick as OFF_TICK", (price) => {

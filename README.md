@@ -2,6 +2,8 @@
 
 **An AI-native market laboratory for learning how markets and trading strategies actually work.**
 
+**Live demo: [marketlab-nine.vercel.app](https://marketlab-nine.vercel.app)**
+
 ## Thesis
 
 **Problem.** Finance students learn market mechanics (order books, liquidity, slippage, panics)
@@ -84,9 +86,11 @@ itself keeps working.
 
 ## Project status
 
-Week 1 of 4. What exists today:
+**Week 1 ✅ complete.** Week 2 (matching engine and a live market on page load) is next.
+What exists today:
 
-- [x] Next.js + TypeScript (strict) app with the terminal-style layout and placeholder panels
+- [x] Next.js + TypeScript (strict) app with the terminal-style layout and placeholder panels,
+      deployed on Vercel at [marketlab-nine.vercel.app](https://marketlab-nine.vercel.app)
 - [x] `OrderBook`: integer-cent prices, tick size, price-time priority, add / cancel / partial
       fill, per-owner orders and cancel-all, best bid/ask, spread and depth. It is never crossed,
       and rejected orders come back with a reason code instead of throwing.
@@ -180,7 +184,7 @@ Each stage ends as a complete, working demo.
 
 | When | Deliverables | Milestone |
 | --- | --- | --- |
-| **Week 1** (→ Oct 3) | Repo, skeleton app on Vercel, layout, OrderBook + tests, README | Foundation |
+| **Week 1** ✅ Done | Repo, skeleton app on Vercel, layout, OrderBook + 107 tests (98% mutation score), README | Foundation |
 | **Week 2** (Oct 4–10) | Matching engine, seeded RNG, sim clock, market maker / noise / momentum agents, Web Worker, live candlestick chart + trade feed | Price moves realistically with no input |
 | **Week 3** (Oct 11–17) | Value / panic / whale agents, order book depth view, tuning, realism panel (fat tails, volatility clustering, spread vs. stress), professor interviews | Market behaves like a market |
 | **Week 4** (Oct 18–24) | AI interpret route for headlines and strategies, editable parameter panel, user strategy agent, manual trading, execution report (slippage, P&L, Sharpe, drawdown), glass box v1 | Full 90-second demo works end to end |

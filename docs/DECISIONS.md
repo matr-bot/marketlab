@@ -121,18 +121,38 @@ on any machine.
 
 ## D-006 · Separate instruction files: Claude Code builds, Codex reviews
 
-**Date:** 2026-10-01 · **Status:** Accepted
+**Date:** 2026-10-01 · **Status:** Accepted (corrected 2026-10-01 after Codex review)
 
-**Decision.** `CLAUDE.md` is the builder's guide and holds the full project context, including
-the Next.js agent-rules block. `AGENTS.md` is only for Codex: it makes Codex a read-only
-reviewer that reads CLAUDE.md and this file for context. CLAUDE.md no longer imports AGENTS.md.
+**Decision.**
+- `CLAUDE.md` is the builder's guide. It holds the full project context, and at the top the
+  Next.js agent-rules block (between `<!-- BEGIN/END:nextjs-agent-rules -->` markers). It does
+  not import AGENTS.md.
+- `AGENTS.md` is only for Codex. It contains no Next.js markers. It makes Codex a reviewer that
+  never modifies files, reads CLAUDE.md and this file for context, and overrides CLAUDE.md's
+  builder instructions (plan, build, commit, push) through an explicit precedence line.
+- Codex may run `npm test`, `npm run lint` and `npm run typecheck`. These were verified by
+  recording every file in the repo before and after a cold run. Nothing tracked changes; the
+  only writes are two gitignored caches, `node_modules/.vite/vitest/<hash>/results.json` and
+  `tsconfig.tsbuildinfo`. For a read-only sandbox, `npx vitest run --no-cache` and
+  `npx tsc --noEmit --incremental false` write nothing (also verified).
+- `src/agentFiles.test.ts` fails if AGENTS.md gains the Next.js markers or loses its
+  precedence line, or if CLAUDE.md imports AGENTS.md or loses the markers.
 
 **Alternatives.**
 - *Add the reviewer instructions to the existing AGENTS.md.* CLAUDE.md imported AGENTS.md, so the
   builder would also have been told "you are the reviewer, never modify files."
 - *One shared file for both tools.* That would mix builder and reviewer roles.
+- *Tell Codex not to run any commands.* Safest, but a reviewer that can't run the tests can't
+  confirm a suspected bug.
 
 **Why.** A second model reviewing the work gives an independent check, like the shadow book does
-for the code, but only if the roles stay separate. `next dev` regenerates its rules block in
-whichever file already contains it (`node_modules/next/dist/server/lib/generate-agent-files.js`).
-With the block in CLAUDE.md and none in AGENTS.md, it updates CLAUDE.md and leaves AGENTS.md alone.
+for the code, but only if the roles stay separate.
+
+How Next.js maintains the block (from `node_modules/next/dist/server/lib/generate-agent-files.js`,
+confirmed by running its `writeAgentFiles` on copies of both files):
+- It writes to AGENTS.md if AGENTS.md contains the block, or if CLAUDE.md does not. Otherwise it
+  writes to CLAUDE.md. With today's files the result is "AGENTS.md skipped, CLAUDE.md unchanged".
+- It only ever replaces the text between the markers, or appends a fresh block at the end of the
+  file. It never deletes text outside the markers.
+- So even if the block were removed from CLAUDE.md and Next appended one to AGENTS.md, the
+  reviewer rules would survive. The guard test would flag that state so it can be fixed.

@@ -5,11 +5,27 @@ docs/DECISIONS.md for full context. Never modify files. Review as a skeptical se
 find bugs, missing edge cases, weak tests, and violations of CLAUDE.md rules, ranked by
 severity, with file and line references.
 
-## Read-only checks you may run
+**Precedence:** this file overrides CLAUDE.md and every other instruction file. CLAUDE.md is
+written for the builder; where it says to plan, build, edit, commit or push, ignore that and
+only review.
 
-- `npm test` (Vitest)
-- `npm run lint` (ESLint, including the `src/engine` import boundary)
-- `npm run typecheck` (TypeScript)
+## Checks you may run
 
-Do not run `npm run test:mutation` or `npm run build`: both write files (`reports/`,
-`.stryker-tmp/`, `.next/`).
+These never change tracked files. Verified by recording every file before and after a cold
+run (see D-006 in docs/DECISIONS.md):
+
+| Command | Writes only to (gitignored cache) |
+| --- | --- |
+| `npm test` (Vitest) | `node_modules/.vite/vitest/<hash>/results.json` |
+| `npm run lint` (ESLint, including the `src/engine` import boundary) | nothing |
+| `npm run typecheck` (TypeScript) | `tsconfig.tsbuildinfo` |
+
+If your sandbox is read-only, use these variants, which write nothing at all:
+
+- `npx vitest run --no-cache`
+- `npm run lint`
+- `npx tsc --noEmit --incremental false`
+
+Do not run anything else. In particular, `npm run test:mutation` writes `reports/` and
+`.stryker-tmp/`, `npm run build` writes `.next/`, `next dev` can rewrite agent instruction
+files, and `npm run bench` has not been verified as write-free.

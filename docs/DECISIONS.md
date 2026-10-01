@@ -152,7 +152,11 @@ How Next.js maintains the block (from `node_modules/next/dist/server/lib/generat
 confirmed by running its `writeAgentFiles` on copies of both files):
 - It writes to AGENTS.md if AGENTS.md contains the block, or if CLAUDE.md does not. Otherwise it
   writes to CLAUDE.md. With today's files the result is "AGENTS.md skipped, CLAUDE.md unchanged".
-- It only ever replaces the text between the markers, or appends a fresh block at the end of the
-  file. It never deletes text outside the markers.
+- In the file it writes to, it first deletes any block between the *legacy* markers
+  `<!-- NEXT-AGENTS-MD-START -->` / `<!-- NEXT-AGENTS-MD-END -->`, along with the whitespace
+  around it (`stripLegacyAgentRulesBlock`). It then replaces the text between the current
+  `BEGIN/END:nextjs-agent-rules` markers, or appends a fresh block at the end of the file.
+  Apart from those two marked regions, it does not delete anything. Neither file contains the
+  legacy markers, and the guard test fails if either one ever does.
 - So even if the block were removed from CLAUDE.md and Next appended one to AGENTS.md, the
   reviewer rules would survive. The guard test would flag that state so it can be fixed.

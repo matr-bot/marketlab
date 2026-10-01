@@ -86,7 +86,7 @@ itself keeps working.
 
 ## Project status
 
-**Week 1 ✅ complete.** Week 2 (matching engine and a live market on page load) is next.
+**Week 1 of 5 ✅ complete.** Week 2 (matching engine and a live market on page load) is next.
 What exists today:
 
 - [x] Next.js + TypeScript (strict) app with the terminal-style layout and placeholder panels,
@@ -180,17 +180,20 @@ src/
 
 ## Roadmap
 
-Each stage ends as a complete, working demo.
+Five weeks of building, then a week of rehearsal. Each week ends as a complete, working demo.
 
 | When | Deliverables | Milestone |
 | --- | --- | --- |
-| **Week 1** ✅ Done | Repo, skeleton app on Vercel, layout, OrderBook + 107 tests (98% mutation score), README | Foundation |
-| **Week 2** (Oct 4–10) | Matching engine, seeded RNG, sim clock, market maker / noise / momentum agents, Web Worker, live candlestick chart + trade feed | Price moves realistically with no input |
-| **Week 3** (Oct 11–17) | Value / panic / whale agents, order book depth view, tuning, realism panel (fat tails, volatility clustering, spread vs. stress), professor interviews | Market behaves like a market |
-| **Week 4** (Oct 18–24) | AI interpret route for headlines and strategies, editable parameter panel, user strategy agent, manual trading, execution report (slippage, P&L, Sharpe, drawdown), glass box v1 | Full 90-second demo works end to end |
-| **Tier 2** (Oct 25–31) | 3–5 correlated stocks calibrated from historical data, macro dashboard, regime presets (2008 / 2020 / 2022), side-by-side what-if reruns, Strategy Arena, education-level slider | |
-| **Tier 3** (if ahead) | Simple option pricing that reacts to simulated volatility | |
+| **Week 1** ✅ Done | Repo, deploy, layout shell, OrderBook + 107 tests, 98% mutation score | |
+| **Week 2** (Oct 2–10) | Matching engine + tests (market and limit orders, partial fills, fill log with agent types), seeded RNG + sim clock, worker + batched snapshots, Noise + MarketMaker (Avellaneda–Stoikov) + Momentum agents, live candlestick chart + tape, market alive on load, new layout and amber theme | A realistic market moves on its own at page load |
+| **Week 3** (Oct 11–17) | Value, Panic (threshold cascade) and Whale agents; depth view; crowd panel; narrator v1; attribution ("who moved the price?"); realism panel; tuning; professor interviews | |
+| **Week 4** (Oct 18–24) | Command bar; AI headline → clamped, editable parameters; your desk (manual trading, strategy agent, execution report with slippage); hover formulas; glass box reveal | The full 90-second demo works end to end |
+| **Week 5** (Oct 25–31) | Missions 1, 3 and 5; Learn/Pro modes; rewind; what-if reruns; polish | |
+| **Stretch** (only if ahead) | Multi-stock + macro + regime presets, Strategy Arena, option pricing | |
 | **Nov 1–5** | Feature freeze, demo script, backup video, rehearsals | |
+
+**Priority rule:** learning features (missions, narrator, Learn mode) beat breadth features
+(multi-stock, options). Depth over breadth.
 
 ### The 90-second demo
 

@@ -116,3 +116,23 @@ own market. Running in a worker keeps the UI at 60fps. Sending batched snapshots
 individual trades keeps the messages from the worker to React small and steady however busy
 the market gets. Because the engine is deterministic, any run can be reproduced from its seed
 on any machine.
+
+---
+
+## D-006 · Separate instruction files: Claude Code builds, Codex reviews
+
+**Date:** 2026-10-01 · **Status:** Accepted
+
+**Decision.** `CLAUDE.md` is the builder's guide and holds the full project context, including
+the Next.js agent-rules block. `AGENTS.md` is only for Codex: it makes Codex a read-only
+reviewer that reads CLAUDE.md and this file for context. CLAUDE.md no longer imports AGENTS.md.
+
+**Alternatives.**
+- *Add the reviewer instructions to the existing AGENTS.md.* CLAUDE.md imported AGENTS.md, so the
+  builder would also have been told "you are the reviewer, never modify files."
+- *One shared file for both tools.* That would mix builder and reviewer roles.
+
+**Why.** A second model reviewing the work gives an independent check, like the shadow book does
+for the code, but only if the roles stay separate. `next dev` regenerates its rules block in
+whichever file already contains it (`node_modules/next/dist/server/lib/generate-agent-files.js`).
+With the block in CLAUDE.md and none in AGENTS.md, it updates CLAUDE.md and leaves AGENTS.md alone.

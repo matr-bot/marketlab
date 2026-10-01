@@ -1,9 +1,15 @@
-<!-- BEGIN:nextjs-agent-rules -->
+# AGENTS.md — instructions for Codex
 
-# This is NOT the Next.js you know
+You are the code reviewer for this project, not the builder. Read CLAUDE.md and
+docs/DECISIONS.md for full context. Never modify files. Review as a skeptical senior engineer:
+find bugs, missing edge cases, weak tests, and violations of CLAUDE.md rules, ranked by
+severity, with file and line references.
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+## Read-only checks you may run
 
-This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+- `npm test` (Vitest)
+- `npm run lint` (ESLint, including the `src/engine` import boundary)
+- `npm run typecheck` (TypeScript)
 
-<!-- END:nextjs-agent-rules -->
+Do not run `npm run test:mutation` or `npm run build`: both write files (`reports/`,
+`.stryker-tmp/`, `.next/`).

@@ -131,8 +131,8 @@ cancel-all, and maximum-size orders. After every order it also checks rules that
 hold: shares in = filled + resting + cancelled, no trader ever trades with itself, limit prices
 are respected, and the book is never crossed. A coverage guard fails the test if any case happens
 fewer than 5 times per seed, or if the book or the trade count stays too small, so the random test
-can never quietly stop testing anything. We also planted eight realistic bugs by hand; every one
-was caught.
+can never quietly stop testing anything. We also planted seven realistic bugs by hand (one in the order book, six in the
+matching engine); every one was caught.
 
 **Mutation testing.** Stryker makes hundreds of small deliberate bugs in the engine (flipping `<`
 to `<=`, deleting a line, changing a constant) and checks that some test fails for each one.

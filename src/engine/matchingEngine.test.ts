@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { MarketRegistry } from "./marketRegistry";
 import { MatchingEngine, type LimitOrderInput, type MarketOrderInput, type OrderInput, type SubmitResult } from "./matchingEngine";
 import type { AgentType, Side } from "./types";
 
@@ -70,6 +71,14 @@ describe("MatchingEngine", () => {
       const sneaky = { ...lim("buy", 100, 1), id: "mine" } as OrderInput;
       expect(accepted(e.submit(sneaky, 0)).orderId).toBe("SPY-1");
       expect(e.book.has("mine")).toBe(false);
+    });
+
+    it("numbers each market independently", () => {
+      const reg = new MarketRegistry();
+      const spy = reg.create("SPY");
+      const nvda = reg.create("NVDA");
+      accepted(spy.submit(lim("buy", 100, 1), 0));
+      expect(accepted(nvda.submit(lim("buy", 100, 1), 0)).orderId).toBe("NVDA-1");
     });
   });
 
@@ -390,5 +399,47 @@ describe("MatchingEngine", () => {
     expect(e.ticker).toBe("NVDA");
     expect(e.book.ticker).toBe("NVDA");
     expect(e.book.tickSize).toBe(5);
+  });
+});
+
+describe("MarketRegistry", () => {
+  it("holds one independent market per ticker, in creation order", () => {
+    const reg = new MarketRegistry();
+    const spy = reg.create("SPY");
+    const nvda = reg.create("NVDA", 5);
+    accepted(spy.submit(lim("buy", 100, 1), 0));
+    expect(reg.get("SPY")).toBe(spy);
+    expect(reg.get("NVDA")).toBe(nvda);
+    expect(nvda.book.size).toBe(0);
+    expect(nvda.book.tickSize).toBe(5);
+    expect(reg.get("AAPL")).toBeUndefined();
+    expect(reg.tickers()).toEqual(["SPY", "NVDA"]);
+  });
+
+  it("throws on a duplicate ticker (setup bug)", () => {
+    const reg = new MarketRegistry();
+    reg.create("SPY");
+    expect(() => reg.create("SPY")).toThrow("Market already exists: SPY");
+  });
+
+  it.each(["", "spy", "1ABC", "TOOLONGTICKER", "SP Y"])("throws on an invalid ticker %j", (ticker) => {
+    expect(() => new MarketRegistry().create(ticker)).toThrow(RangeError);
+  });
+
+  it("throws on a non-string ticker even if it prints like a valid one", () => {
+    const sneaky = { toString: () => "SPY" } as unknown as string;
+    expect(() => new MarketRegistry().create(sneaky)).toThrow(
+      "ticker must be 1-10 uppercase letters, digits or dots, starting with a letter, got {}",
+    );
+  });
+
+  it("names the bad ticker in its error", () => {
+    expect(() => new MarketRegistry().create("spy")).toThrow(
+      'ticker must be 1-10 uppercase letters, digits or dots, starting with a letter, got "spy"',
+    );
+  });
+
+  it.each(["A", "BRK.B", "X1"])("accepts ticker %j", (ticker) => {
+    expect(new MarketRegistry().create(ticker).ticker).toBe(ticker);
   });
 });

@@ -62,8 +62,8 @@ screen must be true to what the engine actually did.
 ## The 90-second demo story (everything serves this)
 1. IDEA — student types a strategy: "Buy after a quick 3% drop because panic sellers overshoot."
 2. MARKET — a judge types any headline live; the crowd reacts; the strategy trades through it.
-3. REALITY CHECK — execution report: intended price vs actual average fill (slippage), P&L,
-   Sharpe ratio, max drawdown.
+3. REALITY CHECK — execution report: intended price (the arrival mid) vs actual average fill
+   (slippage, split into spread cost and impact cost), P&L, Sharpe ratio, max drawdown.
 4. REVEAL — "Show me what I built": English → rules → formulas with real numbers → Python.
 
 ## Non-goals (do not build unless explicitly asked)
@@ -133,8 +133,11 @@ Browser UI (Next.js)
   tests.
 - Multi-stock ready from day one: MarketRegistry holds one OrderBook per ticker.
 - /engine has zero React/DOM imports so it is testable in isolation.
-- Every fill records intended price vs executed price so slippage can be reported exactly, and
-  the agent type on each side so attribution is exact.
+- Every fill records, for both sides, the order's arrival quote (bid, ask, mid, touch), its limit
+  price (null for market orders) and its agent type, next to the executed price. The intended
+  price for slippage is the arrival mid (implementation shortfall, D-010), so slippage is exact and
+  splits into spread cost (mid → touch) and impact cost (touch → average fill); the agent types
+  make attribution exact.
 - Rejections return reason codes instead of throwing. Order flow (anything an agent or user
   sends: add, cancel) returns `{ ok: false, reason, message }` with a `RejectReason` code, so
   callers branch on data. Only engine misuse throws (e.g. `reduce` beyond an order's qty, an

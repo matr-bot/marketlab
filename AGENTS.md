@@ -18,13 +18,15 @@ run (see D-006 in docs/DECISIONS.md):
 | --- | --- |
 | `npm test` (Vitest) | `node_modules/.vite/vitest/<hash>/results.json` |
 | `npm run lint` (ESLint, including the `src/engine` import boundary) | nothing |
-| `npm run typecheck` (TypeScript) | `tsconfig.tsbuildinfo` |
+| `npm run typecheck` (Next route types, then TypeScript) | `.next/types/`, `next-env.d.ts`, `tsconfig.tsbuildinfo` |
 
 If your sandbox is read-only, use these variants, which write nothing at all:
 
 - `npx vitest run --no-cache`
 - `npm run lint`
-- `npx tsc --noEmit --incremental false`
+- `npx tsc --noEmit --incremental false` (needs `.next/types/` to exist already: on a fresh clone,
+  `npx next typegen` must run once first, and that writes the gitignored `.next/types/` and
+  `next-env.d.ts`)
 
 Do not run anything else. In particular, `npm run test:mutation` writes `reports/` and
 `.stryker-tmp/`, `npm run build` writes `.next/`, `next dev` can rewrite agent instruction

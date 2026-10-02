@@ -167,7 +167,7 @@ npm run dev        # http://localhost:3000
 | `npm test` | Run the Vitest suite once |
 | `npm run test:watch` | Run Vitest in watch mode |
 | `npm run lint` | ESLint, including the engine import boundary |
-| `npm run typecheck` | TypeScript type check |
+| `npm run typecheck` | Generate Next.js route types, then TypeScript type check (works on a fresh clone) |
 | `npm run test:mutation` | Stryker mutation testing on `src/engine` (HTML report in `reports/`) |
 | `npm run bench` | Order book throughput benchmark |
 | `npm run build` | Production build |

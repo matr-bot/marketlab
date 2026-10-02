@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { MAX_ORDER_QTY, MAX_PRICE_CENTS, OrderBook, type NewLimitOrder } from "./orderBook";
-import type { AddResult, RestingOrder, Side } from "./types";
+import type { AddResult, AgentType, RestingOrder, Side } from "./types";
 
 let counter = 0;
 const order = (side: Side, price: number, qty = 10, overrides: Partial<NewLimitOrder> = {}) => ({
   id: `o${++counter}`,
   ownerId: "t1",
+  agentType: "noise" as AgentType,
   side,
   price,
   qty,
@@ -126,11 +127,11 @@ describe("OrderBook", () => {
 
     it("returns the stored order with an increasing sequence number across both sides", () => {
       const book = new OrderBook("SPY");
-      const a = book.add({ id: "a", ownerId: "mm", side: "buy", price: 100, qty: 5 });
-      const b = place(book, { id: "b", ownerId: "mm", side: "sell", price: 105, qty: 7 });
+      const a = book.add({ id: "a", ownerId: "mm", agentType: "marketMaker", side: "buy", price: 100, qty: 5 });
+      const b = place(book, { id: "b", ownerId: "mm", agentType: "marketMaker", side: "sell", price: 105, qty: 7 });
       expect(a).toEqual({
         ok: true,
-        order: { id: "a", ownerId: "mm", side: "buy", price: 100, qty: 5, seq: 0 },
+        order: { id: "a", ownerId: "mm", agentType: "marketMaker", side: "buy", price: 100, qty: 5, seq: 0 },
       });
       expect(b.seq).toBe(1);
       expect(book.get("b")).toEqual(b);
@@ -388,6 +389,30 @@ describe("OrderBook", () => {
       expect(book.ownerCount).toBe(0);
     });
 
+    it.each(["", "trader", "Noise", 3, null, undefined])("rejects agentType %j as INVALID_AGENT_TYPE", (agentType) => {
+      const book = new OrderBook("SPY");
+      const result = book.add(order("buy", 100, 10, { agentType: agentType as AgentType }));
+      expect(reasonOf(result)).toBe("INVALID_AGENT_TYPE");
+      expect(book.size).toBe(0);
+    });
+
+    it("stores the agent type on the resting order", () => {
+      const book = new OrderBook("SPY");
+      expect(place(book, order("sell", 105, 10, { id: "w", agentType: "whale" })).agentType).toBe("whale");
+      expect(book.get("w")?.agentType).toBe("whale");
+    });
+
+    it("checks the agent type after the owner and before duplicates", () => {
+      const book = new OrderBook("SPY");
+      place(book, order("buy", 100, 10, { id: "a" }));
+      const bad = "x" as AgentType;
+      expect(reasonOf(book.add(order("buy", 100, 10, { ownerId: "", agentType: bad })))).toBe("INVALID_OWNER");
+      expect(reasonOf(book.add(order("buy", 100, 10, { id: "a", agentType: bad })))).toBe("INVALID_AGENT_TYPE");
+      expect(book.add(order("buy", 100, 10, { agentType: bad }))).toMatchObject({
+        message: 'agentType must be one of noise, marketMaker, momentum, value, panic, whale, user, got "x"',
+      });
+    });
+
     it("names the bad id or owner in the message", () => {
       const book = new OrderBook("SPY");
       expect(book.add(order("buy", 100, 10, { id: "" }))).toMatchObject({
@@ -490,6 +515,15 @@ describe("OrderBook", () => {
       book.cancel("a");
       place(book, order("buy", 100, 3, { id: "b" }));
       expect(book.depth("buy")).toEqual([{ price: 100, qty: 3, orderCount: 1 }]);
+    });
+
+    it("reports whether an id is resting with has()", () => {
+      const book = new OrderBook("SPY");
+      place(book, order("buy", 100, 5, { id: "a" }));
+      expect(book.has("a")).toBe(true);
+      expect(book.has("b")).toBe(false);
+      book.reduce("a", 5);
+      expect(book.has("a")).toBe(false);
     });
 
     it("returns an empty list for a price that never had orders", () => {

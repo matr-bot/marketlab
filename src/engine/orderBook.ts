@@ -1,25 +1,12 @@
-import type {
-  AddResult,
-  CancelResult,
-  Cents,
-  DepthLevel,
-  OrderId,
-  RejectReason,
-  Rejection,
-  RestingOrder,
-  Side,
-} from "./types";
+import type { AddResult, AgentType, CancelResult, Cents, DepthLevel, OrderId, RestingOrder, Side } from "./types";
+import { reject, validateOrder } from "./validation";
 
-/** Highest accepted price: $1,000,000.00 per share. */
-export const MAX_PRICE_CENTS = 100_000_000;
-/** Largest accepted order size in shares. */
-export const MAX_ORDER_QTY = 10_000_000;
-// Why these limits: price × qty ≤ 1e15 < 2^53, so an order's notional value is always an
-// exact integer. A level total would need ~900 million max-size orders to lose precision.
+export { MAX_ORDER_QTY, MAX_PRICE_CENTS } from "./validation";
 
 export interface NewLimitOrder {
   id: OrderId;
   ownerId: string;
+  agentType: AgentType;
   side: Side;
   price: Cents;
   qty: number;
@@ -132,27 +119,9 @@ export class OrderBook {
    * crossing orders come back as `{ ok: false, reason }`.
    */
   add(input: NewLimitOrder): AddResult {
-    const { id, ownerId, side, price, qty } = input;
-    if (typeof id !== "string" || id === "") {
-      return reject("INVALID_ID", `order id must be a non-empty string, got ${JSON.stringify(id)}`);
-    }
-    if (typeof ownerId !== "string" || ownerId === "") {
-      return reject("INVALID_OWNER", `ownerId must be a non-empty string, got ${JSON.stringify(ownerId)}`);
-    }
-    if (this.byId.has(id)) return reject("DUPLICATE_ID", `Duplicate order id: ${id}`);
-    if (side !== "buy" && side !== "sell") return reject("INVALID_SIDE", `Invalid side: ${String(side)}`);
-    if (!Number.isSafeInteger(price) || price <= 0 || price > MAX_PRICE_CENTS) {
-      return reject(
-        "INVALID_PRICE",
-        `price must be an integer number of cents in 1..${MAX_PRICE_CENTS}, got ${price}`,
-      );
-    }
-    if (price % this.tickSize !== 0) {
-      return reject("OFF_TICK", `price ${price} is not a multiple of tick size ${this.tickSize}`);
-    }
-    if (!Number.isSafeInteger(qty) || qty <= 0 || qty > MAX_ORDER_QTY) {
-      return reject("INVALID_QTY", `qty must be an integer in 1..${MAX_ORDER_QTY}, got ${qty}`);
-    }
+    const invalid = validateOrder(input, { tickSize: this.tickSize, live: this.byId, priced: true });
+    if (invalid) return invalid;
+    const { id, ownerId, agentType, side, price, qty } = input;
     if (this.wouldCross(side, price)) {
       return reject(
         "WOULD_CROSS",
@@ -160,7 +129,7 @@ export class OrderBook {
       );
     }
 
-    const order: MutableOrder = { id, ownerId, side, price, qty, seq: this.nextSeq++ };
+    const order: MutableOrder = { id, ownerId, agentType, side, price, qty, seq: this.nextSeq++ };
     this.sideOf(side).insert(order);
     this.byId.set(id, order);
     let owned = this.byOwner.get(ownerId);
@@ -227,6 +196,11 @@ export class OrderBook {
     return order.qty;
   }
 
+  /** True if an order with this id is resting in the book. Allocation-free, unlike `get`. */
+  has(id: OrderId): boolean {
+    return this.byId.has(id);
+  }
+
   get(id: OrderId): RestingOrder | undefined {
     const order = this.byId.get(id);
     return order ? { ...order } : undefined;
@@ -288,8 +262,4 @@ export class OrderBook {
     if (opposite === null) return false;
     return side === "buy" ? price >= opposite : price <= opposite;
   }
-}
-
-function reject(reason: RejectReason, message: string): Rejection {
-  return { ok: false, reason, message };
 }

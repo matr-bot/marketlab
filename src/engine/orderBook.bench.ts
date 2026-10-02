@@ -70,7 +70,7 @@ function requoteOps(agents: number, seed: number): Op[] {
 function replay(ops: Op[]) {
   const book = new OrderBook("BENCH");
   for (const op of ops) {
-    if (op.kind === "add") book.add({ id: op.id, ownerId: "b", side: op.side, price: op.price, qty: op.qty });
+    if (op.kind === "add") book.add({ id: op.id, ownerId: "b", agentType: "noise", side: op.side, price: op.price, qty: op.qty });
     else book.cancel(op.id);
   }
   return book;

@@ -4,7 +4,7 @@
 const config = {
   testRunner: "vitest",
   vitest: { configFile: "vitest.config.mts" },
-  mutate: ["src/engine/**/*.ts", "!src/engine/**/*.test.ts", "!src/engine/**/*.bench.ts"],
+  mutate: ["src/engine/**/*.ts", "!src/engine/**/*.test.ts", "!src/engine/**/*.bench.ts", "!src/engine/testing/**"],
   coverageAnalysis: "perTest",
   reporters: ["clear-text", "progress", "html"],
   htmlReporter: { fileName: "reports/mutation/index.html" },

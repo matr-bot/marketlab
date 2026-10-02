@@ -1,4 +1,5 @@
 import { bench, describe } from "vitest";
+import { MatchingEngine, type OrderInput } from "./matchingEngine";
 import { OrderBook } from "./orderBook";
 import type { Side } from "./types";
 
@@ -75,6 +76,52 @@ function replay(ops: Op[]) {
   }
   return book;
 }
+
+/**
+ * Order flow through the matching engine: 55% passive limits, 15% aggressive limits that trade,
+ * 10% market orders, 20% cancels. Ids are assigned by the engine (D-014), so a cancel names the
+ * k-th accepted order, chosen in advance; some of those have already filled, as with real agents.
+ */
+type EngineOp = OrderInput | { type: "cancel"; pick: number };
+
+function engineOps(seed: number): EngineOp[] {
+  const rand = rng(seed);
+  const ops: EngineOp[] = [];
+  while (ops.length < OPS) {
+    const r = rand();
+    const side: Side = rand() < 0.5 ? "buy" : "sell";
+    const base = { ownerId: `a${Math.floor(rand() * 200)}`, agentType: "noise" as const, side, qty: 1 + Math.floor(rand() * 100) };
+    const away = (ticks: number) => (side === "buy" ? MID - ticks : MID + ticks);
+    if (r < 0.55) ops.push({ ...base, type: "limit", price: away(1 + Math.floor(rand() * 100)) });
+    else if (r < 0.7) ops.push({ ...base, type: "limit", price: away(-Math.floor(rand() * 10)) });
+    else if (r < 0.8) ops.push({ ...base, type: "market" });
+    else ops.push({ type: "cancel", pick: rand() });
+  }
+  return ops;
+}
+
+const engineScenario = engineOps(4);
+
+describe("MatchingEngine: 100,000 order-flow operations per iteration", () => {
+  const run = () => {
+    const engine = new MatchingEngine("BENCH");
+    const ids: string[] = [];
+    for (let i = 0; i < engineScenario.length; i++) {
+      const op = engineScenario[i];
+      if (op.type === "cancel") {
+        if (ids.length > 0) engine.cancel(ids[Math.floor(op.pick * ids.length)]);
+      } else {
+        const r = engine.submit(op, i);
+        if (r.ok) ids.push(r.orderId);
+      }
+    }
+    return engine;
+  };
+  const sample = run();
+  bench(`limit + market + cancel mix [${sample.fillCount} fills, ends at ${sample.book.size} orders]`, () => {
+    run();
+  }, { time: 2_000 });
+});
 
 const scenarios = {
   "mixed add/cancel, ~200 levels (60% add)": mixedOps(100, 0.6, 1),

@@ -71,36 +71,138 @@ screen must be true to what the engine actually did.
 - User accounts / login, multiplayer, mobile-first layout
 - Full options market or implied-volatility surface (stretch at most: simple option pricing)
 
-## Look: Bloomberg-inspired, beginner-friendly
-- Inspired by professional terminals, but NEVER copy Bloomberg's name, logo or exact screens.
-- Black background, AMBER as the primary accent/text color, green/red ONLY for up/down moves,
-  dense monospaced numbers, sharp panel borders.
-- Two modes:
-  - LEARN mode (default): fewer panels, plain-English labels, the narrator guides attention.
-  - PRO mode: full dense terminal with every panel visible.
-- Every metric/label has a plain-English hover explanation (e.g. SPREAD: "The gap between the
-  best buy and sell price. Wider means it costs more to trade.").
+## Design System (terminal-style; replaces the earlier "Look" and neon-green rules)
+This section is the spec. The UI is built only once live engine data is flowing (Week 2 Step 8),
+then grows week by week with the roadmap:
+
+| Week | Design parts that ship |
+| --- | --- |
+| Week 2 (Step 8) | Theme (black / amber / white, flash rules), status bar, scrolling ticker, default-layout grid, `GP` (price chart), `TAPE`, `BOOK` basics (best bid/ask, top levels) |
+| Week 3 | `CROWD`, `CHAT` (desk chat / narrator), full `BOOK` depth view, `WHO` (click a candle in `GP`) |
+| Week 4 | Command bar (function codes, commands, headlines) and shortcut strip, `NEWS` input, `TKT`, `EXR`, `STRAT` + glass box reveal, `HELP`, hover explanations and formulas |
+| Week 5 | Learn / Pro modes with the per-panel "On a professional terminal…" notes, rewind with the `REPLAY` label, `ASK` |
+
+Until a function ships, its slot in the default layout is simply not drawn (the grid closes up);
+there are no placeholder panels, so there is never a blank or fake state.
+
+### Goal
+MarketLab looks and feels like a professional trading terminal, so students who learn here can
+move easily to real terminals on a trading floor. Terminal-style, but NEVER use any real
+company's name, logo or exact screens.
+
+### Colors and look
+- Pure black background.
+- AMBER (orange-gold) for labels, panel headers and UI text.
+- WHITE for numbers and data.
+- GREEN and RED ONLY for price direction (up / down). Nothing else is green or red, with one
+  named exception: the bottom shortcut strip's key colors (see Layout), as on real terminal
+  keyboards.
+- Monospace font, small and dense; numbers right-aligned so digits line up.
+- Thin, solid borders with sharp corners. No dashed lines, rounded corners, shadows or gradients.
+- Dense rows and tight spacing; no big empty boxes.
+
+### No "AI dashboard" tells
+- No LIVE badge, glowing dot or "live" indicator anywhere. The moving numbers show it is live.
+- The only status label is a small REPLAY label, shown during rewind.
 - The market is ALREADY RUNNING when the page loads (calm regime, demo seed). Never show
   "engine not running" as a first impression.
 
-## Layout (follows the demo story: cause → reaction → your result → reveal)
-- Top: command bar (headline input, front and center), play/pause, speed (1x/4x), regime, seed,
-  Rerun, What-if, Learn/Pro toggle.
-- Center-left: PRICE CHART, the largest element, with event markers (headline hit, user trades).
-- Center-left below chart: THE CROWD — each agent type's mood, position and activity, live.
-- Bottom-left: NARRATOR feed and TAPE (time & sales), side by side or tabbed.
-- Right column: DEPTH / ORDER BOOK on top; YOUR DESK below (strategy input, buy/sell, position,
-  P&L, execution report).
-- GLASS BOX is a full-screen reveal opened by "Show me what I built", not a permanent panel.
+### Layout
+- **Top status bar:** ticker, last price, change and % change, volume, sim clock.
+- **Scrolling ticker tape** under the status bar: one thin strip where every trade slides
+  sideways, like an exchange ticker. Format: `SPY 1,340 @ 187.42 ▲`, green or red by whether the
+  trade was up or down from the previous trade. Injected headlines scroll through it in amber. It
+  speeds up when trading is busy and slows when it is quiet. The ticker is the ONE place smooth
+  scrolling is allowed; the numbers inside it never animate.
+- **Command bar:** typing a code such as `SPY GP` and pressing Enter opens that function in the
+  active panel (see Command bar below).
+- **A grid of numbered panels** (1, 2, 3, …). Each header shows its number and code, e.g.
+  `1 GP · SPY PRICE`. Typing a code opens that function in the active panel; the default layout
+  below is what every page load shows.
+- **Bottom shortcut strip** with color-coded keys: yellow for market/function keys, green for
+  GO/Enter, red for cancel/Esc.
+- **Keyboard first.** The mouse still works, but everything can be done by typing.
+- **Sim controls** (play/pause, speed 1x/4x, regime, seed, rerun, what-if, Learn/Pro) are
+  command-bar commands and shortcut keys, not buttons scattered across panels. The seed is always
+  visible so any run can be reproduced.
+- The GLASS BOX is a full-screen reveal opened from STRAT ("Show me what I built"), not a
+  permanent panel.
+
+### Default layout (what the page shows on load)
+It follows the demo story, cause → reaction → your result → reveal, and the whole 90-second demo
+works from it without opening any panels.
+
+```
+┌ status bar: SPY  187.42  +0.35 +0.19%  VOL 1,204,300  09:41:27.300  SEED 187 ──────────────┐
+├ ticker: … SPY 1,340 @ 187.42 ▲ … SPY 200 @ 187.41 ▼ … FED SURPRISE HIKE 75BPS … ──────────────┤
+├ command bar: > _ ───────────────────────────────────────────────────────────────────────────┤
+│ 1 GP · SPY PRICE                                          │ 5 BOOK · SPY DEPTH              │
+│ (largest panel: ~2/3 width, ~half the height;            │                                 │
+│  candles + headline and trade markers)                    ├─────────────────────────────────┤
+│                                                           │ 6 TKT · ORDER TICKET            │
+├─────────────────────────────┬─────────────────────────────┼─────────────────────────────────┤
+│ 2 CROWD · WHO IS TRADING    │ 3 CHAT · DESK CHAT          │ 7 STRAT · STRATEGY              │
+├─────────────────────────────┴─────────────────────────────┼─────────────────────────────────┤
+│ 4 TAPE · TIME & SALES                                     │ 8 EXR · EXECUTION REPORT        │
+└ shortcut strip: [F1 HELP] [F2 GP] [F3 BOOK] …  [GO] [CANCEL] ─────────────────────────────────┘
+```
+
+- **Left, cause → reaction:** `1 GP` is the largest element. `2 CROWD` and `3 CHAT` sit right under
+  it, so when a headline hits, the price move, who is trading and the desk's commentary are all in
+  view at once. `4 TAPE` is directly below them.
+- **Right, the market and your desk:** `5 BOOK` (depth) on top, then the user's desk:
+  `6 TKT` (manual buy/sell), `7 STRAT` (type a strategy; "Show me what I built" opens the glass
+  box) and `8 EXR` (slippage, P&L, Sharpe, drawdown).
+- **Demo path with no panels opened:** idea → type it in `7 STRAT`; market → type the headline in
+  the command bar, watch `1 GP`, `2 CROWD`, `3 CHAT` and the ticker; reality check → `8 EXR`;
+  reveal → "Show me what I built" in `7 STRAT`.
+- `NEWS`, `WHO`, `ASK` and `HELP` open in the active panel on demand. Headlines entered in the
+  command bar also scroll through the ticker in amber.
+
+### Function codes
+| Code | Function |
+| --- | --- |
+| `GP` | Price chart (candles, with event markers for headlines and user trades) |
+| `BOOK` | Order book depth |
+| `TAPE` | Time & sales |
+| `NEWS` | Headline feed and headline input |
+| `TKT` | Order ticket: buy/sell, limit/market |
+| `EXR` | Execution report: slippage (spread + impact), P&L, Sharpe, drawdown |
+| `STRAT` | Strategy builder and glass box |
+| `WHO` | Who moved the price (attribution) |
+| `ASK` | Ask a plain-English question, answered from real engine data (see AI contracts) |
+| `CHAT` | Desk chat: the narrator's running commentary |
+| `HELP` | List of all codes |
+| `CROWD` | Each agent type's mood, position and activity (Week 3) |
+
+### Desk chat panel (the narrator; deterministic, not AI)
+The narrator posts short updates like a colleague on a trading desk, e.g. "Big seller hitting
+bids, 62% of flow is panic selling." It is generated by our own code from engine events and the
+fill log, so every number in it is true. In Learn mode it also says where to look.
+
+### Learn mode and Pro mode
+- LEARN mode (default): fewer panels, plain-English labels, the desk chat guides attention, and
+  each panel carries a short note: "On a professional terminal, this is called ___. Traders use
+  it to ___." That is the bridge to real trading.
+- PRO mode: full dense terminal with every panel visible.
+- Every metric and label has a plain-English hover explanation (e.g. SPREAD: "The gap between
+  the best buy and sell price. Wider means it costs more to trade.").
+
+### Numbers must move like a real market
+- Price movement comes ONLY from engine trades, never from UI animation or fake data.
+- The stock starts at a realistic price (around $187, penny ticks: tick size 1 cent).
+- When a PRICE changes, it flashes green (up) or red (down) versus the previous price for a split
+  second, then returns to white. Every other changing number (volume, sizes, the clock, counts)
+  gets a brief neutral highlight, then returns to white, because green and red mean price
+  direction only. No sliding or counting-up animations.
+- The tape, ticker and order book update exactly when trades and orders happen, so busy moments
+  look busy and quiet moments look quiet.
+- Exact prices and sizes (e.g. 1,340 shares), never rounded.
 
 ## Command bar
-Accepts commands and plain words: `SHOCK <headline>`, `RUN`, `PAUSE`, `REWIND`, `RERUN`,
-`WHATIF`, `HELP`. Unknown input is treated as a headline. Friendly errors, never crashes.
-
-## Narrator (deterministic, not AI)
-Plain-English commentary generated by our own code from engine events/metrics, so it is always
-true. Examples: "Market makers widened spreads 4x." "Panic sellers triggered." "Liquidity is down
-50%." In Learn mode it also says where to look.
+Accepts function codes (`SPY GP`, `BOOK`, `HELP`, …), commands (`SHOCK <headline>`, `RUN`,
+`PAUSE`, `REWIND`, `RERUN`, `WHATIF`) and plain words. Known codes and commands are matched
+first; any other input is treated as a headline. Friendly errors, never crashes.
 
 ## "Who moved the price?" (attribution)
 The engine logs every fill with the agent type on each side. Clicking any candle shows buy and
@@ -183,6 +285,11 @@ Stretch: Cholesky decomposition for correlated multi-stock moves.
   Values are clamped to sensible ranges, so weird headlines still map to sensible parameters.
 - StrategySpec: hypothesis (text), entry rule, exit rules, position size, stop loss, take
   profit — from a fixed menu of rule types only.
+- AskQuery (for `ASK`): the LLM maps a plain-English question to one query from a
+  fixed menu (e.g. "volume by agent type between t1 and t2", "spread now vs before the
+  headline"), validated with Zod. Our code computes the answer from engine data and writes every
+  number into the reply. The LLM never writes a number. Same `/api/interpret` route, so it stays
+  the only network call.
 
 ## Glass box rules (must be exactly true)
 - Python shown to users is GENERATED FROM THE StrategySpec USING TEMPLATES, never written by
@@ -224,7 +331,8 @@ finance careers. Missions double as ready-made professor assignments. Contest bu
 - No blank or broken states; AI failures show a friendly message; weird headlines still map to
   sensible, clamped parameters.
 - Demo mode with rehearsed preset seeds, plus live mode for judges.
-- Every number on screen is computed from the engine. Nothing is faked.
+- Every market number on screen comes from engine state. Nothing is faked. (UI values such as
+  the seed, the sim clock and panel numbers are not market numbers.)
 
 ## Build order (components and dependencies)
 1. OrderBook → 2. Matching Engine → 3. Seeded RNG + Sim Clock → 4. Basic agents →
@@ -245,12 +353,15 @@ below: multi-stock, macro, regime presets and Strategy Arena (parts of 12–13) 
 - Week 3 (Oct 11–17): Value, Panic (threshold cascade) and Whale agents; depth view; crowd
   panel; narrator v1; attribution ("who moved the price?"); realism panel; tuning. Professor
   interviews this week.
+  Tuning target: trades arrive in uneven bursts, never at a steady rhythm, and big moves cluster
+  together like a real market (volatility clustering).
 - Week 4 (Oct 18–24): command bar; AI headline → clamped, editable parameters; your desk
   (manual trading, strategy agent, execution report with slippage); hover formulas; glass box
   reveal.
   Milestone: the full 90-second demo works end to end.
 - Week 5 (Oct 25–31): missions 1, 3 and 5; Learn/Pro modes; rewind; what-if reruns; polish.
-- Stretch only if ahead: multi-stock + macro + regime presets, Strategy Arena, option pricing.
+- Stretch only if ahead (after the contest essentials): multi-stock + macro + regime presets,
+  Strategy Arena, option pricing, supply chain mapping, bonds.
 - Nov 1–5: feature freeze, demo script, backup video, rehearsals.
 
 Priority rule: learning features (missions, narrator, Learn mode) beat breadth features
@@ -260,5 +371,6 @@ Priority rule: learning features (missions, narrator, Learn mode) beat breadth f
 - TypeScript strict mode. Small, focused commits with clear messages.
 - Every engine change comes with Vitest tests. Run tests before committing.
 - Plan before large changes: explain the plan, then implement.
-- Visual style: see "Look" above (black, amber primary, green/red only for up/down, sharp
-  borders). This replaces the earlier neon-green terminal aesthetic.
+- Visual style: see "Design System" above (black, amber labels, white numbers, green/red only
+  for price direction, sharp borders, keyboard first). This replaces the earlier neon-green
+  terminal aesthetic.

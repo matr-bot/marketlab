@@ -1,6 +1,7 @@
 // Test-only reference implementations. Deliberately naive: one flat array, every question
 // answered by filtering and sorting from scratch. Nothing here is shared with the real engine
 // (not even validation), so real and shadow can only agree if both are right. See D-004.
+import type { ArrivalQuote, Fill, FillParty, OrderInput } from "../matchingEngine";
 import type { NewLimitOrder } from "../orderBook";
 import type { AgentType, CancelResult, DepthLevel, RejectReason, RestingOrder, Side } from "../types";
 
@@ -125,6 +126,102 @@ export class ShadowBook {
   bestAsk(): number | null {
     const prices = this.orders.filter((r) => r.side === "sell").map((r) => r.price);
     return prices.length ? Math.min(...prices) : null;
+  }
+}
+
+export type ShadowSubmit =
+  | {
+      ok: true;
+      orderId: string;
+      arrival: ArrivalQuote;
+      fills: Fill[];
+      resting: RestingOrder | null;
+      cancelledQty: number;
+      selfTradeCancelled: RestingOrder[];
+    }
+  | Fail;
+
+/** Naive matcher on top of ShadowBook: re-sorts the whole opposite side before every fill. */
+export class ShadowEngine {
+  readonly book: ShadowBook;
+  readonly arrivals = new Map<string, ArrivalQuote>();
+  readonly fills: Fill[] = [];
+  private accepted = 0;
+
+  constructor(readonly ticker: string, tick: number) {
+    this.book = new ShadowBook(tick);
+  }
+
+  submit(order: OrderInput, time: number): ShadowSubmit {
+    if (order.type !== "limit" && order.type !== "market") return fail("INVALID_ORDER_TYPE");
+    const limit = order.type === "limit" ? order.price : null;
+    const id = `${this.ticker}-${this.accepted + 1}`;
+    const invalid = naiveValidate({ ...order, id }, this.book.tick, this.book.ids(), limit !== null);
+    if (invalid) return invalid;
+
+    const bid = this.book.bestBid();
+    const ask = this.book.bestAsk();
+    const arrival: ArrivalQuote = {
+      bid,
+      ask,
+      midX2: bid !== null && ask !== null ? bid + ask : null,
+      touch: order.side === "buy" ? ask : bid,
+    };
+    if (limit === null && arrival.touch === null) return fail("NO_LIQUIDITY");
+    this.accepted++;
+
+    const opposite: Side = order.side === "buy" ? "sell" : "buy";
+    const me: FillParty = { orderId: id, ownerId: order.ownerId, agentType: order.agentType, limitPrice: limit, arrival };
+    const fills: Fill[] = [];
+    const selfTradeCancelled: RestingOrder[] = [];
+    let left = order.qty;
+    for (;;) {
+      if (left === 0) break;
+      const best = this.book.queue(opposite)[0];
+      if (best === undefined) break;
+      const ok = limit === null || (order.side === "buy" ? best.price <= limit : best.price >= limit);
+      if (!ok) break;
+      if (best.ownerId === order.ownerId) {
+        this.book.cancel(best.id);
+        this.arrivals.delete(best.id);
+        selfTradeCancelled.push(best);
+        continue;
+      }
+      const q = Math.min(left, best.qty);
+      const them: FillParty = { orderId: best.id, ownerId: best.ownerId, agentType: best.agentType as AgentType, limitPrice: best.price, arrival: this.arrivals.get(best.id)! };
+      if (this.book.reduce(best.id, q) === 0) this.arrivals.delete(best.id);
+      left -= q;
+      const fill: Fill = {
+        seq: this.fills.length,
+        time,
+        ticker: this.ticker,
+        price: best.price,
+        qty: q,
+        aggressor: order.side,
+        buy: order.side === "buy" ? me : them,
+        sell: order.side === "sell" ? me : them,
+      };
+      this.fills.push(fill);
+      fills.push(fill);
+    }
+
+    if (limit !== null && left > 0) {
+      const resting = this.book.push({ id, ownerId: order.ownerId, agentType: order.agentType, side: order.side, price: limit, qty: left });
+      this.arrivals.set(id, arrival);
+      return { ok: true, orderId: id, arrival, fills, resting, cancelledQty: 0, selfTradeCancelled };
+    }
+    return { ok: true, orderId: id, arrival, fills, resting: null, cancelledQty: left, selfTradeCancelled };
+  }
+
+  cancel(id: string): CancelResult {
+    this.arrivals.delete(id);
+    return this.book.cancel(id);
+  }
+
+  cancelAll(ownerId: string): RestingOrder[] {
+    const gone = this.book.cancelAll(ownerId);
+    for (const r of gone) this.arrivals.delete(r.id);
+    return gone;
   }
 }
 

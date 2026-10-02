@@ -379,3 +379,60 @@ When rewind is built (Week 5), the log gets an upper limit:
 **Why.** Determinism means old fills can always be regenerated from a snapshot, so they don't need
 to stay in memory. The aggregates keep every on-screen number exact without them.
 
+
+---
+
+## D-016 · A terminal-style design system: amber, keyboard first, no "live" badges
+
+**Date:** 2026-10-02 · **Status:** Accepted (spec; the UI ships week by week from Week 2 Step 8,
+per the table in CLAUDE.md "Design System")
+
+**Decision.** MarketLab looks like a professional trading terminal: a pure black background, amber
+labels and headers, white numbers, and green/red only for price direction. It uses a dense
+monospace grid of numbered panels opened by function codes (`SPY GP`, `BOOK`, `TAPE`, …) from a
+command bar, with a scrolling trade ticker and a color-coded shortcut strip. In Learn mode each
+panel says what it is called on a professional terminal and what traders use it for. It never
+uses a real company's name, logo or exact screens. Full spec in CLAUDE.md, "Design System".
+
+**Why amber over green.** On real trading terminals amber is the color of the interface (labels,
+headers, text) and green/red are reserved for meaning: up or down. If the interface itself is
+green (as in the Week 1 neon-green shell), a student can't tell decoration from a price going
+up. Keeping green and red for direction only means every green or red pixel on screen tells the
+student something true about the market. The one named exception is the shortcut strip's
+GO/cancel keys, as on real terminal keyboards.
+
+**Why no LIVE badge.** A pulsing "LIVE" dot is decoration that claims activity instead of showing
+it, and it is a recognizable tell of generic AI-built dashboards. Real terminals show that a
+market is live by numbers changing, the tape printing and the ticker moving. Our numbers change
+only when the engine trades, so the screen proves it is live on its own. The only status label is
+REPLAY during rewind, because then the screen is *not* showing live state and the user must know.
+
+**Why keyboard first with function codes.** Professionals drive terminals by typing codes, not by
+hunting through menus, and the codes become muscle memory that transfers to a trading desk. It
+also suits the demo: a judge types `SPY GP` or a headline and sees the result instantly. The mouse
+still works, so a first-time user is never stuck.
+
+**Why Learn mode names each panel's real-world equivalent.** The product promise is "learn how
+markets really work, the way traders and quants see them." The note on each panel ("On a
+professional terminal, this is called ___. Traders use it to ___.") turns every panel into a
+lesson that carries over to a real job, which is the reason a student or professor would choose
+MarketLab over a toy simulator.
+
+**Alternatives.**
+- *A modern web-app dashboard* (cards, rounded corners, charts with gradients). Friendlier at
+  first sight, but it teaches nothing about real tools and looks like every AI-generated demo.
+- *A faithful copy of a specific commercial terminal.* That would be the most realistic, but it
+  is not ours to copy, and the contest rules and good practice both rule it out.
+- *Keep the Week 1 neon-green look.* Its green was decoration, which clashes with green meaning
+  "price up".
+
+**Consequences.**
+- Only prices flash green or red (up or down versus the previous price). Other changing numbers
+  get a brief neutral highlight. Nothing slides or counts up; smooth motion is allowed only in the
+  scrolling ticker.
+- The default layout keeps the demo story's flow (chart largest, crowd and desk chat beside it,
+  the user's desk on the right), so the 90-second demo needs no panel switching.
+- Every market number on screen comes from engine state. UI values such as the seed, the sim
+  clock and panel numbers are not market numbers.
+- The `ASK` function must not let the AI invent numbers: the AI only picks a query from a fixed
+  menu (the AskQuery schema in CLAUDE.md), and our code computes and writes every number.

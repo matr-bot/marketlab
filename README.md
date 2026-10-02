@@ -77,7 +77,7 @@ Browser UI (Next.js)
 | **Seeded RNG** for all randomness | Same seed + same inputs = same result, which makes what-if reruns fair |
 | One `OrderBook` per ticker in a `MarketRegistry` | Ready for more than one stock from day one |
 | `src/engine` has **zero React/DOM imports** | Testable in isolation; **enforced by ESLint** |
-| Every fill records intended vs executed price | Slippage is reported exactly, not estimated |
+| Every fill records each side's arrival quote and limit price | Slippage is exact: intended price (the arrival mid) vs executed price |
 
 The engine boundary is checked automatically. An ESLint rule in `eslint.config.mjs` fails
 `npm run lint` if anything in `src/engine/` imports React, React DOM, Next.js or UI code, or
@@ -86,15 +86,18 @@ itself keeps working.
 
 ## Project status
 
-**Week 1 of 5 ✅ complete.** Week 2 (matching engine and a live market on page load) is next.
-What exists today:
+**Week 1 of 5 ✅ complete.** Week 2 is in progress: step 1, the matching engine, is done; the goal
+for the week is a live market moving on its own at page load. What exists today:
 
 - [x] Next.js + TypeScript (strict) app with the terminal-style layout and placeholder panels,
       deployed on Vercel at [marketlab-nine.vercel.app](https://marketlab-nine.vercel.app)
 - [x] `OrderBook`: integer-cent prices, tick size, price-time priority, add / cancel / partial
       fill, per-owner orders and cancel-all, best bid/ask, spread and depth. It is never crossed,
       and rejected orders come back with a reason code instead of throwing.
-- [x] 107 tests, shadow-model comparison, and 98% mutation score (see [Testing](#testing))
+- [x] Matching engine: limit and market orders, sweeps across price levels, partial fills,
+      self-trade prevention, and a frozen fill log recording both sides' agent type, limit price and
+      arrival quote, so slippage (vs the arrival mid) and "who moved the price?" are exact
+- [x] 187 tests, shadow-model comparison, and 98% mutation score (see [Testing](#testing))
 - [x] ESLint-enforced engine boundary
 
 The panels in the UI say which week they go live. They show no fake market data.
@@ -106,41 +109,48 @@ not just "does it work on my example" but "can any small bug slip past the tests
 
 | Check | Result |
 | --- | --- |
-| Unit and property tests (Vitest) | **107 passing** across 3 files |
-| Randomized shadow-model comparison | 5 seeds × 3,000 operations, full state compared after **every** step |
-| Mutation score (Stryker) on `orderBook.ts` | **98.26%**: 282 of 287 mutants detected |
-| Throughput benchmark | **4–11 million order-book operations per second** |
+| Unit and property tests (Vitest) | **187 passing** across 7 files |
+| Randomized shadow-model comparison | Order book and matching engine, 5 seeds × 3,000 operations each, full state compared after **every** step |
+| Mutation score (Stryker) on `src/engine` | **98.15%**: 477 of 486 mutants detected |
+| Throughput benchmark | **~1.5 million matching-engine operations per second** with real fills |
 
-**Shadow model.** `src/engine/orderBook.shadow.test.ts` contains a deliberately naive reference
-order book: a flat array where every query is answered by filtering and sorting from scratch.
-It shares no code with the real `OrderBook`, so the two can only agree if both are correct. A
-seeded random generator drives both books through the same operations and compares
-everything observable after each step: best prices, spread, depth, every queue in
-price-time order, every order ever created, and every owner's orders.
+**Shadow models.** `src/engine/testing/shadow.ts` contains a deliberately naive reference order
+book and matching engine: a flat array where every question is answered by filtering and
+sorting from scratch. They share no code with the real engine, not even validation or limits,
+so the two can only agree if both are correct. A seeded random generator drives the real and
+shadow versions through the same operations and compares everything observable after each step:
+every trade (price, size, both sides' agent types, limit prices and arrival quotes), best prices,
+spread, depth, every queue in price-time order, every order ever created, and every owner's
+orders.
 
 **Randomized, but reproducible.** Every run uses fixed seeds, so a failure always reproduces. The
-generator mixes normal orders with the cases that break order books: orders that would cross
-the spread, reused and duplicate IDs, invalid prices and quantities, cancels of orders that
-no longer exist, partial and full fills, cancel-all, and maximum-size orders. A coverage guard
-fails the test if any of those cases happens fewer than 5 times per seed, or if the book never
-grows past 100 resting orders, so the random test can never quietly stop testing anything.
+generator mixes normal orders with the cases that break exchanges: orders that cross the spread,
+market orders that sweep several levels or drain a side completely, self-trades, every kind of
+invalid order, cancels of orders that already filled or never existed, partial and full fills,
+cancel-all, and maximum-size orders. After every order it also checks rules that must always
+hold: shares in = filled + resting + cancelled, no trader ever trades with itself, limit prices
+are respected, and the book is never crossed. A coverage guard fails the test if any case happens
+fewer than 5 times per seed, or if the book or the trade count stays too small, so the random test
+can never quietly stop testing anything. We also planted eight realistic bugs by hand; every one
+was caught.
 
 **Mutation testing.** Stryker makes hundreds of small deliberate bugs in the engine (flipping `<`
 to `<=`, deleting a line, changing a constant) and checks that some test fails for each one.
-Only 5 of 287 survive, and none of them can be killed by any test. Three produce identical
-behavior (for example, `>` versus `>=` when the two values can never be equal), and two sit in
-a safety check that can only run if the book is already corrupted.
+477 of 486 are caught. None of the other 9 can be caught by any test: 3 produce identical behavior
+(for example, `>` versus `>=` when the two values can never be equal), and 6 sit in safety checks
+that can only run if the engine is already corrupted.
 
-**Benchmark.** 100,000 add and cancel operations per run on an Apple Silicon MacBook Air:
+**Benchmark.** 100,000 operations per run on an Apple Silicon MacBook Air:
 
 | Scenario | Operations / second |
 | --- | --- |
-| Mixed add/cancel, ~200 price levels | ~5.8 million |
-| Mixed add/cancel, ~5,000 price levels | ~4.3 million |
-| 100 market makers cancel and requote every tick | ~11 million |
+| Matching engine: limit + market + cancel mix (~33,000 fills) | ~1.5 million |
+| Order book: mixed add/cancel, ~200 price levels | ~4.3 million |
+| Order book: mixed add/cancel, ~5,000 price levels | ~3.3 million |
+| Order book: 100 market makers cancel and requote every tick | ~7.9 million |
 
-A busy tick (hundreds of agents, about 1,000 book operations) costs about 0.2 ms, so the order
-book has roughly 40× headroom for a smooth 60 fps simulation.
+A busy tick (hundreds of agents, about 1,000 orders through the matching engine) costs about
+0.65 ms, roughly 25× headroom inside a 16 ms frame for a smooth 60 fps simulation.
 
 ## Getting started
 
@@ -169,12 +179,16 @@ src/
   app/          Next.js App Router: layout, page, global theme
   components/   UI components (Panel, …)
   engine/       Simulation engine: pure TypeScript, no React/DOM (lint-enforced)
-    orderBook.ts              Limit order book (price-time priority)
-    orderBook.test.ts         Unit and edge-case tests
-    orderBook.shadow.test.ts  Randomized comparison against a naive reference book
-    orderBook.bench.ts        Throughput benchmark
-    boundary.test.ts          Checks the ESLint engine-boundary rule itself
-    types.ts
+    orderBook.ts                   Limit order book (price-time priority)
+    matchingEngine.ts              Matching engine: limit/market orders, fills, arrival quotes
+    marketRegistry.ts              One matching engine per ticker
+    validation.ts                  Order validation shared by the book and the engine
+    types.ts                       Shared types and reason codes
+    *.test.ts                      Unit, edge-case and limit tests
+    *.shadow.test.ts               Randomized comparison against the naive reference models
+    orderBook.bench.ts             Throughput benchmark
+    boundary.test.ts               Checks the ESLint engine-boundary rule itself
+    testing/shadow.ts              Naive reference order book and matching engine (tests only)
   lib/          Shared code, e.g. Zod schemas for AI contracts (coming in Week 4)
 ```
 
@@ -201,8 +215,8 @@ Five weeks of building, then a week of rehearsal. Each week ends as a complete, 
    overshoot."*
 2. **Market.** A judge types any headline live, the crowd reacts, and the strategy trades
    through it.
-3. **Reality check.** The execution report shows intended vs. actual fill price (slippage),
-   P&L, Sharpe ratio and max drawdown.
+3. **Reality check.** The execution report shows the intended price (the market's mid price when
+   the order arrived) vs. the actual average fill (slippage), P&L, Sharpe ratio and max drawdown.
 4. **Reveal.** "Show me what I built": English → rules → formulas with real numbers → Python.
 
 ---

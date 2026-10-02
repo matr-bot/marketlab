@@ -160,3 +160,222 @@ confirmed by running its `writeAgentFiles` on copies of both files):
   legacy markers, and the guard test fails if either one ever does.
 - So even if the block were removed from CLAUDE.md and Next appended one to AGENTS.md, the
   reviewer rules would survive. The guard test would flag that state so it can be fixed.
+
+---
+
+## D-007 · A market order's unfilled part is cancelled, never rested
+
+**Date:** 2026-10-02 · **Status:** Accepted
+
+**Decision.** A market order trades through as many price levels as it needs. If the opposite
+side runs out, whatever is left is cancelled and reported as `cancelledQty`. It never rests in
+the book. (Limit orders do rest their remainder, at their limit price.)
+
+**Alternatives.**
+- *Rest the remainder at the last fill price.* That turns a market order into a hidden limit
+  order the user never asked for.
+- *Turn the remainder into a limit order at some offset.* An arbitrary rule that would be hard to
+  explain in the glass box.
+
+**Why.** This matches how real market orders behave (immediate-or-cancel), and the execution
+report can say exactly "you asked for 30, got 20, 10 cancelled: there was no one left to sell."
+
+---
+
+## D-008 · Self-trade prevention: cancel the resting order
+
+**Date:** 2026-10-02 · **Status:** Accepted
+
+**Decision.** If an incoming order would trade with a resting order from the same owner, the
+engine cancels the resting order (reported in `selfTradeCancelled`) and keeps matching against
+everyone else. No fill ever has the same owner on both sides.
+
+**Alternatives.**
+- *Cancel the incoming order.* This penalizes the owner's newest intent and leaves their stale
+  quote in the book.
+- *Allow self-trades.* That creates fake volume and fake price prints, which would corrupt
+  attribution ("who moved the price?") and the realism statistics.
+
+**Why.** When an agent trades against its own quote, the quote is almost always stale. A market
+maker repricing is the typical case. Real exchanges offer this rule ("cancel resting" self-trade
+prevention), and it keeps every printed trade a genuine trade between two different traders.
+
+---
+
+## D-009 · Every order carries its agent type
+
+**Date:** 2026-10-02 · **Status:** Accepted
+
+**Decision.** `agentType` (`noise`, `marketMaker`, `momentum`, `value`, `panic`, `whale`, `user`)
+is a required, validated field on every order. Resting orders keep it, and every fill copies it
+for both sides. All seven types are defined now, so later agents don't change the fill format.
+
+**Alternatives.**
+- *A separate owner → agent-type registry looked up when a fill happens.* This is less data per
+  order, but the lookup can fail or get out of sync, and attribution would then be wrong.
+
+**Why.** "Who moved the price?" must be exact and computed from logged fills. With the type on
+the order, no fill can be missing its attribution.
+
+---
+
+## D-010 · Slippage is measured against the arrival mid (implementation shortfall)
+
+**Date:** 2026-10-02 · **Status:** Accepted
+
+**Decision.** When an order arrives, the engine records an `ArrivalQuote`: best `bid`, best `ask`,
+the mid price, and the `touch` (best opposite price: the ask for a buy, the bid for a sell). Each
+fill carries, for both parties, the arrival quote and the order's `limitPrice` (its worst
+acceptable price; `null` for a market order; for a resting order, its price). If a side is empty
+at arrival it is recorded as `null`, and anything that depends on it (the mid, or a touch on that
+side) is `null` too.
+
+**"Intended price" means the arrival mid**, everywhere: in CLAUDE.md, the README, the execution
+report and the glass box. The limit price is recorded separately because it answers a different
+question ("how bad a price would this trader accept?"), not "what did slippage cost?".
+
+Slippage is implementation shortfall against the mid, and splits exactly into two parts. For a
+buy of Q shares with fills (pᵢ, qᵢ):
+- shortfall = Σ pᵢqᵢ − mid·Q
+- spread cost = (touch − mid)·Q, the cost of crossing from the mid to the best price
+- impact cost = Σ pᵢqᵢ − touch·Q, the cost of eating deeper into the book
+- shortfall = spread cost + impact cost (signs flip for a sell)
+
+**How the mid stays an integer.** It's stored doubled as `midX2 = bid + ask`, so a half-cent mid
+(bid 100, ask 101 → 100.5) is the exact integer 201. All slippage math is done in half-cents and
+divided by two only for display. Example tested in `matchingEngine.test.ts`: buying 12 against
+bid 99 and ask 100 gives shortfall 17¢, made of 6¢ spread cost and 11¢ impact cost.
+
+**Alternatives.**
+- *Measure only against the touch.* Simpler, but it hides the spread cost, which is exactly what
+  beginners pay without noticing.
+- *Store the mid as a float.* Exact in practice for half-cents, but it breaks the integer-cents rule
+  (D-001), and later sums would not be exact.
+
+**Why.** Implementation shortfall is the professional standard (Perold, 1988). Splitting it into
+spread cost and impact cost teaches the two lessons separately: crossing the spread costs money,
+and trading big moves the price against you.
+
+---
+
+## D-011 · A market order into an empty side is rejected with `NO_LIQUIDITY`
+
+**Date:** 2026-10-02 · **Status:** Accepted
+
+**Decision.** If the opposite side is empty when a market order arrives, it is rejected with
+reason `NO_LIQUIDITY` and nothing changes. If there was liquidity on arrival but all of it
+belonged to the submitter (and so was cancelled by D-008), the order is accepted with zero fills
+and its whole quantity cancelled.
+
+**Alternatives.**
+- *Accept with zero fills.* Technically fine, but an empty-book market order is a distinct event
+  worth naming.
+
+**Why.** A reason code lets the narrator and the UI say what happened ("No sellers: the order
+could not trade") instead of showing an empty fill list.
+
+---
+
+## D-012 · No price protection on market orders (for now)
+
+**Date:** 2026-10-02 · **Status:** Accepted
+
+**Decision.** Market orders have no price band. A large market sell into a thin book can sweep
+many levels down.
+
+**Alternatives.**
+- *A fixed band* (for example, never fill more than 10% from the arrival price). Safer, but it
+  would hide exactly the behavior the crash scenarios are meant to show.
+
+**Why.** Liquidity spirals and flash crashes (the 2010 whale scenario) are a core teaching goal,
+and they only happen when orders can sweep a thin book. **Planned:** circuit breakers and price
+bands (limit up / limit down, trading halts) as a future scenario setting. That would let a
+student run the same crash with and without them, which is a natural what-if experiment.
+
+---
+
+## D-013 · The engine is the only writer and keeps arrival quotes beside the book
+
+**Date:** 2026-10-02 · **Status:** Accepted
+
+**Decision.** `MatchingEngine` owns its `OrderBook` privately and exposes `book`: a separate,
+frozen `BookView` object holding only query functions (best prices, depth, queues, lookups). It is
+not the OrderBook itself, so not even a type cast can reach `add`, `cancel` or `reduce`. Every
+change (submit, cancel, cancel-all) goes through the engine. Fill records, their parties and
+arrival quotes are frozen, and `engine.fills` returns a copy, so no caller can rewrite history. The engine keeps
+each resting order's arrival quote in a map and removes it the moment the order leaves the book,
+whether by fill, cancel, cancel-all or self-trade prevention. Tests check after every random step
+that the map holds exactly the orders in the book.
+
+**Alternatives.**
+- *Expose the OrderBook typed as a read-only interface.* This was the first version. TypeScript
+  hides the write methods, but a cast still reaches them at runtime (found in Codex review).
+- *Store the arrival quote on the book's resting orders.* No map to keep in sync, but it adds a
+  matching-engine concept to the order book and changes its API for everyone.
+- *Keep the arrival quote of every order ever submitted.* Memory would grow without bound over a
+  long session.
+
+**Why.** The order book stays a pure price-time data structure, memory stays proportional to
+the book, and the "no leak, no gap" invariant is tested directly.
+
+**Trade-offs measured.**
+- Moving validation into one shared function used by both the book and the engine, and adding
+  agent types, made plain book operations about 20% slower (measured back to back against the
+  previous commit: about 5.4M → 4.3M operations per second). We kept one validator rather than
+  two copies that could drift apart.
+- Freezing fill records costs about 6% of engine throughput (1.66M → 1.56M operations per
+  second, measured back to back).
+- The engine benchmark (limit, market and cancel mix, about 33,000 fills per 100,000 operations)
+  runs at about 1.56M operations per second, so a busy 1,000-operation tick costs about 0.64 ms.
+  That is well within a 16 ms frame.
+
+---
+
+## D-014 · The engine assigns order ids from a counter; ids are never reused
+
+**Date:** 2026-10-02 · **Status:** Accepted
+
+**Decision.** Callers no longer supply an order id. Each market numbers the orders it accepts:
+`SPY-1`, `SPY-2`, `SPY-3`, … The id comes back in the submit result, and agents use it to cancel.
+Rejected orders do not use up a number. Because the counter only goes up, an id is never reused,
+even after its order fills or is cancelled.
+
+**Alternatives.**
+- *Caller-chosen ids, unique only among resting orders* (the Week 1 rule). Then one id could appear
+  in the fill log for two different orders over time, which makes the history ambiguous.
+- *Remember every id ever submitted and reject repeats.* That is unique too, but it needs a set
+  that grows forever and gives callers one more way to be rejected.
+- *Random ids (UUIDs).* Unique, but they would break determinism unless drawn from the seeded RNG,
+  and they are unreadable in the glass box and the tape.
+
+**Why.** The fill log is history, and every id in it must refer to exactly one order. A counter
+guarantees that for free, is deterministic (same seed, same ids), and gives readable ids. The
+ticker prefix keeps ids unique across markets in the registry.
+
+---
+
+## D-015 · The fill log will be capped and snapshotted when rewind is built
+
+**Date:** 2026-10-02 · **Status:** Planned (Week 5, with rewind)
+
+**Decision (planned).** Today the fill log is an in-memory array that grows for the whole session.
+That is fine for a demo session. Measured: about 450 bytes of heap per fill in the worst case,
+where every fill comes from a different pair of orders (100,000 fills ≈ 45 MB). Fills from one
+sweeping order share that order's records, so they cost less.
+When rewind is built (Week 5), the log gets an upper limit:
+- **Periodic snapshots** of engine state (book, arrival quotes, counters, RNG state), as
+  CLAUDE.md's rewind design already calls for.
+- **A cap on the log.** Fills older than the retained window are folded into per-interval
+  aggregates (candles and per-agent-type volume for "who moved the price?") before they are
+  dropped, so charts and attribution stay exact for the whole session.
+- **Rewind** restores the nearest snapshot and re-simulates deterministically to the chosen moment,
+  regenerating any dropped fills exactly.
+
+**Alternatives.**
+- *Cap the log now.* Premature: the snapshot format depends on the agents and the clock (Steps 2–3),
+  which don't exist yet.
+- *Never cap it.* A long classroom session with a busy market could grow without bound.
+
+**Why.** Determinism means old fills can always be regenerated from a snapshot, so they don't need
+to stay in memory. The aggregates keep every on-screen number exact without them.
+

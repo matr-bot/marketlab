@@ -86,8 +86,9 @@ itself keeps working.
 
 ## Project status
 
-**Week 1 of 5 ✅ complete.** Week 2 is in progress: step 1, the matching engine, is done; the goal
-for the week is a live market moving on its own at page load. What exists today:
+**Week 1 of 5 ✅ complete.** Week 2 is in progress: steps 1 (matching engine) and 2 (seeded
+randomness and sim clock) are done; the goal for the week is a live market moving on its own at
+page load. What exists today:
 
 - [x] Next.js + TypeScript (strict) app with the terminal-style layout and placeholder panels,
       deployed on Vercel at [marketlab-nine.vercel.app](https://marketlab-nine.vercel.app)
@@ -97,8 +98,13 @@ for the week is a live market moving on its own at page load. What exists today:
 - [x] Matching engine: limit and market orders, sweeps across price levels, partial fills,
       self-trade prevention, and a frozen fill log recording both sides' agent type, limit price and
       arrival quote, so slippage (vs the arrival mid) and "who moved the price?" are exact
-- [x] 187 tests, shadow-model comparison, and 98% mutation score (see [Testing](#testing))
-- [x] ESLint-enforced engine boundary
+- [x] Seeded randomness: the same seed gives the same market **in every browser**. One seeded
+      generator (xoshiro128\*\*, verified against the authors' reference C code), an independent
+      named stream per agent, and our own deterministic `ln`/`exp`/`pow`, since browsers may
+      compute `Math.log` and friends differently
+- [x] Sim clock (100 ms ticks from 09:30:00.000) and Poisson order arrivals with exact timestamps
+- [x] 405 tests, shadow-model comparison, and 96% mutation score (see [Testing](#testing))
+- [x] Engine boundary and determinism rules, enforced by ESLint and checked at runtime
 
 The panels in the UI say which week they go live. They show no fake market data.
 
@@ -109,9 +115,10 @@ not just "does it work on my example" but "can any small bug slip past the tests
 
 | Check | Result |
 | --- | --- |
-| Unit and property tests (Vitest) | **187 passing** across 7 files |
+| Unit and property tests (Vitest) | **405 passing** across 12 files |
 | Randomized shadow-model comparison | Order book and matching engine, 5 seeds × 3,000 operations each, full state compared after **every** step |
-| Mutation score (Stryker) on `src/engine` | **98.15%**: 477 of 486 mutants detected |
+| Mutation score (Stryker) on `src/engine` | **96.40%**: 965 of 1,001 mutants detected |
+| Same seed → same numbers in every browser | Random generator matches the reference C code exactly; `ln`/`exp` bits pinned over 226,000+ inputs; inexact `Math` functions banned by lint **and** by a runtime test |
 | Throughput benchmark | **~1.5 million matching-engine operations per second** with real fills |
 
 **Shadow models.** `src/engine/testing/shadow.ts` contains a deliberately naive reference order
@@ -134,11 +141,21 @@ fewer than 5 times per seed, or if the book or the trade count stays too small, 
 can never quietly stop testing anything. We also planted seven realistic bugs by hand (one in the order book, six in the
 matching engine); every one was caught.
 
+**Determinism across browsers.** The JavaScript spec lets each browser compute `Math.log`,
+`Math.exp`, `Math.pow` and the trig functions slightly differently, so the same seed could give a
+different market in Safari than in Chrome. The engine therefore uses its own `ln`, `exp` and `pow`
+(ports of the fdlibm library, built only from operations every browser must compute exactly), and
+the random generator is checked against the authors' reference C program
+(`scripts/reference/xoshiro128ss.c`). Two layers keep it that way: an ESLint rule bans every route
+to the inexact functions, the unseeded `Math.random` and the real clock; and a runtime test
+replaces all of them with functions that throw, reruns the engine's full random workloads, and
+requires identical results. We confirmed the runtime test catches code the lint rule cannot see.
+
 **Mutation testing.** Stryker makes hundreds of small deliberate bugs in the engine (flipping `<`
 to `<=`, deleting a line, changing a constant) and checks that some test fails for each one.
-477 of 486 are caught. None of the other 9 can be caught by any test: 3 produce identical behavior
-(for example, `>` versus `>=` when the two values can never be equal), and 6 sit in safety checks
-that can only run if the engine is already corrupted.
+965 of 1,001 are caught. We reviewed the other 36 one by one: they are safety checks that can
+only run if the engine is already broken, comparisons that only differ when a random time lands
+exactly on a boundary (probability ≈ 0), or alternate math paths that give bit-identical results.
 
 **Benchmark.** 100,000 operations per run on an Apple Silicon MacBook Air:
 
@@ -184,11 +201,17 @@ src/
     marketRegistry.ts              One matching engine per ticker
     validation.ts                  Order validation shared by the book and the engine
     types.ts                       Shared types and reason codes
+    rng.ts                         Seeded random numbers (xoshiro128**), named streams per agent
+    detMath.ts                     Deterministic ln / exp / pow (same bits in every browser)
+    simClock.ts                    Sim time: 100 ms ticks from 09:30:00.000
+    arrivals.ts                    Poisson order arrivals per agent
     *.test.ts                      Unit, edge-case and limit tests
     *.shadow.test.ts               Randomized comparison against the naive reference models
     orderBook.bench.ts             Throughput benchmark
-    boundary.test.ts               Checks the ESLint engine-boundary rule itself
-    testing/shadow.ts              Naive reference order book and matching engine (tests only)
+    boundary.test.ts               Checks the ESLint boundary and determinism rules themselves
+    determinism.test.ts            Runtime backstop: reruns the workloads with banned globals stubbed
+    testing/                       Test-only: shadow models, shared random workloads, fingerprints
+scripts/reference/xoshiro128ss.c   Reference C generator the RNG tests are checked against
   lib/          Shared code, e.g. Zod schemas for AI contracts (coming in Week 4)
 ```
 

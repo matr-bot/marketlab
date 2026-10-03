@@ -436,3 +436,206 @@ MarketLab over a toy simulator.
   clock and panel numbers are not market numbers.
 - The `ASK` function must not let the AI invent numbers: the AI only picks a query from a fixed
   menu (the AskQuery schema in CLAUDE.md), and our code computes and writes every number.
+
+---
+
+## D-017 · Random numbers come from xoshiro128\*\*, seeded by SplitMix64
+
+**Date:** 2026-10-02 · **Status:** Accepted
+
+**Decision.** All randomness in the engine comes from `Rng` (`src/engine/rng.ts`). It uses the
+xoshiro128\*\* generator (Blackman & Vigna, "Scrambled Linear Pseudorandom Number Generators,"
+*ACM TOMS* 2021): four 32-bit state words, period 2¹²⁸ − 1, passes the standard statistical test
+batteries, and uses only 32-bit operations, which JavaScript does quickly (`Math.imul`, shifts).
+The seed is expanded into the state by SplitMix64 (Steele, Lea & Flood, OOPSLA 2014), using
+BigInt once per stream. `tsconfig` targets ES2020 for BigInt literals; every browser Next.js
+supports has had BigInt since 2020.
+
+**How we know it is right.** `scripts/reference/xoshiro128ss.c` is the authors' reference code
+plus our seeding scheme. Compiled and run locally, its output is pasted into `rng.test.ts`, and
+our TypeScript must match it exactly: state words, the first 8 outputs and the 1,000th, for 4 seeds.
+
+**Alternatives.**
+- *mulberry32.* Tiny, but its sequence repeats after 2³² ≈ 4.3 billion numbers, which a long, busy
+  session could actually use up, and it fails some statistical tests.
+- *sfc32.* Fine, but less studied.
+- *PCG32.* Excellent, but needs 64-bit multiplication, which is slow in JavaScript.
+- *`Math.random`.* Cannot be seeded, so no reruns or reproducible demos.
+
+---
+
+## D-018 · Every agent draws from its own named random stream
+
+**Date:** 2026-10-02 · **Status:** Accepted
+
+**Decision.** `rng.stream("noise-3")` returns an independent generator. Streams can be nested
+(`root.stream("arrivals").stream("noise-3")`, path `arrivals/noise-3`). A stream is seeded by
+SplitMix64 from a 64-bit FNV-1a hash of the seed and its **whole path**, encoded as JSON
+(`[187, "arrivals", "noise-3"]`). So:
+- every distinct path gives a different generator, and order matters (`a/b` ≠ `b/a`);
+- a stream never equals its parent or the root (`a/a` ≠ root);
+- a label containing "/" is not confused with a nested path;
+- a stream depends only on the seed and its path, never on how many numbers anyone has drawn.
+The root itself is seeded straight from the seed, exactly as the reference C program does. The
+arrival scheduler gives each source the stream `arrivals/<id>`.
+
+**Correction (Codex review).** The first version derived a stream's seed by XOR:
+`rootSeed ⊕ hash(label)`. Because XOR cancels itself, `stream("a").stream("a")` was *exactly the
+root generator*, and `a/b` equalled `b/a`, so streams could silently share numbers. Hashing the
+full path fixes both; tests check nested, reordered, repeated and look-alike paths all differ.
+The remaining risk is a 64-bit hash collision between two paths, about 1 in 10¹⁹ per pair.
+
+**Alternatives.**
+- *One shared stream for everything.* If a what-if changes one agent (say, the market maker's risk
+  aversion), that agent draws a different number of random numbers, and every later draw by every
+  other agent shifts. The rerun then differs everywhere instead of only where the change matters,
+  which defeats the point of a what-if.
+- *xoshiro's jump function to split streams.* Guarantees non-overlap, but the streams then depend
+  on the order they are created in, which is fragile.
+- *XOR of the seed and a label hash.* The first version; it aliases (see the correction above).
+
+**Why.** "Change one variable and rerun" is a core feature, so randomness must be stable per agent.
+Tested: adding a whale stream that draws 1,000 numbers leaves the noise trader's numbers
+unchanged; adding an arrival source leaves other sources' arrival times unchanged.
+
+---
+
+## D-019 · Deterministic math in the engine, enforced by lint
+
+**Date:** 2026-10-02 · **Status:** Accepted
+
+**Decision.** Engine code computes `ln`, `exp` and `pow` with `src/engine/detMath.ts`, never with
+`Math.log`, `Math.exp`, `Math.pow`, `**` or the trig and hyperbolic functions. `ln` and `exp` are
+straight ports of fdlibm's `e_log.c` and `e_exp.c` (Sun Microsystems, 1993), built only from
++ − × ÷ and bit access through typed arrays. `pow(x, y)` is `exp(y · ln x)` for x > 0; it is for
+things like Pareto order sizes (Step 3), not exact math (`pow(10, 3)` is 1000.0000000000007).
+
+**Enforced in two layers.**
+1. **ESLint, in engine source** (tests and benchmarks are exempt):
+   - Any reference to `Math` is an error unless it is `Math.<member>` written out directly with an
+     exact member: `sqrt`, `abs`, `floor`, `ceil`, `trunc`, `round`, `min`, `max`, `imul`, `sign`,
+     `fround`, `clz32`. This blocks `Math.log`, `Math["log"]`, `const m = Math`,
+     `const { log } = Math`, `f(Math)`, `(0, Math).log`, `Reflect.get(Math, …)`, `Math?.log` …
+   - `Date`, `performance`, `crypto`, `globalThis`, `self` and `global` may not be referenced at
+     all, which catches aliases too. `**`, `**=`, `eval`, `new Function` and string timers are blocked.
+   - `boundary.test.ts` tests the rule against every bypass above, and that UI code is unaffected.
+2. **A runtime backstop** (`determinism.test.ts`) replaces every banned global (the inexact `Math`
+   functions, `Math.random`, `Date`, `performance.now`, `crypto.getRandomValues`) with a stub that
+   throws, reruns the engine's full random workloads (the order book and matching engine shadow
+   workloads for all 5 seeds, plus a workload exercising every random distribution, `detMath`,
+   the clock and the scheduler), and requires an identical result to a normal run. Static analysis
+   cannot see code that builds names at runtime; this can. Verified by planting
+   `Function.prototype.constructor("return this")()["Ma" + "th"]["lo" + "g"]` in `rng.normal()`:
+   it passes lint and fails the backstop. (`**` cannot be stubbed at runtime; lint covers it.)
+
+**Correction (Codex review).** The first version of the rule only matched `Math.log` written
+literally, so `globalThis.Math.log(x)`, `const m = Math; m.log(x)` and `const { log } = Math` got
+past it, and "lint-enforced" overstated the guarantee. Both layers above replace it.
+
+**Integer money stays integer.** Prices, quantities and cash are integer cents and shares
+(D-001). `ln`, `exp` and `pow` return non-integers, so:
+- the price and cash files (`orderBook.ts`, `matchingEngine.ts`, `validation.ts`,
+  `marketRegistry.ts`, `types.ts`) may not import `detMath` (ESLint);
+- every order is validated at the boundary: a non-integer price or quantity is rejected
+  (`INVALID_PRICE`, `INVALID_QTY`), never rounded silently;
+- the engine's random workload checks that every fill's price, size and price × size are exact
+  integers after every order;
+- agents that compute a price from floating-point math (Step 3 on) must convert it with one
+  explicit round-to-tick step before submitting; that conversion is the only place a float
+  becomes a price.
+
+**Why.** The JavaScript spec calls `Math.log`, `Math.exp`, `Math.pow`, `**` and the trig
+functions "implementation-approximated": each engine may return slightly different last bits.
+Chrome's V8, Safari's JavaScriptCore and Firefox's SpiderMonkey use different math libraries, so
+the same seed could produce a *different market* in Safari than in Chrome, and a judge on a Mac
+would not see the rehearsed demo. Only + − × ÷ and `Math.sqrt` are required to be exact.
+
+**How we know it is right.**
+- **Accuracy:** within 1 ulp of Chrome's built-ins over more than 225,000 inputs covering every
+  branch of both algorithms, including the exact branch boundaries and subnormals. (`exp(1)` is
+  one ulp above `Math.E`, the same as fdlibm and Java's `StrictMath`.)
+- **Exact bits:** a fingerprint of every result's bits over those inputs is pinned, plus golden
+  values for named inputs. A change of a single coefficient in the 6th digit, which stays within
+  1 ulp, is caught only by the fingerprint.
+
+**Alternatives.**
+- *Use `Math.log` and accept per-browser markets.* Determinism would hold only within one browser.
+- *Avoid logarithms entirely.* Not possible: exponential waiting times and normal draws need them.
+
+---
+
+## D-020 · Normal random numbers by Marsaglia's polar method
+
+**Date:** 2026-10-02 · **Status:** Accepted
+
+**Decision.** `rng.normal()` uses the polar method (Marsaglia & Bray, *SIAM Review* 1964). Pick a
+point uniformly in the square [−1, 1]², keep it if it lies inside the unit circle
+(0 < s = x² + y² < 1), and return `x · √(−2 ln s / s)`. The method yields two independent values;
+we discard the second so the generator's whole state stays its four words, which keeps snapshots
+for rewind simple.
+
+**Alternatives.**
+- *Box–Muller.* Needs `cos`, another browser-dependent function.
+- *Ziggurat.* Faster, but it needs large lookup tables and is harder to verify.
+
+**Why.** It needs only `ln` and `sqrt`, both deterministic here. Tested: mean 0, variance 1, skew 0
+and kurtosis 3 on 1,000,000 draws for 5 seeds, and a Kolmogorov–Smirnov test against the bell curve.
+Fat tails in the market must come from the agents' behavior, not from the random numbers.
+
+---
+
+## D-021 · Sim time: 100 ms ticks, Poisson arrivals with exact millisecond timestamps
+
+**Date:** 2026-10-02 · **Status:** Accepted
+
+**Decision.**
+- **Clock (`simClock.ts`):** integer milliseconds since the 09:30:00.000 open, advanced in fixed
+  ticks of 100 ms. Tick k covers the half-open window [100k, 100k + 100), so an event exactly on a
+  boundary belongs to exactly one tick. The engine never reads the wall clock; how fast ticks play
+  on screen (1x, 4x) is the worker's job (Step 7).
+- **Arrivals (`arrivals.ts`):** each order source is a Poisson process. Gaps between its orders
+  are exponential, `Δ = −ln(U) / λ`, with U strictly inside (0, 1), so every gap is finite and
+  strictly positive. Arrivals keep their exact time for ordering and get the timestamp ⌊t⌋ ms.
+  Ties on exact time go to the source registered first.
+- **Strictly increasing per source:** if a gap is smaller than the spacing between doubles at the
+  current time (very high rates late in a session), the next representable time is used instead,
+  so a source's time always moves forward.
+- **Changing rates:** `setRate` changes a source's rate from a given time on by redrawing its
+  pending gap. That is exact for a piecewise-constant rate because exponential gaps are memoryless
+  (cf. Lewis & Shedler 1979). It is the hook for Week 3's bursts.
+
+**Correction (Codex review).** The first version drew U from (0, 1], so U = 1 gave a gap of exactly
+0 and two arrivals at the same instant. Worse, at very high rates a tiny gap can round away when
+added to a large time; then a source's time never advances and `drain` loops forever. Removing the
+new guard makes the high-rate test crash the test worker out of memory, which is how we know the
+guard is load-bearing. Both are fixed and tested.
+
+**Alternatives.**
+- *1-second ticks.* Too coarse: bursts within a second would disappear.
+- *Fully event-driven with no ticks.* Purer, but harder to batch into one snapshot per frame (Step 7).
+- *A fixed number of orders per tick.* That is the steady rhythm we must avoid.
+
+**Why.** Real order flow is irregular. Even plain Poisson arrivals clump: the pinned schedule for
+seed 187 has orders at 1866, 1883 and 1888 ms, then a gap. Exact millisecond timestamps keep the
+tape and ticker honest about when each trade happened. Tested: count per second has mean =
+variance = λ, gaps have standard deviation = mean, ticked and unticked draining give identical
+schedules, and rate changes take effect exactly at the change time.
+
+---
+
+## D-022 · The seed is a whole number from 0 to 4,294,967,295; the demo seed is 187
+
+**Date:** 2026-10-02 · **Status:** Accepted
+
+**Decision.** The user-visible seed is an unsigned 32-bit integer, always shown in the status bar
+(D-016). The demo seed is `187`, matching the stock's ~$187 starting price, which makes it easy to
+say on stage. `Rng.fromSeed` rejects anything else with a clear error.
+
+**Alternatives.**
+- *A text seed* ("fed-hike-demo"). Friendlier, but it needs a hashing step that is one more thing
+  to explain and test.
+- *A 64-bit seed.* More seeds than anyone needs, and awkward to type and to represent exactly in
+  JavaScript.
+
+**Why.** A short number is easy to read aloud, type and share ("try seed 4021"), and 4.3 billion
+seeds are plenty.

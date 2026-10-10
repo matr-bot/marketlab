@@ -78,9 +78,9 @@ then grows week by week with the roadmap:
 | Week | Design parts that ship |
 | --- | --- |
 | Week 2 (Step 8) | Theme (black / amber / white, flash rules), status bar, scrolling ticker, default-layout grid, `GP` (price chart), `TAPE`, `BOOK` basics (best bid/ask, top levels) |
-| Week 3 | `CROWD`, `CHAT` (desk chat / narrator), full `BOOK` depth view, `WHO` (click a candle in `GP`) |
-| Week 4 | Command bar (function codes, commands, headlines) and shortcut strip, `NEWS` input, `TKT`, `EXR`, `STRAT` + glass box reveal, `HELP`, hover explanations and formulas |
-| Week 5 | Learn / Pro modes with the per-panel "On a professional terminal…" notes, rewind with the `REPLAY` label, `ASK` |
+| Week 3 | `CROWD`, `CHAT` (desk chat / narrator), `WHO` (click a candle in `GP`), the command bar with codes for panels that exist, `NEWS` headline input, `TKT` manual trading |
+| Week 4 | `STRAT` + the strategy agent + glass box reveal, `EXR`, full `BOOK` depth view, Mission 5 |
+| If time | Missions 1 and 3, realism panel, Learn / Pro modes (with the per-panel "On a professional terminal…" notes), rewind with the `REPLAY` label, what-if reruns, `ASK`, hover formulas, shortcut strip, `HELP`, function codes beyond existing panels |
 
 Until a function ships, its slot in the default layout is simply not drawn (the grid closes up);
 there are no placeholder panels, so there is never a blank or fake state.
@@ -249,7 +249,12 @@ Browser UI (Next.js)
   most one message per animation frame (quotes, depth, new candles, fills since last frame).
 
 ## Agents (Tier 1 set)
-Common interface: `onTick(marketState, rng) → Order[]`.
+Common interface (D-023): an agent acts only at its own Poisson arrival times, never on a fixed
+rhythm. `act(ctx)` receives the time, a read-only book view, the last trade price, the opening
+price and its own resting orders (oldest first), and may `submit` or `cancel`; the simulation
+stamps its owner id and agent type on every order. Each agent draws arrival times from
+`arrivals/<id>` and decisions from `decisions/<id>`, so a behavior change never moves arrival
+times. Computed prices become cents only through `toTick` (buys round down, sells up).
 - MarketMaker — quotes both sides; widens spread and cuts size under stress/inventory risk
 - NoiseTrader — random small orders; baseline activity
 - MomentumTrader — buys rising / sells falling prices
@@ -310,8 +315,8 @@ Stretch: Cholesky decomposition for correlated multi-stock moves.
 
 ## Missions (structured learning)
 Each mission = preset scenario + goal + user attempt + debrief + a line connecting it to real
-finance careers. Missions double as ready-made professor assignments. Contest build: missions 1,
-3 and 5. The rest come after the contest.
+finance careers. Missions double as ready-made professor assignments. Contest build: Mission 5
+(never cut), plus Missions 1 and 3 if time allows. The rest come after the contest.
 1. Make your first trade — order book and price formation (every trading role)
 2. Be the market maker — spreads, liquidity, inventory risk (market-making firms)
 3. Survive the headline — news, fair value, overreaction (event-driven funds)
@@ -345,27 +350,38 @@ below: multi-stock, macro, regime presets and Strategy Arena (parts of 12–13) 
 
 ## Roadmap
 - Week 1 ✅ Done: repo, deploy, layout shell, OrderBook + 107 tests, 98% mutation score.
-- Week 2 (Oct 2–10): matching engine + tests (market and limit orders, partial fills, fill log
-  with agent types), seeded RNG + sim clock, worker + batched snapshots, Noise + MarketMaker
-  (Avellaneda–Stoikov) + Momentum agents, live candlestick chart + tape, market alive on load,
-  new layout and amber theme.
-  Milestone: a realistic market moves on its own at page load.
-- Week 3 (Oct 11–17): Value, Panic (threshold cascade) and Whale agents; depth view; crowd
-  panel; narrator v1; attribution ("who moved the price?"); realism panel; tuning. Professor
-  interviews this week.
+- Week 2 (Oct 2–18): Steps 1–9: 1 matching engine ✅, 2 seeded RNG + sim clock ✅, 3 noise traders
+  ✅, 4 realized volatility + 5 Avellaneda–Stoikov market maker (planned and built together),
+  6 momentum traders (4–6 by Oct 14), 7 Web Worker + batched snapshots, 8 terminal UI + chart +
+  tape, 9 market alive on load (7–9 by Oct 18).
+  Milestone: prices moving on the live site (Oct 18).
+- Week 3 (Oct 19–25): Value, Panic (threshold cascade) and Whale agents; `CROWD` panel; narrator
+  v1 (`CHAT`); attribution (`WHO`, "who moved the price?"); command bar with codes for panels that
+  exist; `NEWS` headline input; the AI `/api/interpret` route for headlines → clamped, editable
+  parameters, built so the same route handles strategies (StrategySpec) in Week 4; manual
+  buy/sell (`TKT`).
+  Milestone (Oct 25): headline → crowd reacts → who moved the price, working on the live site.
   Tuning target: trades arrive in uneven bursts, never at a steady rhythm, and big moves cluster
   together like a real market (volatility clustering).
-- Week 4 (Oct 18–24): command bar; AI headline → clamped, editable parameters; your desk
-  (manual trading, strategy agent, execution report with slippage); hover formulas; glass box
-  reveal.
-  Milestone: the full 90-second demo works end to end.
-- Week 5 (Oct 25–31): missions 1, 3 and 5; Learn/Pro modes; rewind; what-if reruns; polish.
+- Week 4 (Oct 26–31): the strategy agent (StrategySpec → rules that trade) with `STRAT` and the
+  glass box reveal; execution report (`EXR`); full `BOOK` depth view; Mission 5; polish.
+  Milestone (Oct 31): the full 90-second demo end to end (strategy → headline → reaction →
+  execution report → glass box).
+- If time (in cut order, below): Missions 1 and 3, realism panel, Learn/Pro modes, rewind,
+  what-if reruns, `ASK`, hover formulas, shortcut strip, `HELP`.
+- Professor interviews: during Oct 11–25.
 - Stretch only if ahead (after the contest essentials): multi-stock + macro + regime presets,
   Strategy Arena, option pricing, supply chain mapping, bonds.
 - Nov 1–5: feature freeze, demo script, backup video, rehearsals.
 
 Priority rule: learning features (missions, narrator, Learn mode) beat breadth features
 (multi-stock, options). Depth over breadth.
+
+Cut order if time runs short (first to go → last): rewind → what-if reruns → Learn/Pro modes →
+`ASK`, hover formulas, shortcut strip (and function codes beyond existing panels) → realism
+panel → Missions 1 and 3.
+Never cut: the market moving on screen, the headline reaction, "who moved the price?", the
+strategy agent + glass box, Mission 5.
 
 ## Conventions
 - TypeScript strict mode. Small, focused commits with clear messages.

@@ -86,9 +86,9 @@ itself keeps working.
 
 ## Project status
 
-**Week 1 of 5 ✅ complete.** Week 2 is in progress: steps 1 (matching engine) and 2 (seeded
-randomness and sim clock) are done; the goal for the week is a live market moving on its own at
-page load. What exists today:
+**Week 1 of 4 ✅ complete.** Week 2 is in progress (extended to Oct 18): steps 1 (matching
+engine), 2 (seeded randomness and sim clock) and 3 (noise traders and the simulation loop) are
+done; the goal is a live market moving on its own at page load. What exists today:
 
 - [x] Next.js + TypeScript (strict) app with the terminal-style layout and placeholder panels,
       deployed on Vercel at [marketlab-nine.vercel.app](https://marketlab-nine.vercel.app)
@@ -103,7 +103,9 @@ page load. What exists today:
       named stream per agent, and our own deterministic `ln`/`exp`/`pow`, since browsers may
       compute `Math.log` and friends differently
 - [x] Sim clock (100 ms ticks from 09:30:00.000) and Poisson order arrivals with exact timestamps
-- [x] 405 tests, shadow-model comparison, and 96% mutation score (see [Testing](#testing))
+- [x] A living market: 40 zero-intelligence noise traders trading from $187.00, with the same seed
+      giving a byte-identical market (the whole fill log is fingerprinted and pinned)
+- [x] 473 tests, shadow-model comparison, and 97% mutation score (see [Testing](#testing))
 - [x] Engine boundary and determinism rules, enforced by ESLint and checked at runtime
 
 The panels in the UI say which week they go live. They show no fake market data.
@@ -115,9 +117,10 @@ not just "does it work on my example" but "can any small bug slip past the tests
 
 | Check | Result |
 | --- | --- |
-| Unit and property tests (Vitest) | **405 passing** across 12 files |
+| Unit and property tests (Vitest) | **473 passing** across 16 files |
 | Randomized shadow-model comparison | Order book and matching engine, 5 seeds × 3,000 operations each, full state compared after **every** step |
-| Mutation score (Stryker) on `src/engine` | **96.40%**: 965 of 1,001 mutants detected |
+| Mutation score (Stryker) on `src/engine` | **97.22%**: 1,156 of 1,189 mutants detected |
+| Same seed → identical market | The whole fill log and final book of a 10-minute, 40-trader market are fingerprinted and pinned; seed 188 differs |
 | Same seed → same numbers in every browser | Random generator matches the reference C code exactly; `ln`/`exp` bits pinned over 226,000+ inputs; inexact `Math` functions banned by lint **and** by a runtime test |
 | Throughput benchmark | **~1.5 million matching-engine operations per second** with real fills |
 
@@ -153,7 +156,7 @@ requires identical results. We confirmed the runtime test catches code the lint 
 
 **Mutation testing.** Stryker makes hundreds of small deliberate bugs in the engine (flipping `<`
 to `<=`, deleting a line, changing a constant) and checks that some test fails for each one.
-965 of 1,001 are caught. We reviewed the other 36 one by one: they are safety checks that can
+1,156 of 1,189 are caught. We reviewed the other 33 one by one: they are safety checks that can
 only run if the engine is already broken, comparisons that only differ when a random time lands
 exactly on a boundary (probability ≈ 0), or alternate math paths that give bit-identical results.
 
@@ -205,6 +208,10 @@ src/
     detMath.ts                     Deterministic ln / exp / pow (same bits in every browser)
     simClock.ts                    Sim time: 100 ms ticks from 09:30:00.000
     arrivals.ts                    Poisson order arrivals per agent
+    simulation.ts                  The loop: each tick, agents act at their arrival times
+    price.ts                       toTick: the only place a computed price becomes cents
+    agents/agent.ts                The agent interface (act at arrival times, read-only view)
+    agents/noiseTrader.ts          Zero-intelligence noise traders
     *.test.ts                      Unit, edge-case and limit tests
     *.shadow.test.ts               Randomized comparison against the naive reference models
     orderBook.bench.ts             Throughput benchmark
@@ -212,25 +219,32 @@ src/
     determinism.test.ts            Runtime backstop: reruns the workloads with banned globals stubbed
     testing/                       Test-only: shadow models, shared random workloads, fingerprints
 scripts/reference/xoshiro128ss.c   Reference C generator the RNG tests are checked against
-  lib/          Shared code, e.g. Zod schemas for AI contracts (coming in Week 4)
+  lib/          Shared code, e.g. Zod schemas for AI contracts (coming in Week 3)
 ```
 
 ## Roadmap
 
-Five weeks of building, then a week of rehearsal. Each week ends as a complete, working demo.
+Four weeks of building, then a week of rehearsal. Each week ends as a complete, working demo.
 
 | When | Deliverables | Milestone |
 | --- | --- | --- |
 | **Week 1** ✅ Done | Repo, deploy, layout shell, OrderBook + 107 tests, 98% mutation score | |
-| **Week 2** (Oct 2–10) | Matching engine + tests (market and limit orders, partial fills, fill log with agent types), seeded RNG + sim clock, worker + batched snapshots, Noise + MarketMaker (Avellaneda–Stoikov) + Momentum agents, live candlestick chart + tape, market alive on load, new layout and amber theme | A realistic market moves on its own at page load |
-| **Week 3** (Oct 11–17) | Value, Panic (threshold cascade) and Whale agents; depth view; crowd panel; narrator v1; attribution ("who moved the price?"); realism panel; tuning; professor interviews | |
-| **Week 4** (Oct 18–24) | Command bar; AI headline → clamped, editable parameters; your desk (manual trading, strategy agent, execution report with slippage); hover formulas; glass box reveal | The full 90-second demo works end to end |
-| **Week 5** (Oct 25–31) | Missions 1, 3 and 5; Learn/Pro modes; rewind; what-if reruns; polish | |
-| **Stretch** (only if ahead) | Multi-stock + macro + regime presets, Strategy Arena, option pricing | |
+| **Week 2** (Oct 2–18) | Steps 1–9: matching engine ✅, seeded RNG + sim clock ✅, noise traders ✅, realized volatility + Avellaneda–Stoikov market maker and momentum traders (by Oct 14), Web Worker + batched snapshots, terminal UI + chart + tape, market alive on load (by Oct 18) | Prices moving on the live site (Oct 18) |
+| **Week 3** (Oct 19–25) | Value, Panic and Whale agents; crowd panel; narrator v1; attribution ("who moved the price?"); command bar; headline input with the AI interpret route (built to handle strategies in Week 4); manual buy/sell | Headline → crowd reacts → who moved the price, on the live site (Oct 25) |
+| **Week 4** (Oct 26–31) | Strategy agent (plain-English strategy → rules that trade) with the glass box reveal; execution report; full depth view; Mission 5; polish | The full 90-second demo end to end (Oct 31) |
+| **If time** | Missions 1 and 3, realism panel, Learn/Pro modes, rewind, what-if reruns, ask-the-AI, hover formulas, shortcut strip | |
+| **Stretch** (only if ahead) | Multi-stock + macro + regime presets, Strategy Arena, option pricing, supply chain mapping, bonds | |
 | **Nov 1–5** | Feature freeze, demo script, backup video, rehearsals | |
+
+Professor interviews happen during Oct 11–25.
 
 **Priority rule:** learning features (missions, narrator, Learn mode) beat breadth features
 (multi-stock, options). Depth over breadth.
+
+**Cut order if time runs short** (first to go → last): rewind → what-if reruns → Learn/Pro modes →
+ask-the-AI, hover formulas, shortcut strip → realism panel → Missions 1 and 3. **Never cut:** the
+market moving on screen, the headline reaction, "who moved the price?", the strategy agent + glass
+box, Mission 5.
 
 ### The 90-second demo
 

@@ -94,7 +94,7 @@ describe("engine determinism rule (ESLint)", () => {
 
   it("keeps detMath out of price and cash code (integer money)", async () => {
     const code = 'import { ln } from "./detMath";\nexport const x = ln(2);\n';
-    for (const file of ["orderBook", "matchingEngine", "validation", "marketRegistry", "types"]) {
+    for (const file of ["orderBook", "matchingEngine", "validation", "marketRegistry", "types", "price"]) {
       expect(await lint(code, `src/engine/${file}.ts`)).toContain("no-restricted-imports");
     }
     expect(await lint(code, "src/engine/rng.ts")).toEqual([]);

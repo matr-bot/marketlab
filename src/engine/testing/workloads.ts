@@ -3,6 +3,7 @@
 // step (D-004), then returns what it saw plus a fingerprint of the final state, so the same
 // workload can be rerun with the inexact Math functions stubbed out (determinism.test.ts).
 import { expect } from "vitest";
+import { noiseTraders } from "../agents/noiseTrader";
 import { ArrivalScheduler } from "../arrivals";
 import { exp, ln, pow } from "../detMath";
 import { MarketRegistry } from "../marketRegistry";
@@ -10,6 +11,7 @@ import { type MatchingEngine, type OrderInput, type SubmitResult } from "../matc
 import { OrderBook, type NewLimitOrder } from "../orderBook";
 import { Rng } from "../rng";
 import { SimClock } from "../simClock";
+import { Simulation } from "../simulation";
 import type { AddResult, AgentType, CancelResult, RejectReason, RestingOrder, Side } from "../types";
 import { fingerprint } from "./fingerprint";
 import {
@@ -279,4 +281,19 @@ export function runRandomnessWorkload(seed: number): WorkloadResult {
     for (const a of scheduler.drain(w.end)) arrivals.push(a.exactMs);
   }
   return { seen: new Map([["arrivals", arrivals.length]]), peak: 0, fills: 0, fingerprint: fingerprint({ draws, arrivals }) };
+}
+
+// ---------------------------------------------------------------------------------------------
+// The whole market: 40 noise traders for 10 sim-minutes
+// ---------------------------------------------------------------------------------------------
+
+export function runSimulationWorkload(seed: number, ticks = 6_000): WorkloadResult {
+  const sim = new Simulation({ seed, agents: noiseTraders(40, 0.5) });
+  sim.run(ticks);
+  return {
+    seen: new Map([["fills", sim.engine.fillCount]]),
+    peak: sim.engine.book.size,
+    fills: sim.engine.fillCount,
+    fingerprint: fingerprint({ fills: sim.engine.fills, bids: sim.engine.book.depth("buy"), asks: sim.engine.book.depth("sell") }),
+  };
 }

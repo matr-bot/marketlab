@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { runBookWorkload, runEngineWorkload, runRandomnessWorkload, type WorkloadResult } from "./testing/workloads";
+import { runBookWorkload, runEngineWorkload, runRandomnessWorkload, runSimulationWorkload, type WorkloadResult } from "./testing/workloads";
 
 // Runtime backstop for the determinism lint rule (D-019). Static analysis can't see everything:
 // a dependency, a computed property name or code built at runtime could still reach Math.log,
@@ -100,6 +100,12 @@ describe("determinism backstop: the engine's full random workloads never reach a
     const normal = runEngineWorkload(seed);
     expect(normal.fills).toBeGreaterThan(1_000);
     same(normal, withBannedGlobals(() => runEngineWorkload(seed)));
+  }, SLOW);
+
+  it.each([1, 187, 4_294_967_295])("the whole market: 40 noise traders for 10 sim-minutes, seed %i", (seed) => {
+    const normal = runSimulationWorkload(seed);
+    expect(normal.fills).toBeGreaterThan(2_000);
+    same(normal, withBannedGlobals(() => runSimulationWorkload(seed)));
   }, SLOW);
 
   it.each([1, 187, 4_294_967_295])("randomness, detMath, clock and arrivals workload, seed %i", (seed) => {

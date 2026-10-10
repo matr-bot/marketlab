@@ -88,7 +88,7 @@ const eslintConfig = defineConfig([
   // detMath, whose ln/exp/pow return non-integers. Floats become prices only through an explicit
   // round-to-tick step in agent code, and the order book rejects any non-integer price.
   {
-    files: ["src/engine/orderBook.ts", "src/engine/matchingEngine.ts", "src/engine/validation.ts", "src/engine/marketRegistry.ts", "src/engine/types.ts"],
+    files: ["src/engine/orderBook.ts", "src/engine/matchingEngine.ts", "src/engine/validation.ts", "src/engine/marketRegistry.ts", "src/engine/types.ts", "src/engine/price.ts"],
     rules: {
       "no-restricted-imports": [
         "error",

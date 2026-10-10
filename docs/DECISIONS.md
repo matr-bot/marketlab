@@ -639,3 +639,162 @@ say on stage. `Rng.fromSeed` rejects anything else with a clear error.
 
 **Why.** A short number is easy to read aloud, type and share ("try seed 4021"), and 4.3 billion
 seeds are plenty.
+
+---
+
+## D-023 · Agents act at their own random arrival times, through a context, with separate streams
+
+**Date:** 2026-10-03 · **Status:** Accepted (replaces CLAUDE.md's original `onTick(marketState, rng) → Order[]`)
+
+**Decision.**
+- An agent acts only when its Poisson arrival comes up (D-021), never every tick.
+- `act(ctx)` receives the arrival time, a read-only book view, the last trade price, the opening
+  price and the agent's own resting orders, and may call `submit` and `cancel`. Orders execute
+  immediately, so the next agent sees the market the previous one left.
+- The simulation stamps the agent's owner id and agent type on every order, and refuses to
+  cancel anyone else's order (`UNKNOWN_ORDER`), so an agent cannot act as another.
+- Each agent has two random streams: `arrivals/<id>` for *when* it acts and `decisions/<id>`
+  for *what* it does. A what-if that changes how an agent decides never moves anyone's arrival
+  times. Tested: changing noise-3's behavior changes the market but leaves all 12,000+ arrivals
+  at exactly the same times; adding a trader leaves the others' arrival times unchanged.
+
+**Alternatives.**
+- *Act every tick (`onTick`).* That gives every agent a steady 100 ms rhythm, the opposite of
+  real order flow (D-016's "uneven bursts").
+- *Return a list of orders.* Then an agent can't learn its new order ids, so it can't cancel later.
+- *One stream per agent for both timing and decisions.* A behavior change would shift timing too.
+
+---
+
+## D-024 · Noise traders price limit orders around the mid: δ = μ·E − θ
+
+**Date:** 2026-10-03 · **Status:** Accepted
+
+**Decision.** The reference price is the mid, or the last trade if a side is empty, or the opening
+price ($187.00) before any trade. A buy is placed at `toTick(m − δ, down)` and a sell at
+`toTick(m + δ, up)`, with `δ = μ·E − θ`, `E ~ Exp(1)`, `μ = 8¢`, `θ = 2¢`. So
+`P(δ < 0) = 1 − e^(−θ/μ) ≈ 22%` of limits land at or through the mid (aggressive; they may trade
+immediately) and the rest rest a few cents away (mean δ = 6¢). Market orders are 10% of orders.
+
+**Sources.** Zero-intelligence traders: Gode & Sunder (1993); placement relative to the best prices
+and Poisson cancellation: Smith, Farmer, Gillemot & Krishnamurthy (2003), Farmer, Patelli & Zovko
+(2005); limit orders cluster near the best prices: Bouchaud, Mézard & Potters (2002).
+
+**Alternatives.** A fixed offset (every order at the same distance, unrealistic); uniform within a
+band (no clustering near the mid).
+
+---
+
+## D-025 · Noise order sizes: capped Pareto, with a much smaller cap for market orders
+
+**Date:** 2026-10-03 · **Status:** Accepted
+
+**Decision.** Sizes are `min(cap, ⌊100 · U^(−1/1.5)⌋)` shares: Pareto with tail exponent α = 1.5
+(share volume's empirical tail, Gopikrishnan, Plerou, Gabaix & Stanley 2000), minimum 100.
+- **Limit orders:** capped at 25,000 shares.
+- **Market orders:** capped at **2,000 shares**. Huge sweeps belong to the Week 3 whale and panic
+  agents, not to background noise.
+
+**Evidence (seed 187, one sim-hour, 40 traders at 0.5 arrivals/s).**
+
+| | Market cap 25,000 | **Market cap 2,000** |
+|---|---|---|
+| Either book side empty | 0% of ticks | 0% of ticks |
+| Average / median spread | 1.46¢ / 1¢ | 1.43¢ / 1¢ |
+| Average orders resting per side | 52.5 / 52.7 | 52.6 / 53.2 |
+| Largest price span within one order | **38¢** | **10¢** |
+| Largest mid move from one order | 7¢ | 3.5¢ |
+| Orders sweeping more than 3 price levels | 84 | 59 |
+| Price range over the hour | $186.74–$187.29 | $186.74–$187.13 |
+| Market orders over 2,000 shares | 57 | 0 |
+
+The feared failure, a side wiped out, did not happen: 40 traders keep about 52 orders on each
+side. But the uncapped tail produced the hour's extremes: one noise order swept 38¢, nearly 4× any
+other. A 2,000 cap removes that while leaving depth, spread and volume essentially unchanged; a
+1,000 cap gained little more. These are sanity checks, not realism claims; realism tuning is Week 3.
+
+**Testing note.** Tail exponent: the Hill (1975) estimator on 500,000 uncapped draws is within
+0.06 of 1.5 (about 4 standard errors). Estimating on capped sizes with the capped values dropped
+biases it upward (1.66 versus 1.58 on one sample), so the trader's own sizes are checked through
+tail probabilities instead: P(q > 1,000) ≈ 3.2%, P(q > 5,000) ≈ 0.28%.
+
+---
+
+## D-026 · Cancellations: a random own order, chosen from an explicitly ordered list
+
+**Date:** 2026-10-03 · **Status:** Accepted
+
+**Decision.** On each arrival, a noise trader with resting orders cancels one of them with
+probability 35%, chosen uniformly from its orders **sorted oldest first by the book's sequence
+number** (`oldestFirst`). Otherwise it places an order, first cancelling its oldest if it already
+has 5 resting.
+
+**Why the explicit sort.** The choice "pick the 3rd order" is only deterministic if the list order
+is. Today the book happens to return an owner's orders oldest first (an insertion-ordered `Map`),
+but relying on a container's iteration order is fragile. Sorting by sequence number makes the order
+part of the contract. Engine ids would sort wrongly as text ("SPY-12" < "SPY-9"). Tested: the same
+seed gives the same choice when the book lists the orders shuffled. Planting the bug (using the
+book's order directly) leaves the pinned demo market unchanged, so only that test catches it.
+
+**Alternatives.** Timed expiry (needs a timer per order); always cancel the oldest (then orders
+never get lucky and stay, which thins the book unrealistically).
+
+---
+
+## D-027 · `toTick`: the only place a computed price becomes cents
+
+**Date:** 2026-10-03 · **Status:** Accepted
+
+**Decision.** Agents compute prices with floating-point math (a half-cent mid, an exponential
+offset). They convert them to cents only with `toTick(x, tick, "down" | "up")`. Buys round **down**
+and sells round **up**, so rounding never makes an order more aggressive than the trader intended.
+The result is clamped to [one tick, the highest tick within the price cap] and is always an exact
+integer. `price.ts` is one of the integer-money files that may not import `detMath` (D-019).
+
+**Correction (Codex review).** The clamp computed the highest valid tick as
+⌊MAX_PRICE_CENTS / tick⌋, which is 0 for a tick larger than the price cap, so `toTick` could return
+0, not a valid price. The order book now rejects such a tick size in its constructor, and `toTick`
+keeps its own guard (it throws rather than return 0); both are tested.
+
+**Alternatives.** Rounding inside each agent: scattered, easy to get wrong (round-to-nearest would
+let a buy pay up to half a tick more than it meant).
+
+---
+
+## D-028 · Mutation runs leave out whole-market workloads (they still run on every commit)
+
+**Date:** 2026-10-10 · **Status:** Accepted
+
+**Decision.** Stryker uses its own Vitest config, `vitest.stryker.config.mts`, which:
+- excludes `determinism.test.ts` (the runtime backstop reruns every random workload twice with the
+  banned globals stubbed, so it touches nearly every engine line);
+- sets `MARKETLAB_MUTATION=1`, so the one-hour whole-market tests in `simulation.test.ts`
+  (invariants and conservation over an hour, the sanity-band report, the speed check) skip
+  themselves. Their hour-long runs moved into `beforeAll`, so a skipped block runs nothing.
+
+Everything still runs in the normal suite (`npm test`) on every commit; only mutation runs change.
+Per-test coverage analysis (`coverageAnalysis: "perTest"`) was already on, so each mutant only
+reruns the tests that touch it. That is exactly why the backstop was so expensive: it touches
+almost every mutant. The full mutation suite now runs once per step, right before committing.
+
+**Measured on the same code (Step 3, 1,189 mutants):**
+
+| | Before | After |
+| --- | --- | --- |
+| Wall time | about 23 minutes | **6 min 31 s** |
+| Mutation score | 97.22% | **97.22%** |
+| Killed / timed out | 1,073 / 83 | 1,109 / 47 |
+
+Two mutants went from "timed out" to "survived": the little-endian startup check in `detMath`
+(can never fire) and an `ln` branch boundary already shown to give bit-identical results. They
+only timed out because the backstop made every run slow, and Stryker counts timeouts as caught;
+their true status is "equivalent". Three went the other way: one genuinely (`simulation.ts:85`,
+caught by a new `run(0)` test added in the same change), two by the same timeout effect. No real
+detection was lost.
+
+**Alternatives.**
+- *Run mutation on changed files only.* Faster still, but a change in one file can leave
+  another file's mutants alive (shared validation, the simulation loop), so the final run before
+  committing stays whole-engine.
+- *Shorter versions of the whole-market tests under mutation.* Possible if a future score drop
+  shows they are the only tests catching some mutants; not needed now.

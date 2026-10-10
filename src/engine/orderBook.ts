@@ -1,5 +1,5 @@
 import type { AddResult, AgentType, CancelResult, Cents, DepthLevel, OrderId, RestingOrder, Side } from "./types";
-import { reject, validateOrder } from "./validation";
+import { MAX_PRICE_CENTS, reject, validateOrder } from "./validation";
 
 export { MAX_ORDER_QTY, MAX_PRICE_CENTS } from "./validation";
 
@@ -111,6 +111,10 @@ export class OrderBook {
   ) {
     if (!Number.isSafeInteger(tickSize) || tickSize <= 0) {
       throw new RangeError(`tickSize must be a positive integer number of cents, got ${tickSize}`);
+    }
+    if (tickSize > MAX_PRICE_CENTS) {
+      // No valid price would exist: every price must be a whole number of ticks ≤ the cap.
+      throw new RangeError(`tickSize ${tickSize} is larger than the maximum price ${MAX_PRICE_CENTS}, so no price would be valid`);
     }
   }
 

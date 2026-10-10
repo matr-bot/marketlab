@@ -432,6 +432,13 @@ describe("OrderBook", () => {
       expect(() => new OrderBook("SPY", tick)).toThrow(RangeError);
     });
 
+    it("rejects a tick size larger than the maximum price (no price could be valid)", () => {
+      expect(() => new OrderBook("SPY", 100_000_001)).toThrow(
+        "tickSize 100000001 is larger than the maximum price 100000000, so no price would be valid",
+      );
+      expect(() => new OrderBook("SPY", 100_000_000)).not.toThrow(); // exactly at the cap: one valid price
+    });
+
     it("names the bad tick size in its error", () => {
       expect(() => new OrderBook("SPY", 0)).toThrow(
         /tickSize must be a positive integer number of cents, got 0/,

@@ -3,7 +3,7 @@
 /** @type {import('@stryker-mutator/api/core').PartialStrykerOptions} */
 const config = {
   testRunner: "vitest",
-  vitest: { configFile: "vitest.config.mts" },
+  vitest: { configFile: "vitest.stryker.config.mts" }, // leaves out whole-market workloads (D-028)
   mutate: ["src/engine/**/*.ts", "!src/engine/**/*.test.ts", "!src/engine/**/*.bench.ts", "!src/engine/testing/**"],
   coverageAnalysis: "perTest",
   reporters: ["clear-text", "progress", "html"],

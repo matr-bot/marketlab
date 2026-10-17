@@ -1,0 +1,91 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+import type { FrameTrade } from "@/engine/feed";
+import { formatPrice, formatQty } from "@/lib/format";
+import styles from "./terminal.module.css";
+
+const GAP_PX = 28;
+const BASE_SPEED = 50; // px per second when quiet
+const MAX_SPEED = 260;
+/** Waiting items beyond this many strip widths are skipped, so the strip shows recent trades (D-040). */
+const MAX_BACKLOG_WIDTHS = 2;
+/** On the first frame (the warm-up), only the most recent trades enter the strip. */
+const FIRST_FRAME_TRADES = 12;
+
+interface Item {
+  readonly el: HTMLSpanElement;
+  x: number;
+  readonly w: number;
+}
+
+/**
+ * The scrolling ticker: each trade slides in from the right as `SPY 1,340 @ 187.42 ▲`, green or red
+ * by tick direction. It speeds up when trades queue up and slows when quiet. This strip is the one
+ * place smooth scrolling is allowed; the numbers inside never change once printed.
+ */
+export function TickerTape({ ticker, trades, frameCount }: { ticker: string; trades: readonly FrameTrade[]; frameCount: number }) {
+  const boxRef = useRef<HTMLDivElement>(null);
+  const items = useRef<Item[]>([]);
+  const seenFrame = useRef(0);
+
+  // New trades from this frame join the end of the queue.
+  useEffect(() => {
+    const box = boxRef.current;
+    if (box === null || frameCount === seenFrame.current) return; // each frame's trades join once
+    seenFrame.current = frameCount;
+    const queue = items.current;
+    const width = box.clientWidth;
+    const fresh = frameCount === 1 ? trades.slice(-FIRST_FRAME_TRADES) : trades;
+    for (const t of fresh) {
+      const el = document.createElement("span");
+      el.className = `${styles.tickerItem} ${t.tick === "up" ? styles.up : styles.down}`;
+      el.textContent = `${ticker} ${formatQty(t.qty)} @ ${formatPrice(t.price)} ${t.tick === "up" ? "▲" : "▼"}`;
+      box.appendChild(el);
+      const tail = queue[queue.length - 1];
+      // The market is already running on load: the first frame's trades start across the strip.
+      const entry = frameCount === 1 ? 0 : width;
+      const item: Item = { el, x: Math.max(entry, tail ? tail.x + tail.w : 0), w: el.offsetWidth + GAP_PX };
+      el.style.transform = `translateX(${item.x}px)`;
+      queue.push(item);
+    }
+    // Too far behind: skip the oldest items that have not entered the strip yet.
+    let waiting = queue.length > 0 ? queue[queue.length - 1].x + queue[queue.length - 1].w - width : 0;
+    while (waiting > MAX_BACKLOG_WIDTHS * width) {
+      const i = queue.findIndex((it) => it.x >= width);
+      if (i < 0 || i === queue.length - 1) break;
+      const [skipped] = queue.splice(i, 1);
+      skipped.el.remove();
+      for (let j = i; j < queue.length; j++) queue[j].x -= skipped.w;
+      waiting -= skipped.w;
+    }
+  }, [frameCount, trades, ticker]);
+
+  // Scroll loop.
+  useEffect(() => {
+    let raf = 0;
+    let before = performance.now();
+    const step = (now: number) => {
+      const box = boxRef.current;
+      const queue = items.current;
+      const dt = Math.min(0.1, (now - before) / 1000);
+      before = now;
+      if (box !== null && queue.length > 0) {
+        const width = box.clientWidth;
+        const tail = queue[queue.length - 1];
+        const backlog = Math.max(0, tail.x + tail.w - width);
+        const dx = Math.min(MAX_SPEED, BASE_SPEED + backlog * 0.15) * dt;
+        for (const it of queue) {
+          it.x -= dx;
+          it.el.style.transform = `translateX(${it.x}px)`;
+        }
+        while (queue.length > 0 && queue[0].x + queue[0].w < 0) queue.shift()!.el.remove();
+      }
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  return <div ref={boxRef} className={styles.tickerTape} data-testid="ticker" aria-label="Trade ticker" />;
+}

@@ -1,5 +1,7 @@
 # MarketLab
 
+[![CI](https://github.com/matr-bot/marketlab/actions/workflows/ci.yml/badge.svg)](https://github.com/matr-bot/marketlab/actions/workflows/ci.yml)
+
 **An AI-native market laboratory for learning how markets and trading strategies actually work.**
 
 **Live demo: [marketlab-nine.vercel.app](https://marketlab-nine.vercel.app)**

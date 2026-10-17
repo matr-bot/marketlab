@@ -798,3 +798,205 @@ detection was lost.
   committing stays whole-engine.
 - *Shorter versions of the whole-market tests under mutation.* Possible if a future score drop
   shows they are the only tests catching some mutants; not needed now.
+
+---
+
+## D-029 · Volatility is measured from the mid price, never from trade prices
+
+**Date:** 2026-10-10 · **Status:** Accepted
+
+**Decision.** The volatility estimator reads the mid, (best bid + best ask) / 2, on a fixed
+sim-time grid. Trade prices are never used.
+
+**Why.** Trades alternate between the bid and the ask ("bid-ask bounce", Roll 1984), which looks
+like movement even when the market is still. Measured on the seed-187 noise market: consecutive
+trade-price returns have lag-1 autocorrelation −0.17, and volatility from trade prices is **2.3×**
+the mid-based value over the same hour. A test checks this on the live market.
+
+---
+
+## D-030 · Sample every 5 seconds of sim time
+
+**Date:** 2026-10-10 · **Status:** Accepted
+
+**Decision.** The mid is sampled at every 5,000 ms of sim time (tick ends on the grid).
+
+**Evidence (volatility signature plot, seed 187, one hour, σ in ¢ per √second).**
+
+| Interval | 0.1 s | 1 s | 5 s | 10 s | 30 s |
+|---|---|---|---|---|---|
+| Noise traders only | 1.23 | 1.03 | 0.81 | 0.73 | 0.61 |
+| Noise + 2 market makers | 0.92 | 0.89 | 0.75 | 0.67 | 0.59 |
+
+Short intervals overstate volatility because the mid itself flickers: noise orders placed inside
+the spread and then cancelled or hit make it bounce back and forth (1-second mid returns have
+autocorrelation −0.19). Sampling every second would overstate it by about 1.7×; sampling every
+30 seconds reacts too slowly to a headline. 5 s is the compromise; the market makers flatten the
+short end, as real liquidity providers do. (Zhang, Mykland & Aït-Sahalia 2005; Andersen, Bollerslev,
+Diebold & Labys 2000.)
+
+---
+
+## D-031 · Two EWMAs, fast (30 s) and slow (120 s); users take the larger
+
+**Date:** 2026-10-10 · **Status:** Accepted
+
+**Decision.** Each 5-second sample updates two exponentially weighted moving averages
+(RiskMetrics 1996) of the per-second squared log return: `v ← λv + (1 − λ)·r²/Δt`, with
+`λ = 2^(−Δt/H)`, H = 30 s (fast) and 120 s (slow). Decay uses the real elapsed time, so a skipped
+sample weighs the old estimate correctly. The market maker uses `σ = √max(v_fast, v_slow)`: it
+reacts quickly when volatility jumps and stays steady when it falls. All math uses `detMath`.
+
+**Why two (your review of the plan).** With only the 120 s average, one shock sample carries under
+3% weight, so a sudden regime change takes minutes to show.
+
+**Measured shock response** (calm regime, then exactly 4× volatility, sampled every 5 s; seconds
+until the market maker's spread doubles; pinned in `volatility.test.ts`):
+
+| | max(fast 30 s, slow) | slow 120 s alone | (fast 15 s, for comparison) |
+|---|---|---|---|
+| Formula spread δ | **30 s** | 95 s | 15 s |
+| Quoted spread (rounded to whole cents) | **30–50 s** | 110–175 s | 20–25 s |
+
+The quoted spread is slower than the formula spread because rounding away from the market adds up
+to 2¢ to the calm spread, so doubling the quoted spread needs more of the shock absorbed. A 15-second
+fast half-life would show a headline within about 20–25 s at the cost of a noisier estimate; it is
+one parameter if we want it.
+
+---
+
+## D-032 · Volatility units, warm-up and missing samples
+
+**Date:** 2026-10-10 · **Status:** Accepted
+
+**Decision.**
+- **Units:** log return per √second of sim time. In cents per √second: σ × mid. Per minute: ×√60;
+  per hour: ×60. No annualizing (CLAUDE.md: use the sim's own clock, never 252 trading days).
+- **Warm-up:** both averages start at σ₀ = 4.3×10⁻⁵/√s (measured: ≈ 0.8¢/√s at $187) and the
+  estimate reports `ready` after 24 returns. The first sample (at 5 s) only sets the baseline mid,
+  so with no skipped samples it is ready at **125 s** of sim time: one baseline sample plus 24
+  returns. (Corrected after Codex review; this said "24 samples (2 minutes)". Pinned on the live
+  market in `volatility.test.ts`.)
+- **Missing mid** (a side of the book empty at a sample): the sample is skipped; the next return is
+  taken from the last good mid and divided by the real elapsed time, so it stays a fair per-second
+  rate. Repeating the last mid instead would fake "no movement" and bias volatility down.
+
+---
+
+## D-033 · Avellaneda–Stoikov market maker, with k = 1.0 after a P&L investigation
+
+**Date:** 2026-10-10 · **Status:** Accepted
+
+**Decision.** Two market makers quote around a reservation price with an Avellaneda–Stoikov spread
+(Avellaneda & Stoikov 2008):
+- reservation `r = s − q·γ·σc²·τ` (s: others' mid; q: inventory in lots of 100; σc = σ × s, in
+  ¢/√s): long → quotes lean lower so others buy from it; short → higher;
+- spread `δ = γ·σc²·τ + (2/γ)·ln(1 + γ/k)`: an inventory-risk part that grows with volatility²
+  and a competitive part set by how fast fills fall off with distance;
+- quotes `toTick(r − δ/2, down)` and `toTick(r + δ/2, up)`;
+- γ = 0.010 (mm-1) and 0.015 (mm-2) per cent; **k = 1.0 per cent** (plan: 1.5).
+
+**The P&L investigation (your review: "if it's negative, investigate before committing").** At
+k = 1.5 the market makers lost money on 5 of 6 runs (two market makers × three seeds). Breaking
+every market-maker fill into edge and markout (seed 187):
+- edge at the fill against the mid just before: **+0.77¢ per share**, about half its spread, as expected;
+- the mid then moved against it by **0.81¢ per share within 5 seconds and never came back**
+  (0.82¢ after 2 minutes); the loss came almost entirely from market orders.
+
+Uninformed traders still beat it because this market has **no fair-value anchor**: price is the sum
+of past order flow, so every order's impact is permanent and order flow predicts the future price.
+Real market makers survive because value traders pull prices back (Week 3). Sweeping k:
+
+| k (per cent) | P&L positive (of 6 runs) | MM fills per hour | MM at best price | Market spread |
+|---|---|---|---|---|
+| 1.5 | 1 | ≈ 3,700 | 50% | 1.27¢ |
+| **1.0** | **6** | ≈ 2,500 | 34% | 1.35¢ |
+| 0.75 | 6 | ≈ 1,600 | 21% | 1.38¢ |
+| 0.5 | 6 | ≈ 570 | 7% | 1.40¢ |
+
+k = 1.0 is the tightest setting that is profitable on every run while still at the best price a third
+of the time. It was chosen from this sweep, not from a fill-rate calibration; calibrating k from
+fill rates belongs with Week 3's tuning, once value traders anchor the price. A test requires
+positive P&L marked to the mid for both market makers on three seeds.
+
+**Out-of-sample check (Codex review).** Those three seeds (187, 1, 2) are the ones k was chosen on,
+so that test guards against regressions but does not independently show profitability. Seeds 3, 4
+and 5 were fixed in advance and run once at k = 1.0 (one sim-hour, P&L marked to the final mid):
+
+| Seed | mm-1 | mm-2 |
+| --- | --- | --- |
+| 3 | +$151.48 | +$234.86 |
+| 4 | +$158.15 | +$123.64 |
+| 5 | +$223.44 | +$183.45 |
+| *In sample (187, 1, 2)* | *+$197 to +$271* | *+$112 to +$159* |
+
+Profitable on 6 of 6 out-of-sample runs, in the same range as in sample. A second test pins them.
+k is still provisional: the fill-rate recalibration once value traders exist is unchanged
+(CLAUDE.md, Open tuning).
+
+---
+
+## D-034 · A rolling 60-second horizon instead of a session end
+
+**Date:** 2026-10-10 · **Status:** Accepted
+
+**Decision.** Avellaneda–Stoikov assumes trading stops at a time T and uses T − t. Our market runs
+continuously, so the market maker always uses τ = 60 s, as if the session ended a minute from now.
+
+**Alternatives.** Time to the 16:00 close: quotes would drift wider, then narrower, over the day for
+no market reason, which would be confusing to explain and to see.
+
+---
+
+## D-035 · Post-only quotes, inventory limits and size rules
+
+**Date:** 2026-10-10 · **Status:** Accepted
+
+**Decision.**
+- **Post-only:** a market maker's bid is never at or above another trader's best ask, and its ask
+  never at or below another's best bid (clamped one tick away), so it always provides liquidity and
+  never takes it. Its own quotes are excluded when finding the best prices (`othersBest`), so it never
+  prices off itself. Tested: in an hour of live market, every market-maker fill has it as the resting side.
+- **Inventory:** lots of 100 shares; limit ±5,000 shares. On the side that would grow its position,
+  size shrinks linearly with the position and stops at the limit, and no quote can take it past the
+  limit (tested over the whole range).
+- **Size under stress:** `500 × max(0.25, min(1, σ₀/σ))`, rounded down to whole lots: at 2× calm
+  volatility a quote is 200 shares, at 4× or more it is 100.
+
+---
+
+## D-036 · Requote only on change; two market makers; who sets the visible spread
+
+**Date:** 2026-10-10 · **Status:** Accepted
+
+**Decision.**
+- **Requote only on change (your review):** each arrival (Poisson, about 5 per second per market
+  maker), a side is replaced only if its computed price or size differs from what is resting.
+  Unchanged quotes keep their time priority. Changed sides are cancelled first, then placed, so a
+  market maker never briefly crosses itself. Tested with a fake market: five identical arrivals in a
+  row produce no orders at all.
+- **Two market makers** (mm-1, mm-2) with slightly different risk aversion, so they compete at the
+  best price.
+
+**How the market changes with them** (seed 187, one hour):
+
+| | Noise only | Noise + 2 MMs | Noise + 2 MMs that see 4× volatility (stub) |
+|---|---|---|---|
+| Average / median spread | 1.43¢ / 1¢ | 1.35¢ / 1¢ | 1.43¢ / 1¢ |
+| Orders per side | 52.6 / 53.2 | 55.5 / 55.9 | 55.1 / 55.1 |
+| Price range | $186.74–$187.13 | $186.65–$187.07 | $186.62–$187.09 |
+| Orders sweeping more than 3 levels | 59 | 12 | 49 |
+| Largest sweep / largest mid move | 10¢ / 3.5¢ | 6¢ / 3¢ | 8¢ / 5¢ |
+| A market maker at best bid / ask | — | 35% / 33% | 1% / 1% |
+| MM share of shares at the best prices | — | 17% | 0.1% |
+| MM P&L (mm-1 / mm-2), marked to mid | — | +$197 / +$154 | +$31 / +$23 |
+
+**Who sets the visible spread (your review).** At 4× volatility the market makers withdraw almost
+completely (34% → 1% at the best price), but the market spread only moves from 1.35¢ to 1.43¢:
+noise traders keep posting one-cent quotes and hold 83% of the shares at the best prices. The
+withdrawal shows in sweeps (12 → 49) and mid moves (3¢ → 5¢), not in the spread, so "market makers
+widened spreads 4×" would not show on screen today. **Proposed Week 3 tuning (not done now):**
+1. make noise limit orders less aggressive (μ ≈ 15¢, θ = 0), so market makers set the best prices
+   most of the time;
+2. let noise traders' limit offsets widen with volatility too, as real limit-order traders do.
+Both to be measured against this same report.

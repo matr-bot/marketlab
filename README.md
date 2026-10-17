@@ -86,9 +86,9 @@ itself keeps working.
 
 ## Project status
 
-**Week 1 of 4 ✅ complete.** Week 2 is in progress (extended to Oct 18): steps 1 (matching
-engine), 2 (seeded randomness and sim clock) and 3 (noise traders and the simulation loop) are
-done; the goal is a live market moving on its own at page load. What exists today:
+**Engine steps 1–5 ✅ done** (matching engine, seeded randomness and sim clock, noise traders and
+the simulation loop, realized volatility, Avellaneda–Stoikov market makers). Next: the market alive
+on the live site (Oct 18). What exists today:
 
 - [x] Next.js + TypeScript (strict) app with the terminal-style layout and placeholder panels,
       deployed on Vercel at [marketlab-nine.vercel.app](https://marketlab-nine.vercel.app)
@@ -105,7 +105,13 @@ done; the goal is a live market moving on its own at page load. What exists toda
 - [x] Sim clock (100 ms ticks from 09:30:00.000) and Poisson order arrivals with exact timestamps
 - [x] A living market: 40 zero-intelligence noise traders trading from $187.00, with the same seed
       giving a byte-identical market (the whole fill log is fingerprinted and pinned)
-- [x] 473 tests, shadow-model comparison, and 97% mutation score (see [Testing](#testing))
+- [x] Realized volatility from the mid price (never trade prices, which bounce between bid and
+      ask), sampled every 5 s of sim time, with a fast (30 s) and a slow (120 s) moving average
+- [x] Two Avellaneda–Stoikov market makers: quotes around an inventory-adjusted price, a spread
+      that widens with volatility, smaller sizes under stress, post-only quotes and inventory
+      limits. Profitable against the noise crowd on 6 of 6 runs, including seeds never used to
+      tune them
+- [x] 521 tests, shadow-model comparison, and 97% mutation score (see [Testing](#testing))
 - [x] Engine boundary and determinism rules, enforced by ESLint and checked at runtime
 
 The panels in the UI say which week they go live. They show no fake market data.
@@ -117,9 +123,9 @@ not just "does it work on my example" but "can any small bug slip past the tests
 
 | Check | Result |
 | --- | --- |
-| Unit and property tests (Vitest) | **473 passing** across 16 files |
+| Unit and property tests (Vitest) | **521 passing** across 18 files |
 | Randomized shadow-model comparison | Order book and matching engine, 5 seeds × 3,000 operations each, full state compared after **every** step |
-| Mutation score (Stryker) on `src/engine` | **97.22%**: 1,156 of 1,189 mutants detected |
+| Mutation score (Stryker) on `src/engine` | **96.93%**: 1,421 of 1,466 mutants detected |
 | Same seed → identical market | The whole fill log and final book of a 10-minute, 40-trader market are fingerprinted and pinned; seed 188 differs |
 | Same seed → same numbers in every browser | Random generator matches the reference C code exactly; `ln`/`exp` bits pinned over 226,000+ inputs; inexact `Math` functions banned by lint **and** by a runtime test |
 | Throughput benchmark | **~1.5 million matching-engine operations per second** with real fills |
@@ -156,7 +162,7 @@ requires identical results. We confirmed the runtime test catches code the lint 
 
 **Mutation testing.** Stryker makes hundreds of small deliberate bugs in the engine (flipping `<`
 to `<=`, deleting a line, changing a constant) and checks that some test fails for each one.
-1,156 of 1,189 are caught. We reviewed the other 33 one by one: they are safety checks that can
+1,421 of 1,466 are caught. We reviewed the other 45 one by one: they are safety checks that can
 only run if the engine is already broken, comparisons that only differ when a random time lands
 exactly on a boundary (probability ≈ 0), or alternate math paths that give bit-identical results.
 
@@ -212,6 +218,8 @@ src/
     price.ts                       toTick: the only place a computed price becomes cents
     agents/agent.ts                The agent interface (act at arrival times, read-only view)
     agents/noiseTrader.ts          Zero-intelligence noise traders
+    agents/marketMaker.ts          Avellaneda–Stoikov market makers
+    volatility.ts                  Realized volatility of the mid (fast and slow EWMA)
     *.test.ts                      Unit, edge-case and limit tests
     *.shadow.test.ts               Randomized comparison against the naive reference models
     orderBook.bench.ts             Throughput benchmark

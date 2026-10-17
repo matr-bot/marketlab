@@ -251,11 +251,13 @@ Browser UI (Next.js)
 ## Agents (Tier 1 set)
 Common interface (D-023): an agent acts only at its own Poisson arrival times, never on a fixed
 rhythm. `act(ctx)` receives the time, a read-only book view, the last trade price, the opening
-price and its own resting orders (oldest first), and may `submit` or `cancel`; the simulation
+price, its position, the mid's realized volatility (D-029 to D-032) and its own resting orders
+(oldest first), and may `submit` or `cancel`; the simulation
 stamps its owner id and agent type on every order. Each agent draws arrival times from
 `arrivals/<id>` and decisions from `decisions/<id>`, so a behavior change never moves arrival
 times. Computed prices become cents only through `toTick` (buys round down, sells up).
 - MarketMaker — quotes both sides; widens spread and cuts size under stress/inventory risk
+  (Avellaneda–Stoikov, D-033 to D-036)
 - NoiseTrader — random small orders; baseline activity
 - MomentumTrader — buys rising / sells falling prices
 - ValueTrader — trades toward a belief about fair value

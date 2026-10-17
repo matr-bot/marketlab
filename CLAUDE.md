@@ -16,7 +16,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - `/lib` = `src/lib/` (e.g. `src/lib/schemas.ts`)
 - `/data` = `data/` at the repo root
 - Commands: `npm run dev`, `npm test`, `npm run lint`, `npm run typecheck`,
-  `npm run test:mutation` (Stryker), `npm run bench`
+  `npm run test:mutation` (Stryker), `npm run test:e2e` (Playwright, after `npm run build`),
+  `npm run bench`
 
 ## What this is
 MarketLab is an AI-native market laboratory for learning how markets and trading strategies
@@ -369,7 +370,7 @@ market makers).
 
 New priority: everything visible. The engine is strong; judges can only grade what they can see.
 
-- **Sun 10/18:** Web Worker + terminal UI (status bar, ticker, `GP` chart, `TAPE`, `BOOK` basics)
+- **Sun 10/18 ✅ (done Sat 10/17):** Web Worker + terminal UI (status bar, ticker, `GP` chart, `TAPE`, `BOOK` basics)
   + market alive on load. Milestone: prices moving on the live site.
 - **Mon 10/19:** value traders (fair value), panic sellers (threshold cascade), headline shock =
   a fair-value jump.

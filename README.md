@@ -89,11 +89,15 @@ itself keeps working.
 ## Project status
 
 **Engine steps 1–5 ✅ done** (matching engine, seeded randomness and sim clock, noise traders and
-the simulation loop, realized volatility, Avellaneda–Stoikov market makers). Next: the market alive
-on the live site (Oct 18). What exists today:
+the simulation loop, realized volatility, Avellaneda–Stoikov market makers), and **the market is
+alive on the live site**. What exists today:
 
-- [x] Next.js + TypeScript (strict) app with the terminal-style layout and placeholder panels,
-      deployed on Vercel at [marketlab-nine.vercel.app](https://marketlab-nine.vercel.app)
+- [x] A terminal-style UI on [marketlab-nine.vercel.app](https://marketlab-nine.vercel.app): the
+      market is already trading when the page loads. Status bar (last price, change, volume, sim
+      clock, seed), a scrolling trade ticker, a candlestick price chart (`GP`), time & sales
+      (`TAPE`) and the order book (`BOOK`), every number from the engine
+- [x] The whole simulation runs in a Web Worker; the page pulls one coalesced frame per animation
+      frame, and the real clock only decides how many ticks run, never what happens in them
 - [x] `OrderBook`: integer-cent prices, tick size, price-time priority, add / cancel / partial
       fill, per-owner orders and cancel-all, best bid/ask, spread and depth. It is never crossed,
       and rejected orders come back with a reason code instead of throwing.
@@ -113,7 +117,8 @@ on the live site (Oct 18). What exists today:
       that widens with volatility, smaller sizes under stress, post-only quotes and inventory
       limits. Profitable against the noise crowd on 6 of 6 runs, including seeds never used to
       tune them
-- [x] 521 tests, shadow-model comparison, and 97% mutation score (see [Testing](#testing))
+- [x] 553 unit tests, a browser smoke test in CI, shadow-model comparison, and 97% mutation score
+      (see [Testing](#testing))
 - [x] Engine boundary and determinism rules, enforced by ESLint and checked at runtime
 
 The panels in the UI say which week they go live. They show no fake market data.
@@ -125,9 +130,10 @@ not just "does it work on my example" but "can any small bug slip past the tests
 
 | Check | Result |
 | --- | --- |
-| Unit and property tests (Vitest) | **521 passing** across 18 files |
+| Unit and property tests (Vitest) | **553 passing** across 21 files |
+| Browser smoke test (Playwright, in CI) | Production build: the page loads, prices change within 5 s, no console errors |
 | Randomized shadow-model comparison | Order book and matching engine, 5 seeds × 3,000 operations each, full state compared after **every** step |
-| Mutation score (Stryker) on `src/engine` | **96.93%**: 1,421 of 1,466 mutants detected |
+| Mutation score (Stryker) on `src/engine` | **96.79%**: 1,568 of 1,620 mutants detected |
 | Same seed → identical market | The whole fill log and final book of a 10-minute, 40-trader market are fingerprinted and pinned; seed 188 differs |
 | Same seed → same numbers in every browser | Random generator matches the reference C code exactly; `ln`/`exp` bits pinned over 226,000+ inputs; inexact `Math` functions banned by lint **and** by a runtime test |
 | Throughput benchmark | **~1.5 million matching-engine operations per second** with real fills |
@@ -164,7 +170,7 @@ requires identical results. We confirmed the runtime test catches code the lint 
 
 **Mutation testing.** Stryker makes hundreds of small deliberate bugs in the engine (flipping `<`
 to `<=`, deleting a line, changing a constant) and checks that some test fails for each one.
-1,421 of 1,466 are caught. We reviewed the other 45 one by one: they are safety checks that can
+1,568 of 1,620 are caught. We reviewed the other 52 one by one: they are safety checks that can
 only run if the engine is already broken, comparisons that only differ when a random time lands
 exactly on a boundary (probability ≈ 0), or alternate math paths that give bit-identical results.
 
@@ -197,6 +203,7 @@ npm run dev        # http://localhost:3000
 | `npm run lint` | ESLint, including the engine import boundary |
 | `npm run typecheck` | Generate Next.js route types, then TypeScript type check (works on a fresh clone) |
 | `npm run test:mutation` | Stryker mutation testing on `src/engine` (HTML report in `reports/`) |
+| `npm run test:e2e` | Playwright smoke test (needs `npm run build` first) |
 | `npm run bench` | Order book throughput benchmark |
 | `npm run build` | Production build |
 
@@ -205,7 +212,8 @@ npm run dev        # http://localhost:3000
 ```
 src/
   app/          Next.js App Router: layout, page, global theme
-  components/   UI components (Panel, …)
+  components/   UI: Panel, and terminal/ (status bar, ticker, GP chart, TAPE, BOOK, useMarket)
+  worker/       The simulation Web Worker and its message protocol
   engine/       Simulation engine: pure TypeScript, no React/DOM (lint-enforced)
     orderBook.ts                   Limit order book (price-time priority)
     matchingEngine.ts              Matching engine: limit/market orders, fills, arrival quotes
@@ -221,6 +229,8 @@ src/
     agents/agent.ts                The agent interface (act at arrival times, read-only view)
     agents/noiseTrader.ts          Zero-intelligence noise traders
     agents/marketMaker.ts          Avellaneda–Stoikov market makers
+    demoMarket.ts                  The market every page load opens on (seed 187, 10-minute warm-up)
+    feed.ts                        Coalesced frames for the page, and the tick pacer
     volatility.ts                  Realized volatility of the mid (fast and slow EWMA)
     *.test.ts                      Unit, edge-case and limit tests
     *.shadow.test.ts               Randomized comparison against the naive reference models
@@ -229,7 +239,8 @@ src/
     determinism.test.ts            Runtime backstop: reruns the workloads with banned globals stubbed
     testing/                       Test-only: shadow models, shared random workloads, fingerprints
 scripts/reference/xoshiro128ss.c   Reference C generator the RNG tests are checked against
-  lib/          Shared code, e.g. Zod schemas for AI contracts (coming in Week 3)
+  lib/          Shared code: display formatting, the page's market state (Zod schemas next)
+e2e/            Playwright smoke test
 ```
 
 ## Roadmap
@@ -240,7 +251,7 @@ working build on the live site.
 | Day | Deliverables |
 | --- | --- |
 | **Done** | Repo, deploy, layout shell; order book, matching engine, seeded randomness + sim clock, noise traders; realized volatility + Avellaneda–Stoikov market makers (in review) |
-| **Sun 10/18** | Web Worker + terminal UI (status bar, ticker, price chart, time & sales, order book basics) + market alive on load. **Milestone: prices moving on the live site** |
+| **Sun 10/18** ✅ | Web Worker + terminal UI (status bar, ticker, price chart, time & sales, order book basics) + market alive on load. **Milestone: prices moving on the live site** |
 | **Mon 10/19** | Value traders (fair value), panic sellers (threshold cascade), headline shock = a fair-value jump |
 | **Tue 10/20** | AI interpret route for headlines → clamped, editable parameters; headline input; desk-chat narrator (deterministic); "who moved the price?" attribution |
 | **Wed 10/21** | Strategy agent (plain-English strategy via the same route) + glass box + manual buy/sell |
@@ -255,8 +266,8 @@ strategy agent + glass box, the execution report.
 **How each day runs:** one short plan, build, then an independent code review (Codex) at the end
 of the day. High and medium findings are fixed immediately; low ones go to
 [`docs/LATER.md`](docs/LATER.md). Mutation testing runs on the engine once a day before
-committing. CI runs typecheck, lint and unit tests on every push and pull request; a browser smoke
-test (page loads, prices move, no console errors) joins it with the first live UI.
+committing. CI runs typecheck, lint, unit tests and a browser smoke test (page loads, prices
+move, no console errors) on every push and pull request.
 
 ### The 90-second demo
 

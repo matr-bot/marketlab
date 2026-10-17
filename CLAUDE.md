@@ -63,7 +63,7 @@ screen must be true to what the engine actually did.
 1. IDEA — student types a strategy: "Buy after a quick 3% drop because panic sellers overshoot."
 2. MARKET — a judge types any headline live; the crowd reacts; the strategy trades through it.
 3. REALITY CHECK — execution report: intended price (the arrival mid) vs actual average fill
-   (slippage, split into spread cost and impact cost), P&L, Sharpe ratio, max drawdown.
+   (slippage, split into spread cost and impact cost) and P&L.
 4. REVEAL — "Show me what I built": English → rules → formulas with real numbers → Python.
 
 ## Non-goals (do not build unless explicitly asked)
@@ -72,15 +72,16 @@ screen must be true to what the engine actually did.
 - Full options market or implied-volatility surface (stretch at most: simple option pricing)
 
 ## Design System (terminal-style; replaces the earlier "Look" and neon-green rules)
-This section is the spec. The UI is built only once live engine data is flowing (Week 2 Step 8),
-then grows week by week with the roadmap:
+This section is the spec. The UI is built only once live engine data is flowing (Sun 10/18),
+then grows day by day with the roadmap:
 
-| Week | Design parts that ship |
+| Day | Design parts that ship |
 | --- | --- |
-| Week 2 (Step 8) | Theme (black / amber / white, flash rules), status bar, scrolling ticker, default-layout grid, `GP` (price chart), `TAPE`, `BOOK` basics (best bid/ask, top levels) |
-| Week 3 | `CROWD`, `CHAT` (desk chat / narrator), `WHO` (click a candle in `GP`), the command bar with codes for panels that exist, `NEWS` headline input, `TKT` manual trading |
-| Week 4 | `STRAT` + the strategy agent + glass box reveal, `EXR`, full `BOOK` depth view, Mission 5 |
-| If time | Missions 1 and 3, realism panel, Learn / Pro modes (with the per-panel "On a professional terminal…" notes), rewind with the `REPLAY` label, what-if reruns, `ASK`, hover formulas, shortcut strip, `HELP`, function codes beyond existing panels |
+| Sun 10/18 | Theme (black / amber / white, flash rules), status bar, scrolling ticker, default-layout grid, `GP` (price chart), `TAPE`, `BOOK` basics (best bid/ask, top levels) |
+| Tue 10/20 | `NEWS` headline input (with the command bar, codes for panels that exist), `CHAT` (desk chat / narrator), `WHO` (click a candle in `GP`) |
+| Wed 10/21 | `STRAT` + the strategy agent + glass box reveal, `TKT` manual trading |
+| Thu 10/22 | `EXR` (slippage split, P&L) |
+| Cut unless ahead | `CROWD`, missions, full `BOOK` depth view, realism panel, Learn / Pro modes (with the per-panel "On a professional terminal…" notes), rewind with the `REPLAY` label, what-if reruns, `ASK`, shortcut strip, hover formulas, `HELP`, function codes beyond existing panels |
 
 Until a function ships, its slot in the default layout is simply not drawn (the grid closes up);
 there are no placeholder panels, so there is never a blank or fake state.
@@ -105,7 +106,8 @@ company's name, logo or exact screens.
 - No LIVE badge, glowing dot or "live" indicator anywhere. The moving numbers show it is live.
 - The only status label is a small REPLAY label, shown during rewind.
 - The market is ALREADY RUNNING when the page loads (calm regime, demo seed). Never show
-  "engine not running" as a first impression.
+  "engine not running" as a first impression. If the warm-up takes longer than about 1 second,
+  show a brief "OPENING MARKET" state instead of a frozen screen.
 
 ### Layout
 - **Top status bar:** ticker, last price, change and % change, volume, sim clock.
@@ -152,7 +154,7 @@ works from it without opening any panels.
   view at once. `4 TAPE` is directly below them.
 - **Right, the market and your desk:** `5 BOOK` (depth) on top, then the user's desk:
   `6 TKT` (manual buy/sell), `7 STRAT` (type a strategy; "Show me what I built" opens the glass
-  box) and `8 EXR` (slippage, P&L, Sharpe, drawdown).
+  box) and `8 EXR` (slippage, P&L; Sharpe and drawdown if time).
 - **Demo path with no panels opened:** idea → type it in `7 STRAT`; market → type the headline in
   the command bar, watch `1 GP`, `2 CROWD`, `3 CHAT` and the ticker; reality check → `8 EXR`;
   reveal → "Show me what I built" in `7 STRAT`.
@@ -167,13 +169,13 @@ works from it without opening any panels.
 | `TAPE` | Time & sales |
 | `NEWS` | Headline feed and headline input |
 | `TKT` | Order ticket: buy/sell, limit/market |
-| `EXR` | Execution report: slippage (spread + impact), P&L, Sharpe, drawdown |
+| `EXR` | Execution report: slippage (spread + impact), P&L (Sharpe, drawdown if time) |
 | `STRAT` | Strategy builder and glass box |
 | `WHO` | Who moved the price (attribution) |
 | `ASK` | Ask a plain-English question, answered from real engine data (see AI contracts) |
 | `CHAT` | Desk chat: the narrator's running commentary |
 | `HELP` | List of all codes |
-| `CROWD` | Each agent type's mood, position and activity (Week 3) |
+| `CROWD` | Each agent type's mood, position and activity (cut unless ahead) |
 
 ### Desk chat panel (the narrator; deterministic, not AI)
 The narrator posts short updates like a colleague on a trading desk, e.g. "Big seller hitting
@@ -247,6 +249,9 @@ Browser UI (Next.js)
 - The worker sends one batched snapshot per frame to React, never individual trades. The
   engine may produce thousands of events per second; the worker coalesces them and posts at
   most one message per animation frame (quotes, depth, new candles, fills since last frame).
+- The real clock only decides HOW MANY ticks run, never what happens in them. A test pins it:
+  two runs of the worker's tick loop with different frame timings give the identical fill log
+  for the same number of ticks.
 
 ## Agents (Tier 1 set)
 Common interface (D-023): an agent acts only at its own Poisson arrival times, never on a fixed
@@ -267,6 +272,13 @@ times. Computed prices become cents only through `toTick` (buys round down, sell
 
 Most agents are cheap rule-based code. The LLM shifts their parameters (sentiment, fair value,
 risk tolerance, liquidity, activity rate); it never decides individual trades.
+
+Open tuning (measure each against the D-036 market report):
+- Spread out noise traders' limit orders (less aggressive offsets, and offsets that widen with
+  volatility) so market makers set the best prices most of the time and their withdrawal under
+  stress shows in the visible spread (D-036: today 4× volatility only moves it 1.35¢ → 1.43¢).
+- Recalibrate the market maker's k from fill rates once value traders exist: k = 1.0 was chosen
+  from a P&L sweep in a market with no fair-value anchor (D-033).
 
 ## Agent algorithms (use published models; cite them in the glass box)
 - Crowd overall: Chiarella–Iori fundamentalist–chartist–noise (FCN) framework.
@@ -317,8 +329,8 @@ Stretch: Cholesky decomposition for correlated multi-stock moves.
 
 ## Missions (structured learning)
 Each mission = preset scenario + goal + user attempt + debrief + a line connecting it to real
-finance careers. Missions double as ready-made professor assignments. Contest build: Mission 5
-(never cut), plus Missions 1 and 3 if time allows. The rest come after the contest.
+finance careers. Missions double as ready-made professor assignments. Contest build: cut unless
+ahead of the roadmap (Mission 5 first, then 1 and 3). The rest come after the contest.
 1. Make your first trade — order book and price formation (every trading role)
 2. Be the market maker — spreads, liquidity, inventory risk (market-making firms)
 3. Survive the headline — news, fair value, overreaction (event-driven funds)
@@ -351,39 +363,36 @@ Each step must work and be tested before the next depends on it. Scheduling foll
 below: multi-stock, macro, regime presets and Strategy Arena (parts of 12–13) are now stretch.
 
 ## Roadmap
-- Week 1 ✅ Done: repo, deploy, layout shell, OrderBook + 107 tests, 98% mutation score.
-- Week 2 (Oct 2–18): Steps 1–9: 1 matching engine ✅, 2 seeded RNG + sim clock ✅, 3 noise traders
-  ✅, 4 realized volatility + 5 Avellaneda–Stoikov market maker (planned and built together),
-  6 momentum traders (4–6 by Oct 14), 7 Web Worker + batched snapshots, 8 terminal UI + chart +
-  tape, 9 market alive on load (7–9 by Oct 18).
-  Milestone: prices moving on the live site (Oct 18).
-- Week 3 (Oct 19–25): Value, Panic (threshold cascade) and Whale agents; `CROWD` panel; narrator
-  v1 (`CHAT`); attribution (`WHO`, "who moved the price?"); command bar with codes for panels that
-  exist; `NEWS` headline input; the AI `/api/interpret` route for headlines → clamped, editable
-  parameters, built so the same route handles strategies (StrategySpec) in Week 4; manual
-  buy/sell (`TKT`).
-  Milestone (Oct 25): headline → crowd reacts → who moved the price, working on the live site.
-  Tuning target: trades arrive in uneven bursts, never at a steady rhythm, and big moves cluster
-  together like a real market (volatility clustering).
-- Week 4 (Oct 26–31): the strategy agent (StrategySpec → rules that trade) with `STRAT` and the
-  glass box reveal; execution report (`EXR`); full `BOOK` depth view; Mission 5; polish.
-  Milestone (Oct 31): the full 90-second demo end to end (strategy → headline → reaction →
-  execution report → glass box).
-- If time (in cut order, below): Missions 1 and 3, realism panel, Learn/Pro modes, rewind,
-  what-if reruns, `ASK`, hover formulas, shortcut strip, `HELP`.
-- Professor interviews: during Oct 11–25.
-- Stretch only if ahead (after the contest essentials): multi-stock + macro + regime presets,
-  Strategy Arena, option pricing, supply chain mapping, bonds.
-- Nov 1–5: feature freeze, demo script, backup video, rehearsals.
+Done: Week 1 (repo, deploy, layout shell, OrderBook), Steps 1–3 (matching engine, seeded RNG +
+sim clock, noise traders + simulation loop), Steps 4–5 (realized volatility + Avellaneda–Stoikov
+market makers).
 
-Priority rule: learning features (missions, narrator, Learn mode) beat breadth features
-(multi-stock, options). Depth over breadth.
+New priority: everything visible. The engine is strong; judges can only grade what they can see.
 
-Cut order if time runs short (first to go → last): rewind → what-if reruns → Learn/Pro modes →
-`ASK`, hover formulas, shortcut strip (and function codes beyond existing panels) → realism
-panel → Missions 1 and 3.
+- **Sun 10/18:** Web Worker + terminal UI (status bar, ticker, `GP` chart, `TAPE`, `BOOK` basics)
+  + market alive on load. Milestone: prices moving on the live site.
+- **Mon 10/19:** value traders (fair value), panic sellers (threshold cascade), headline shock =
+  a fair-value jump.
+- **Tue 10/20:** `/api/interpret` for headlines → clamped, editable parameters; `NEWS` input;
+  `CHAT` narrator (deterministic); `WHO` attribution.
+- **Wed 10/21:** strategy agent (StrategySpec via the same route) + glass box + `TKT` manual
+  buy/sell.
+- **Thu 10/22:** `EXR` execution report (slippage split, P&L), tuning.
+- **Fri 10/23:** feature freeze, bug bash, demo script, backup video.
+- **Cut unless ahead:** momentum, whale, missions, full depth view, realism panel, Learn/Pro,
+  rewind, what-if, `ASK`, shortcut strip.
+- **If time:** Sharpe ratio and max drawdown in `EXR`.
+
 Never cut: the market moving on screen, the headline reaction, "who moved the price?", the
-strategy agent + glass box, Mission 5.
+strategy agent + glass box, the execution report.
+
+### Daily process
+- One short plan per day. Build, then one Codex review at the end of the day.
+- Fix High/Medium review findings immediately; list Low findings in `docs/LATER.md`.
+- Mutation testing: engine code only, once per day before committing.
+- UI: a Playwright smoke test (page loads, prices change within 5 seconds, no console errors)
+  runs in CI next to typecheck, lint and unit tests.
+- Never break the live site: check the Vercel deploy after every push.
 
 ## Conventions
 - TypeScript strict mode. Small, focused commits with clear messages.

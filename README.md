@@ -234,27 +234,29 @@ scripts/reference/xoshiro128ss.c   Reference C generator the RNG tests are check
 
 ## Roadmap
 
-Four weeks of building, then a week of rehearsal. Each week ends as a complete, working demo.
+The engine is strong; the last week is about making everything visible. Each day ends with a
+working build on the live site.
 
-| When | Deliverables | Milestone |
-| --- | --- | --- |
-| **Week 1** ✅ Done | Repo, deploy, layout shell, OrderBook + 107 tests, 98% mutation score | |
-| **Week 2** (Oct 2–18) | Steps 1–9: matching engine ✅, seeded RNG + sim clock ✅, noise traders ✅, realized volatility + Avellaneda–Stoikov market maker and momentum traders (by Oct 14), Web Worker + batched snapshots, terminal UI + chart + tape, market alive on load (by Oct 18) | Prices moving on the live site (Oct 18) |
-| **Week 3** (Oct 19–25) | Value, Panic and Whale agents; crowd panel; narrator v1; attribution ("who moved the price?"); command bar; headline input with the AI interpret route (built to handle strategies in Week 4); manual buy/sell | Headline → crowd reacts → who moved the price, on the live site (Oct 25) |
-| **Week 4** (Oct 26–31) | Strategy agent (plain-English strategy → rules that trade) with the glass box reveal; execution report; full depth view; Mission 5; polish | The full 90-second demo end to end (Oct 31) |
-| **If time** | Missions 1 and 3, realism panel, Learn/Pro modes, rewind, what-if reruns, ask-the-AI, hover formulas, shortcut strip | |
-| **Stretch** (only if ahead) | Multi-stock + macro + regime presets, Strategy Arena, option pricing, supply chain mapping, bonds | |
-| **Nov 1–5** | Feature freeze, demo script, backup video, rehearsals | |
+| Day | Deliverables |
+| --- | --- |
+| **Done** | Repo, deploy, layout shell; order book, matching engine, seeded randomness + sim clock, noise traders; realized volatility + Avellaneda–Stoikov market makers (in review) |
+| **Sun 10/18** | Web Worker + terminal UI (status bar, ticker, price chart, time & sales, order book basics) + market alive on load. **Milestone: prices moving on the live site** |
+| **Mon 10/19** | Value traders (fair value), panic sellers (threshold cascade), headline shock = a fair-value jump |
+| **Tue 10/20** | AI interpret route for headlines → clamped, editable parameters; headline input; desk-chat narrator (deterministic); "who moved the price?" attribution |
+| **Wed 10/21** | Strategy agent (plain-English strategy via the same route) + glass box + manual buy/sell |
+| **Thu 10/22** | Execution report (slippage split into spread and impact, P&L), tuning |
+| **Fri 10/23** | Feature freeze, bug bash, demo script, backup video |
+| **If time** | Sharpe ratio and max drawdown in the execution report |
+| **Cut unless ahead** | Momentum traders, whale, missions, full depth view, realism panel, Learn/Pro modes, rewind, what-if reruns, ask-the-AI, shortcut strip |
 
-Professor interviews happen during Oct 11–25.
+**Never cut:** the market moving on screen, the headline reaction, "who moved the price?", the
+strategy agent + glass box, the execution report.
 
-**Priority rule:** learning features (missions, narrator, Learn mode) beat breadth features
-(multi-stock, options). Depth over breadth.
-
-**Cut order if time runs short** (first to go → last): rewind → what-if reruns → Learn/Pro modes →
-ask-the-AI, hover formulas, shortcut strip → realism panel → Missions 1 and 3. **Never cut:** the
-market moving on screen, the headline reaction, "who moved the price?", the strategy agent + glass
-box, Mission 5.
+**How each day runs:** one short plan, build, then an independent code review (Codex) at the end
+of the day. High and medium findings are fixed immediately; low ones go to
+[`docs/LATER.md`](docs/LATER.md). Mutation testing runs on the engine once a day before
+committing. CI runs typecheck, lint and unit tests on every push and pull request; a browser smoke
+test (page loads, prices move, no console errors) joins it with the first live UI.
 
 ### The 90-second demo
 
@@ -263,7 +265,7 @@ box, Mission 5.
 2. **Market.** A judge types any headline live, the crowd reacts, and the strategy trades
    through it.
 3. **Reality check.** The execution report shows the intended price (the market's mid price when
-   the order arrived) vs. the actual average fill (slippage), P&L, Sharpe ratio and max drawdown.
+   the order arrived) vs. the actual average fill (slippage, split into spread and impact), and P&L.
 4. **Reveal.** "Show me what I built": English → rules → formulas with real numbers → Python.
 
 ---

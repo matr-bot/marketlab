@@ -1000,3 +1000,81 @@ widened spreads 4×" would not show on screen today. **Proposed Week 3 tuning (n
    most of the time;
 2. let noise traders' limit offsets widen with volatility too, as real limit-order traders do.
 Both to be measured against this same report.
+
+---
+
+## D-037 · The page pulls one coalesced frame per animation frame from the worker
+
+**Date:** 2026-10-17 · **Status:** Accepted
+
+**Decision.** The simulation runs in a Web Worker (`src/worker/sim.worker.ts`). The page sends
+`start` once, then one `frame` request per animation frame, and only after the previous frame has
+arrived. The worker answers each request with one `Frame` (`src/engine/feed.ts`): status-bar
+numbers (last, open, volume, clock, seed), best bid/ask, 20 book levels per side, the trades since
+the last frame and the candles they touched. So the worker never posts more than once per
+animation frame and frames never queue up, however busy the market is.
+
+- At most 500 trades wait for the next frame (the newest); older ones are counted in
+  `droppedTrades` but still counted in volume and candles. At 1× speed a frame carries 0–2 trades.
+- The feed only reads the simulation, so taking frames cannot change the market (tested).
+- A hidden tab gets no animation frames, so the market pauses with it.
+
+**Alternatives.** *Worker pushes on its own timer:* simpler, but messages can pile up behind a
+busy main thread. *SharedArrayBuffer:* needs cross-origin isolation headers on Vercel; not worth
+it at one message per frame.
+
+---
+
+## D-038 · Demo market, 10-minute warm-up and 10-second candles
+
+**Date:** 2026-10-17 · **Status:** Accepted
+
+**Decision.** Every page load opens `createDemoMarket()`: seed 187, SPY from $187.00, 40 noise
+traders and the two market makers. The worker first simulates 10 minutes (6,000 ticks), so the
+page opens at 09:40 already trading, with the volatility estimate ready (125 s, D-032), a full
+tape and about 60 candles. Candles are 10 seconds of sim time.
+
+**Measured.** 10 minutes of this market simulate in 45 ms in Node; in headless Chromium the first
+frame is on screen 125–130 ms after navigation, page load included. Every 10-second interval of
+the warm-up has at least 32 fills, so the chart has no gaps. The "OPENING MARKET" state is shown
+only if the warm-up takes longer than about 1 s (a CSS animation delay, no timer), so on a normal
+machine it never appears.
+
+**Alternatives.** *One-minute candles:* only 10 candles on load and a slow-moving chart at 1×.
+*No warm-up:* an empty chart and tape on load, which reads as "not running".
+
+---
+
+## D-039 · The real clock decides only how many ticks run
+
+**Date:** 2026-10-17 · **Status:** Accepted
+
+**Decision.** `TickPacer` turns real elapsed milliseconds into whole 100 ms ticks (carrying the
+remainder), times the speed. The worker is the only code that reads the real clock
+(`performance.now()`), and only to ask the pacer how many ticks are due. What happens in a tick
+depends only on the seed and the tick count. After a long gap (a hidden tab) at most 10 ticks run
+and the rest is dropped, so the page never freezes simulating a backlog; sim time then lags wall
+time, which is fine because the sim clock is its own.
+
+**Tested (your requirement).** The worker's loop driven by smooth 60 fps frames, by random
+0–250 ms frames, and at 4× speed gives a byte-identical fill log and book for the same number of
+ticks, identical to a plain `sim.run`; the page ends up with the same trades and candles even
+though the frames slice them differently.
+
+---
+
+## D-040 · Ticker tape, tick direction and panel numbers
+
+**Date:** 2026-10-17 · **Status:** Accepted
+
+**Decision.**
+- **Tick direction:** a trade is "up" if its price is above the previous trade's, "down" if
+  below; an unchanged price keeps the last direction (the zero-plus/zero-minus tick convention).
+  The session's first trade counts as up. TAPE and the ticker use the same direction.
+- **Ticker:** one item per trade (`SPY 1,340 @ 187.42 ▲`). It scrolls at 50 px/s when quiet,
+  faster as items queue (up to 260 px/s). The demo market trades about 5 times a second, more
+  than any readable strip can show, so when more than two strip-widths are waiting, the oldest
+  waiting items are skipped and the strip shows recent trades. TAPE lists every trade. On load the
+  strip starts already full, since the market is already running.
+- **Panel numbers** follow the default layout (1 GP, 4 TAPE, 5 BOOK); panels that have not shipped
+  are not drawn and the grid closes up, so today's numbers stay valid as panels 2, 3, 6–8 arrive.

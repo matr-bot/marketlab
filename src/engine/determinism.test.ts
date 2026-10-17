@@ -102,7 +102,7 @@ describe("determinism backstop: the engine's full random workloads never reach a
     same(normal, withBannedGlobals(() => runEngineWorkload(seed)));
   }, SLOW);
 
-  it.each([1, 187, 4_294_967_295])("the whole market: 40 noise traders for 10 sim-minutes, seed %i", (seed) => {
+  it.each([1, 187, 4_294_967_295])("the whole market: 40 noise traders + 2 market makers for 10 sim-minutes, with volatility, seed %i", (seed) => {
     const normal = runSimulationWorkload(seed);
     expect(normal.fills).toBeGreaterThan(2_000);
     same(normal, withBannedGlobals(() => runSimulationWorkload(seed)));

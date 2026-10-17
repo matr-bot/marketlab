@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toTick } from "./price";
+import { highestPrice, toTick } from "./price";
 
 describe("toTick: the only place a computed price becomes whole cents (D-027)", () => {
   it.each([
@@ -46,5 +46,15 @@ describe("toTick: the only place a computed price becomes whole cents (D-027)", 
 
   it("throws for a bad direction", () => {
     expect(() => toTick(100, 1, "sideways" as "up")).toThrow('direction must be "down" or "up", got sideways');
+  });
+});
+
+describe("highestPrice: the top of the legal range on a tick grid", () => {
+  it.each([
+    [1, 100_000_000],
+    [7, 99_999_998],
+    [100_000_000, 100_000_000],
+  ])("highestPrice(%s) = %s", (tick, expected) => {
+    expect(highestPrice(tick)).toBe(expected);
   });
 });

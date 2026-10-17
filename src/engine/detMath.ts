@@ -172,3 +172,11 @@ export function nextUp(x: number): number {
   }
   return f64[0];
 }
+
+/**
+ * Square root. The spec requires Math.sqrt to be correctly rounded (exact), so it is already the
+ * same in every browser; this alias just lets engine math read from one module (D-019).
+ */
+export function sqrt(x: number): number {
+  return Math.sqrt(x);
+}

@@ -1,6 +1,8 @@
 // Market sanity report (test-only). Runs a simulation and measures what a careful reviewer would
 // ask about a thin, noise-only market. Every number comes from engine state through the
 // simulation's observer hooks; the report never changes the market.
+import type { AgentSpec } from "../agents/agent";
+import { DEFAULT_MM_PARAMS, MarketMaker, type MarketMakerParams } from "../agents/marketMaker";
 import { noiseTraders, type NoiseTraderParams, DEFAULT_NOISE_PARAMS } from "../agents/noiseTrader";
 import { Simulation } from "../simulation";
 import type { Side } from "../types";
@@ -35,6 +37,51 @@ export interface MarketReport {
   noLiquidityRejections: number;
   /** Minutes with no trade at all. */
   minutesWithoutTrades: number;
+  /** Share of tick-end best bids / asks where a market maker has an order at that price. */
+  mmAtBestBidShare: number;
+  mmAtBestAskShare: number;
+  /** Share of the quantity at the best bid and ask that belongs to market makers. */
+  mmShareOfBestQty: number;
+  /** Market-maker P&L in cents, marked to the final mid, per market maker. */
+  mmPnl: Record<string, number>;
+  /** Fills with a market maker on either side. */
+  mmFills: number;
+  /** Largest absolute market-maker position (shares). */
+  mmMaxAbsPosition: number;
+}
+
+export interface ReportOptions {
+  noise?: NoiseTraderParams;
+  /** Market makers to add (none by default). */
+  marketMakers?: ReadonlyArray<{ gamma: number }>;
+  mmParams?: MarketMakerParams;
+  /** Multiply the volatility the market makers see (a stub, for "what if volatility were 4×"). */
+  mmSigmaMultiplier?: number;
+}
+
+/** Market makers built for a report, optionally seeing a multiplied volatility. */
+function reportMarketMakers(opts: ReportOptions): AgentSpec[] {
+  const params = opts.mmParams ?? DEFAULT_MM_PARAMS;
+  const mult = opts.mmSigmaMultiplier ?? 1;
+  return (opts.marketMakers ?? []).map(({ gamma }, i) => ({
+    id: `mm-${i + 1}`,
+    agentType: "marketMaker" as const,
+    ratePerSec: 5,
+    create: () => {
+      const mm = new MarketMaker({ ...params, gamma });
+      return {
+        act: (ctx) => {
+          if (mult === 1) return mm.act(ctx);
+          const v = ctx.volatility;
+          mm.act({
+            time: ctx.time, book: ctx.book, startPrice: ctx.startPrice, myOrders: ctx.myOrders, submit: ctx.submit, cancel: ctx.cancel,
+            lastTradePrice: ctx.lastTradePrice, position: ctx.position,
+            volatility: { sigma: v.sigma * mult, fast: v.fast * mult, slow: v.slow * mult, samples: v.samples, ready: v.ready },
+          });
+        },
+      };
+    },
+  }));
 }
 
 /** Median: the middle value, or the average of the two middle values for an even count; NaN if empty. */
@@ -45,7 +92,13 @@ export function median(values: readonly number[]): number {
   return sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
-export function runMarketReport(seed: number, ticks: number, params: NoiseTraderParams = DEFAULT_NOISE_PARAMS): MarketReport {
+export function runMarketReport(seed: number, ticks: number, params: NoiseTraderParams | ReportOptions = DEFAULT_NOISE_PARAMS): MarketReport {
+  const opts: ReportOptions = "pMarket" in params ? { noise: params } : params;
+  let mmAtBid = 0;
+  let mmAtAsk = 0;
+  let bestQty = 0;
+  let mmBestQty = 0;
+  let mmMaxAbsPosition = 0;
   let bidEmpty = 0;
   let askEmpty = 0;
   let eitherEmpty = 0;
@@ -69,7 +122,7 @@ export function runMarketReport(seed: number, ticks: number, params: NoiseTrader
 
   const sim: Simulation = new Simulation({
     seed,
-    agents: noiseTraders(40, 0.5, params),
+    agents: [...noiseTraders(40, 0.5, opts.noise ?? DEFAULT_NOISE_PARAMS), ...reportMarketMakers(opts)],
     observer: {
       onArrival: () => {
         const bid = sim.engine.book.bestBid();
@@ -109,6 +162,18 @@ export function runMarketReport(seed: number, ticks: number, params: NoiseTrader
         if (ask === null) askEmpty++;
         if (bid === null || ask === null) eitherEmpty++;
         else spreads.push(ask - bid);
+        for (const [side, price] of [["buy", bid], ["sell", ask]] as const) {
+          if (price === null) continue;
+          const atBest = book.ordersAt(side, price);
+          const mm = atBest.filter((o) => o.agentType === "marketMaker");
+          if (mm.length > 0) {
+            if (side === "buy") mmAtBid++;
+            else mmAtAsk++;
+          }
+          bestQty += atBest.reduce((s, o) => s + o.qty, 0);
+          mmBestQty += mm.reduce((s, o) => s + o.qty, 0);
+        }
+        for (let i = 1; i <= (opts.marketMakers ?? []).length; i++) mmMaxAbsPosition = Math.max(mmMaxAbsPosition, Math.abs(sim.positionOf(`mm-${i}`)));
         const count = (side: Side) => book.depth(side).reduce((s, l) => s + l.orderCount, 0);
         bidOrders += count("buy");
         askOrders += count("sell");
@@ -116,6 +181,11 @@ export function runMarketReport(seed: number, ticks: number, params: NoiseTrader
     },
   });
   sim.run(ticks);
+  const finalBid = sim.engine.book.bestBid();
+  const finalAsk = sim.engine.book.bestAsk();
+  const finalMid = finalBid !== null && finalAsk !== null ? (finalBid + finalAsk) / 2 : (sim.lastTradePrice ?? sim.startPrice);
+  const mmPnl: Record<string, number> = {};
+  for (let i = 1; i <= (opts.marketMakers ?? []).length; i++) mmPnl[`mm-${i}`] = sim.cashOf(`mm-${i}`) + sim.positionOf(`mm-${i}`) * finalMid;
 
   const minutes = Math.ceil((ticks * 100) / 60_000);
   return {
@@ -140,5 +210,11 @@ export function runMarketReport(seed: number, ticks: number, params: NoiseTrader
     marketOrdersOver2000,
     noLiquidityRejections,
     minutesWithoutTrades: minutes - tradedMinutes.size,
+    mmAtBestBidShare: mmAtBid / ticks,
+    mmAtBestAskShare: mmAtAsk / ticks,
+    mmShareOfBestQty: bestQty > 0 ? mmBestQty / bestQty : 0,
+    mmPnl,
+    mmFills: sim.engine.fills.filter((f) => f.buy.agentType === "marketMaker" || f.sell.agentType === "marketMaker").length,
+    mmMaxAbsPosition,
   };
 }

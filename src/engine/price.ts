@@ -16,6 +16,10 @@ export function toTick(x: number, tick: Cents, direction: "down" | "up"): Cents 
   if (tick > MAX_PRICE_CENTS) throw new RangeError(`tick ${tick} is larger than the maximum price ${MAX_PRICE_CENTS}`);
   if (direction !== "down" && direction !== "up") throw new RangeError(`direction must be "down" or "up", got ${String(direction)}`);
   const steps = direction === "down" ? Math.floor(x / tick) : Math.ceil(x / tick);
-  const highest = Math.floor(MAX_PRICE_CENTS / tick);
-  return Math.min(Math.max(steps, 1), highest) * tick;
+  return Math.min(Math.max(steps, 1) * tick, highestPrice(tick));
+}
+
+/** The highest price on the `tick` grid that the book accepts: the largest multiple of `tick` ≤ MAX_PRICE_CENTS. */
+export function highestPrice(tick: Cents): Cents {
+  return Math.floor(MAX_PRICE_CENTS / tick) * tick;
 }

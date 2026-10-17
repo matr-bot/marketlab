@@ -19,6 +19,8 @@ function fakeContext(opts: { bid?: number | null; ask?: number | null; last?: nu
     book,
     lastTradePrice: opts.last ?? null,
     startPrice: 18_700,
+    position: 0,
+    volatility: { sigma: 4.3e-5, fast: 4.3e-5, slow: 4.3e-5, samples: 0, ready: false },
     myOrders: () => opts.orders ?? [],
     submit: (o) => {
       submitted.push(o);

@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import type { Agent, AgentContext, AgentSpec } from "./agents/agent";
+import { marketMakers } from "./agents/marketMaker";
 import { DEFAULT_NOISE_PARAMS, NoiseTrader, noiseTraders } from "./agents/noiseTrader";
 import { Simulation } from "./simulation";
 import { fingerprint } from "./testing/fingerprint";
@@ -30,6 +31,13 @@ describe("Simulation: same seed → identical market", () => {
     const sim = demo();
     sim.run(TEN_MINUTES);
     expect(marketFingerprint(sim)).toBe(PINNED_DEMO_MARKET);
+  });
+
+  it("is pinned with market makers too: 40 noise traders + 2 market makers, 10 minutes, seed 187", () => {
+    const sim = demo(187, [...noiseTraders(40, 0.5), ...marketMakers()]);
+    sim.run(TEN_MINUTES);
+    expect(sim.engine.fills.some((f) => f.buy.agentType === "marketMaker" || f.sell.agentType === "marketMaker")).toBe(true);
+    expect(marketFingerprint(sim)).toBe(PINNED_MM_MARKET);
   });
 
   it("a different seed gives a different market", () => {
@@ -192,6 +200,23 @@ describe.skipIf(MUTATION_RUN)("Simulation: invariants and conservation over one 
     expect(fromOrders.size).toBe(40); // every trader traded
   });
 
+  it("tracks every agent's position and cash exactly as the fills add up", () => {
+    const pos = new Map<string, number>();
+    const cash = new Map<string, number>();
+    for (const f of sim.engine.fills) {
+      pos.set(f.buy.ownerId, (pos.get(f.buy.ownerId) ?? 0) + f.qty);
+      pos.set(f.sell.ownerId, (pos.get(f.sell.ownerId) ?? 0) - f.qty);
+      cash.set(f.buy.ownerId, (cash.get(f.buy.ownerId) ?? 0) - f.price * f.qty);
+      cash.set(f.sell.ownerId, (cash.get(f.sell.ownerId) ?? 0) + f.price * f.qty);
+    }
+    for (const id of owners) {
+      expect(sim.positionOf(id), id).toBe(pos.get(id) ?? 0);
+      expect(sim.cashOf(id), id).toBe(cash.get(id) ?? 0);
+    }
+    expect(sim.positionOf("nobody")).toBe(0);
+    expect(sim.cashOf("nobody")).toBe(0);
+  });
+
   it("tracks the last trade price", () => {
     const fills = sim.engine.fills;
     expect(sim.lastTradePrice).toBe(fills[fills.length - 1].price);
@@ -332,6 +357,37 @@ describe("Simulation: the agent context", () => {
     expect(lastSeen).toBe(18_750);
   });
 
+  it("books cash and position for both sides of every fill (fast version of the hour-long check)", () => {
+    const sim = new Simulation({
+      seed: 3,
+      agents: [
+        scripted("maker", (ctx) => {
+          if (ctx.myOrders().length === 0) ctx.submit({ type: "limit", side: "sell", price: 18_750, qty: 1_000_000 });
+        }),
+        scripted("taker", (ctx) => {
+          ctx.submit({ type: "market", side: "buy", qty: 3 });
+        }),
+      ],
+    });
+    sim.run(100);
+    const n = sim.engine.fills.length;
+    expect(n).toBeGreaterThan(5);
+    expect([sim.positionOf("taker"), sim.cashOf("taker")]).toEqual([3 * n, -18_750 * 3 * n]);
+    expect([sim.positionOf("maker"), sim.cashOf("maker")]).toEqual([-3 * n, 18_750 * 3 * n]);
+    expect([sim.positionOf("nobody"), sim.cashOf("nobody")]).toEqual([0, 0]);
+  });
+
+  it("skips volatility samples while either side of the book is empty (D-032)", () => {
+    for (const side of ["buy", "sell"] as const) {
+      const sim = new Simulation({
+        seed: 3,
+        agents: [scripted("one-sided", (ctx) => void (ctx.myOrders().length < 3 && ctx.submit({ type: "limit", side, price: side === "buy" ? 18_600 : 18_800, qty: 10 })))],
+      });
+      sim.run(300); // 30 s: six sample times
+      expect(sim.volatility.view.samples, side).toBe(0);
+    }
+  });
+
   it("rejects bad configuration", () => {
     expect(() => new Simulation({ seed: 1, agents: [...noiseTraders(2, 1), ...noiseTraders(1, 1)] })).toThrow("Duplicate agent id: noise-1");
     expect(() => new Simulation({ seed: 1, startPrice: 0, agents: [] })).toThrow(/startPrice must be a positive whole number of ticks/);
@@ -355,3 +411,5 @@ describe("Simulation: the agent context", () => {
 
 // Fingerprint of the 10-minute seed-187 demo market (fills + final book).
 const PINNED_DEMO_MARKET = "e645d6434f2a0b64";
+// Fingerprint of the 10-minute seed-187 market with two market makers added.
+const PINNED_MM_MARKET = "f713b6e6055aebc3";

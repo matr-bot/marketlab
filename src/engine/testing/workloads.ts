@@ -3,6 +3,7 @@
 // step (D-004), then returns what it saw plus a fingerprint of the final state, so the same
 // workload can be rerun with the inexact Math functions stubbed out (determinism.test.ts).
 import { expect } from "vitest";
+import { marketMakers } from "../agents/marketMaker";
 import { noiseTraders } from "../agents/noiseTrader";
 import { ArrivalScheduler } from "../arrivals";
 import { exp, ln, pow } from "../detMath";
@@ -288,12 +289,17 @@ export function runRandomnessWorkload(seed: number): WorkloadResult {
 // ---------------------------------------------------------------------------------------------
 
 export function runSimulationWorkload(seed: number, ticks = 6_000): WorkloadResult {
-  const sim = new Simulation({ seed, agents: noiseTraders(40, 0.5) });
+  const sim = new Simulation({ seed, agents: [...noiseTraders(40, 0.5), ...marketMakers()] });
   sim.run(ticks);
   return {
     seen: new Map([["fills", sim.engine.fillCount]]),
     peak: sim.engine.book.size,
     fills: sim.engine.fillCount,
-    fingerprint: fingerprint({ fills: sim.engine.fills, bids: sim.engine.book.depth("buy"), asks: sim.engine.book.depth("sell") }),
+    fingerprint: fingerprint({
+      fills: sim.engine.fills,
+      bids: sim.engine.book.depth("buy"),
+      asks: sim.engine.book.depth("sell"),
+      volatility: [sim.volatility.view.fast, sim.volatility.view.slow, sim.volatility.view.samples],
+    }),
   };
 }

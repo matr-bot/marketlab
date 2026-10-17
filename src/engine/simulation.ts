@@ -5,6 +5,7 @@ import type { MatchingEngine, OrderInput, SubmitResult } from "./matchingEngine"
 import { Rng } from "./rng";
 import { SimClock, type TickWindow } from "./simClock";
 import type { CancelResult, Cents, OrderId } from "./types";
+import { DEFAULT_VOLATILITY_PARAMS, VolatilityEstimator, type VolatilityParams } from "./volatility";
 
 // The simulation loop (D-023). Each tick: advance the clock 100 ms, take every agent arrival in
 // that window in exact time order, and let each agent act at its arrival's timestamp. Orders
@@ -22,6 +23,8 @@ export interface SimulationConfig {
   /** Opening reference price in cents (default 18,700 = $187.00). */
   readonly startPrice?: Cents;
   readonly agents: readonly AgentSpec[];
+  /** Realized-volatility settings (default: 5 s sampling, 30 s and 120 s half-lives). */
+  readonly volatility?: VolatilityParams;
   /** Optional hooks for reports and tests; they observe only and cannot change anything. */
   readonly observer?: SimulationObserver;
 }
@@ -44,6 +47,10 @@ export class Simulation {
   private readonly agents = new Map<string, { spec: AgentSpec; act: (ctx: AgentContext) => void }>();
   private readonly observer: SimulationObserver;
   private last: Cents | null = null;
+  readonly volatility: VolatilityEstimator;
+  /** Shares and cash (cents) per agent, from fills. */
+  private readonly positions = new Map<string, number>();
+  private readonly cash = new Map<string, number>();
 
   constructor(config: SimulationConfig) {
     this.rng = Rng.fromSeed(config.seed);
@@ -53,6 +60,7 @@ export class Simulation {
       throw new RangeError(`startPrice must be a positive whole number of ticks in cents, got ${this.startPrice}`);
     }
     this.observer = config.observer ?? {};
+    this.volatility = new VolatilityEstimator(config.volatility ?? DEFAULT_VOLATILITY_PARAMS);
     this.scheduler = new ArrivalScheduler(this.rng); // streams "arrivals/<id>"
     const decisions = this.rng.stream("decisions");
     for (const spec of config.agents) {
@@ -68,6 +76,16 @@ export class Simulation {
     return this.last;
   }
 
+  /** Shares held by an agent (+ long, − short); 0 if it never traded. */
+  positionOf(agentId: string): number {
+    return this.positions.get(agentId) ?? 0;
+  }
+
+  /** Cash change of an agent in cents (− for buying, + for selling); 0 if it never traded. */
+  cashOf(agentId: string): number {
+    return this.cash.get(agentId) ?? 0;
+  }
+
   /** Advance one tick (100 ms): every arrival in the window acts, in exact time order. */
   step(): TickWindow {
     const window = this.clock.advance();
@@ -75,6 +93,11 @@ export class Simulation {
       this.observer.onArrival?.(arrival);
       const agent = this.agents.get(arrival.sourceId)!;
       agent.act(this.context(agent.spec, arrival.timeMs));
+    }
+    if (this.volatility.isSampleTime(window.end)) {
+      const bid = this.engine.book.bestBid();
+      const ask = this.engine.book.bestAsk();
+      this.volatility.sample(window.end, bid !== null && ask !== null ? bid + ask : null);
     }
     this.observer.onTickEnd?.(window);
     return window;
@@ -86,21 +109,37 @@ export class Simulation {
     for (let i = 0; i < ticks; i++) this.step();
   }
 
+  private book(agentId: string, shares: number, cents: number): void {
+    this.positions.set(agentId, (this.positions.get(agentId) ?? 0) + shares);
+    this.cash.set(agentId, (this.cash.get(agentId) ?? 0) + cents);
+  }
+
   private context(spec: AgentSpec, time: number): AgentContext {
     const engine = this.engine;
     const lastTrade = () => this.last;
+    const position = () => this.positionOf(spec.id);
     return {
       time,
       book: engine.book,
       startPrice: this.startPrice,
+      volatility: this.volatility.view,
       get lastTradePrice() {
         return lastTrade();
+      },
+      get position() {
+        return position();
       },
       myOrders: () => engine.book.ordersOf(spec.id),
       submit: (order: AgentOrder) => {
         const input: OrderInput = { ...order, ownerId: spec.id, agentType: spec.agentType };
         const result = engine.submit(input, time);
-        if (result.ok && result.fills.length > 0) this.last = result.fills[result.fills.length - 1].price;
+        if (result.ok) {
+          for (const f of result.fills) {
+            this.book(f.buy.ownerId, f.qty, -f.price * f.qty);
+            this.book(f.sell.ownerId, -f.qty, f.price * f.qty);
+          }
+          if (result.fills.length > 0) this.last = result.fills[result.fills.length - 1].price;
+        }
         this.observer.onSubmit?.(spec.id, input, result, time);
         return result;
       },

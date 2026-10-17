@@ -1,6 +1,7 @@
 import type { BookView, SubmitResult } from "../matchingEngine";
 import type { Rng } from "../rng";
 import type { AgentType, CancelResult, Cents, OrderId, RestingOrder, Side } from "../types";
+import type { VolatilityView } from "../volatility";
 
 // The agent interface (D-023). An agent acts only at its own random arrival times (Poisson, from
 // the scheduler), never on a fixed rhythm. Each time, it gets a context: what it may see and the
@@ -21,6 +22,10 @@ export interface AgentContext {
   readonly lastTradePrice: Cents | null;
   /** The opening price, used when there is neither a two-sided book nor a trade yet. */
   readonly startPrice: Cents;
+  /** Shares this agent holds: + long, − short (the simulation tracks it from fills). */
+  readonly position: number;
+  /** Realized volatility of the mid (log return per √second of sim time; D-029 to D-032). */
+  readonly volatility: VolatilityView;
   /** This agent's resting orders, oldest first (sorted explicitly by engine sequence; D-026). */
   myOrders(): RestingOrder[];
   submit(order: AgentOrder): SubmitResult;

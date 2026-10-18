@@ -3,6 +3,7 @@
 import { Panel } from "@/components/Panel";
 import { formatInterval } from "@/lib/format";
 import { BookPanel } from "./BookPanel";
+import { CommandBar } from "./CommandBar";
 import { PriceChart } from "./PriceChart";
 import { StatusBar } from "./StatusBar";
 import { TapePanel } from "./TapePanel";
@@ -15,7 +16,7 @@ import { useMarket } from "./useMarket";
  * shipped yet are simply not drawn, and the grid closes up around the ones that have.
  */
 export function Terminal() {
-  const status = useMarket();
+  const { status, sendShock } = useMarket();
 
   if (status.kind === "opening") return <div className={styles.opening}>OPENING MARKET</div>;
   if (status.kind === "error") {
@@ -30,10 +31,11 @@ export function Terminal() {
   return (
     <div className={styles.shell}>
       <StatusBar frame={frame} />
-      <TickerTape ticker={frame.ticker} trades={frame.trades} frameCount={frameCount} />
+      <TickerTape ticker={frame.ticker} trades={frame.trades} headlines={frame.headlines} frameCount={frameCount} />
+      <CommandBar onShock={sendShock} />
       <main className={styles.grid}>
         <Panel number={1} code="GP" title={`${frame.ticker} PRICE · ${formatInterval(frame.candleMs)} CANDLES`} className={styles.gp}>
-          <PriceChart candles={candles} candleMs={frame.candleMs} last={frame.last} />
+          <PriceChart candles={candles} candleMs={frame.candleMs} last={frame.last} headlines={frame.headlines} />
         </Panel>
         <Panel number={4} code="TAPE" title="TIME & SALES" className={styles.tape}>
           <TapePanel tape={tape} />

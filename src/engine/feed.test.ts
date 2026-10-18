@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createDemoMarket, DEMO_SEED, WARMUP_TICKS } from "./demoMarket";
 import { MarketFeed, TickPacer, type Candle, type Frame, type FrameTrade } from "./feed";
 import type { Fill } from "./matchingEngine";
+import { PRESETS } from "./presets";
 import { Rng } from "./rng";
 import { fingerprint } from "./testing/fingerprint";
 
@@ -180,14 +181,26 @@ describe("MarketFeed: one coalesced frame per request (D-037)", () => {
 });
 
 describe("The real clock decides only HOW MANY ticks run, never what happens in them (D-039)", () => {
-  /** The worker's loop: frame requests arrive after `gaps` real ms; each runs the pacer's ticks, then takes a frame. */
+  /**
+   * The worker's loop: frame requests arrive after `gaps` real ms; each runs the pacer's ticks, then
+   * takes a frame. A FED headline arrives once 1,500 ticks have run (in the worker, a message
+   * between frames; the shock lands at the start of the next tick).
+   */
   function runLoop(gaps: () => number, totalTicks: number, speed = 1) {
     const feed = feedOf();
     const pacer = new TickPacer();
     const frames: Frame[] = [];
     let ran = 0;
+    let shocked = false;
     while (ran < totalTicks) {
-      const due = Math.min(pacer.ticksFor(gaps(), speed), totalTicks - ran);
+      let due = Math.min(pacer.ticksFor(gaps(), speed), totalTicks - ran);
+      if (!shocked && ran + due >= 1_500) {
+        feed.advance(1_500 - ran); // the headline arrives exactly after tick 1,500 in every run
+        due -= 1_500 - ran;
+        ran = 1_500;
+        feed.applyPreset("FED");
+        shocked = true;
+      }
       feed.advance(due);
       ran += due;
       frames.push(feed.frame());
@@ -201,7 +214,9 @@ describe("The real clock decides only HOW MANY ticks run, never what happens in 
     const jittery = runLoop(() => jitter.uniform() * 250, 3_000);
     const fast = runLoop(() => 1000 / 60, 3_000, 4);
     const plain = createDemoMarket();
-    plain.run(3_000);
+    plain.run(1_500);
+    plain.applyShock(PRESETS[0].shock, "FED");
+    plain.run(1_500);
     const prints = [smooth, jittery, fast].map(({ feed }) => fingerprint({ fills: feed.sim.engine.fills, bids: feed.sim.engine.book.depth("buy"), asks: feed.sim.engine.book.depth("sell") }));
     const plainPrint = fingerprint({ fills: plain.engine.fills, bids: plain.engine.book.depth("buy"), asks: plain.engine.book.depth("sell") });
     expect(prints).toEqual([plainPrint, plainPrint, plainPrint]);
@@ -211,6 +226,30 @@ describe("The real clock decides only HOW MANY ticks run, never what happens in 
     const sent = (r: typeof smooth) => r.frames.flatMap((f) => f.trades);
     expect(sent(jittery)).toEqual(sent(smooth));
     expect(mergeCandles(jittery.frames)).toEqual(mergeCandles(smooth.frames));
+  });
+});
+
+describe("MarketFeed: headlines (D-048)", () => {
+  it("applies a preset at the next tick and reports it in every frame, with its P&L after 60 s", () => {
+    const feed = feedOf();
+    feed.advance(600);
+    expect(feed.applyPreset("fed")).toBe("Fed surprise hike 75bps"); // codes are case-insensitive
+    expect(feed.frame().headlines).toEqual([]); // queued, not applied until the next tick
+    feed.advance(1);
+    const [h] = feed.frame().headlines;
+    expect(h).toEqual({ time: 60_000, code: "FED", headline: "Fed surprise hike 75bps", fairValuePct: -0.03, pnlByType: null });
+    feed.advance(600);
+    const later = feed.frame().headlines[0];
+    expect(later.pnlByType).not.toBeNull();
+    expect(later.pnlByType!.marketMaker).toBeTypeOf("number");
+  });
+
+  it("ignores an unknown code: nothing is applied", () => {
+    const feed = feedOf();
+    expect(feed.applyPreset("MOON")).toBeNull();
+    feed.advance(10);
+    expect(feed.frame().headlines).toEqual([]);
+    expect(feed.sim.shocks).toEqual([]);
   });
 });
 

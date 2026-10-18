@@ -9,10 +9,17 @@ import styles from "./terminal.module.css";
 /** Minimum row height in px; rows stretch to fill the panel exactly. */
 const ROW_H = 16;
 
-/** Levels per side: as many as fit in `height` (header and spread rows take one row each), capped by what both sides have. */
-export function levelsPerSide(height: number, asks: number, bids: number): number {
+/**
+ * Levels to show per side: as many as fit in `height` (header and spread rows take one row each).
+ * Both sides show the same number, capped by the thinner side, so the spread stays centered. If a
+ * side is empty (a one-sided book in a crash), the other side still shows its levels and the empty
+ * side shows one "NO BIDS" / "NO ASKS" row, never a blank panel.
+ */
+export function levelsPerSide(height: number, asks: number, bids: number): { asks: number; bids: number } {
   const fit = Math.max(1, Math.floor((height - 2 * ROW_H) / (2 * ROW_H)));
-  return Math.min(fit, asks, bids);
+  if (asks === 0 || bids === 0) return { asks: Math.min(fit, asks), bids: Math.min(fit, bids) };
+  const n = Math.min(fit, asks, bids);
+  return { asks: n, bids: n };
 }
 
 /** One level, with a depth bar behind it: width = this level's size ÷ the largest size shown. */
@@ -44,13 +51,13 @@ export function BookPanel({ frame }: { frame: Frame }) {
     observer.observe(box);
     return () => observer.disconnect();
   }, []);
-  const n = height === 0 ? 0 : levelsPerSide(height, frame.asks.length, frame.bids.length);
-  const asks = frame.asks.slice(0, n).reverse();
-  const bids = frame.bids.slice(0, n);
+  const n = height === 0 ? { asks: 0, bids: 0 } : levelsPerSide(height, frame.asks.length, frame.bids.length);
+  const asks = frame.asks.slice(0, n.asks).reverse();
+  const bids = frame.bids.slice(0, n.bids);
   const spread = frame.bid !== null && frame.ask !== null ? frame.ask - frame.bid : null;
   const maxQty = Math.max(1, ...asks.map((l) => l.qty), ...bids.map((l) => l.qty));
   return (
-    <div ref={boxRef} className={styles.bookPanel} data-testid="book" data-levels={n}>
+    <div ref={boxRef} className={styles.bookPanel} data-testid="book" data-levels={Math.min(n.asks, n.bids)}>
       <div className={`${styles.bookRow} ${styles.bookHead}`}>
         <span>SIDE</span>
         <span>ORDERS</span>
@@ -58,6 +65,7 @@ export function BookPanel({ frame }: { frame: Frame }) {
         <span>PRICE</span>
       </div>
       <div className={styles.bookAsks}>
+        {frame.asks.length === 0 && height > 0 && <div className={`${styles.bookRow} ${styles.bookEmpty}`}>NO ASKS</div>}
         {asks.map((l) => (
           <Level key={`a${l.price}`} level={l} side="ASK" maxQty={maxQty} />
         ))}
@@ -69,6 +77,7 @@ export function BookPanel({ frame }: { frame: Frame }) {
         <span>{frame.bid === null || frame.ask === null ? "" : `MID ${formatMid(frame.bid, frame.ask)}`}</span>
       </div>
       <div className={styles.bookBids}>
+        {frame.bids.length === 0 && height > 0 && <div className={`${styles.bookRow} ${styles.bookEmpty}`}>NO BIDS</div>}
         {bids.map((l) => (
           <Level key={`b${l.price}`} level={l} side="BID" maxQty={maxQty} />
         ))}

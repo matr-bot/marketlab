@@ -30,6 +30,9 @@ scope.onmessage = (event) => {
       feed.advance(pacer.ticksFor(now - lastRequestAt, msg.speed));
       lastRequestAt = now;
       scope.postMessage({ type: "frame", frame: feed.frame() });
+    } else if (msg.type === "shock") {
+      // The command bar only sends known codes; an unknown one is ignored rather than stopping the market.
+      feed?.applyPreset(msg.code);
     }
   } catch (err) {
     scope.postMessage({ type: "error", message: err instanceof Error ? err.message : String(err) });

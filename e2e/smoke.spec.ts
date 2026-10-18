@@ -50,3 +50,39 @@ test("the market is alive on load: prices change within 5 seconds, with no conso
 
   expect(errors).toEqual([]);
 });
+
+test("the offline headline FED, typed into the command bar, moves the market with no network call", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("console", (msg) => {
+    if (msg.type() === "error") errors.push(msg.text());
+  });
+  page.on("pageerror", (err) => errors.push(err.message));
+  const requests: string[] = [];
+  await page.goto("/");
+  const last = page.getByTestId("last-price");
+  await expect(last).toBeVisible({ timeout: 5_000 });
+  page.on("request", (r) => requests.push(r.url()));
+
+  const price = async () => Number((await last.textContent())!.replace(/,/g, ""));
+  const before = await price();
+  await page.keyboard.type("FED"); // keyboard first: typing anywhere goes to the command bar
+  await page.keyboard.press("Enter");
+
+  await expect(page.getByTestId("command-reply")).toHaveText("FED · Fed surprise hike 75bps");
+  await expect(page.getByTestId("ticker").locator("[data-headline=FED]")).toHaveCount(1);
+  await expect(page.getByTestId("chart")).toHaveAttribute("data-markers", "FED");
+  await expect.poll(price, { timeout: 10_000, intervals: [250] }).toBeLessThanOrEqual(before * 0.99);
+  // In the crash, BOOK is never blank: levels on at least one side (an empty side says NO BIDS / NO ASKS).
+  for (let i = 0; i < 10; i++) {
+    expect(await page.getByTestId("book").locator("[data-side]").count()).toBeGreaterThan(0);
+    await page.waitForTimeout(200);
+  }
+
+  await page.keyboard.type("MOON");
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("command-reply")).toContainText('Unknown command "MOON"');
+  await expect(last).toBeVisible(); // a bad command never stops the market
+
+  expect(requests.filter((u) => !u.startsWith("data:") && !u.includes("/_next/"))).toEqual([]);
+  expect(errors).toEqual([]);
+});

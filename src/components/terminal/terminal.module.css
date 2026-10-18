@@ -1,7 +1,7 @@
 /* ---------- shell ---------- */
 .shell {
   display: grid;
-  grid-template-rows: auto auto 1fr;
+  grid-template-rows: auto auto auto 1fr;
   height: 100vh;
   min-height: 560px;
   min-width: 960px;
@@ -121,6 +121,44 @@
   will-change: transform;
 }
 
+/* ---------- command bar ---------- */
+.commandBar {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.prompt {
+  color: var(--amber);
+  font-weight: 700;
+}
+
+.commandInput {
+  flex: 0 0 280px;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--fg);
+  font: inherit;
+  text-transform: uppercase;
+  caret-color: var(--amber);
+}
+
+.commandReply {
+  color: var(--amber);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.headlineItem {
+  color: var(--amber);
+  font-weight: 700;
+}
+
 /* ---------- tables (TAPE, BOOK) ---------- */
 .table {
   width: 100%;
@@ -230,6 +268,14 @@
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
   color: var(--amber);
+}
+
+.bookAsks > .bookEmpty,
+.bookBids > .bookEmpty {
+  display: block;
+  flex: 0 0 16px;
+  color: var(--amber);
+  text-align: center;
 }
 
 .bookSide {

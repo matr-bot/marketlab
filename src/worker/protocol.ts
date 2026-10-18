@@ -8,7 +8,9 @@ export type ToWorker =
   /** Build the market for `seed` and warm it up; answered with the first frame. */
   | { readonly type: "start"; readonly seed: number }
   /** Run the ticks due since the last request at `speed`× real time; answered with a frame. */
-  | { readonly type: "frame"; readonly speed: number };
+  | { readonly type: "frame"; readonly speed: number }
+  /** Apply an offline preset headline at the start of the next tick (D-048). Not answered; it shows in the next frame. */
+  | { readonly type: "shock"; readonly code: string };
 
 export type FromWorker =
   | { readonly type: "frame"; readonly frame: Frame }

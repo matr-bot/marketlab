@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Candle } from "@/engine/feed";
+import type { Candle, FrameHeadline } from "@/engine/feed";
 import { formatSimTime } from "@/engine/simClock";
 import { formatPrice } from "@/lib/format";
 import styles from "./terminal.module.css";
@@ -16,7 +16,7 @@ const VOLUME_SHARE = 0.18; // bottom part of the plot used for volume bars
 const STEPS = [1, 2, 5, 10, 20, 25, 50, 100, 200, 500, 1_000, 2_000, 5_000, 10_000];
 
 /** Price chart (GP): candles from engine fills, volume bars, and the last price on the axis. */
-export function PriceChart({ candles, candleMs, last }: { candles: readonly Candle[]; candleMs: number; last: number | null }) {
+export function PriceChart({ candles, candleMs, last, headlines }: { candles: readonly Candle[]; candleMs: number; last: number | null; headlines: readonly FrameHeadline[] }) {
   const boxRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
@@ -38,17 +38,17 @@ export function PriceChart({ candles, candleMs, last }: { candles: readonly Cand
     const g = canvas.getContext("2d");
     if (g === null) return;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    draw(g, size.w, size.h, candles, candleMs, last, getComputedStyle(canvas).fontFamily);
-  }, [size, candles, candleMs, last]);
+    draw(g, size.w, size.h, candles, candleMs, last, headlines, getComputedStyle(canvas).fontFamily);
+  }, [size, candles, candleMs, last, headlines]);
 
   return (
-    <div ref={boxRef} className={styles.chart} data-testid="chart">
+    <div ref={boxRef} className={styles.chart} data-testid="chart" data-markers={headlines.map((h) => h.code).join(" ")}>
       <canvas ref={canvasRef} aria-label="Price chart" role="img" />
     </div>
   );
 }
 
-function draw(g: CanvasRenderingContext2D, w: number, h: number, candles: readonly Candle[], candleMs: number, last: number | null, font: string) {
+function draw(g: CanvasRenderingContext2D, w: number, h: number, candles: readonly Candle[], candleMs: number, last: number | null, headlines: readonly FrameHeadline[], font: string) {
   g.fillStyle = COLORS.bg;
   g.fillRect(0, 0, w, h);
   const plotW = w - AXIS_W;
@@ -129,6 +129,27 @@ function draw(g: CanvasRenderingContext2D, w: number, h: number, candles: readon
     g.fillRect(x, top, 1, Math.max(1, yOf(c.low) - top));
     const bodyTop = yOf(Math.max(c.open, c.close));
     g.fillRect(x - (body - 1) / 2, bodyTop, body, Math.max(1, yOf(Math.min(c.open, c.close)) - bodyTop));
+  }
+
+  // Headline markers: a thin amber line at the candle the headline arrived in, with its code on top.
+  g.textAlign = "left";
+  g.textBaseline = "top";
+  for (const hl of headlines) {
+    const ago = (newest - (hl.time - (hl.time % candleMs))) / candleMs;
+    if (ago < 0 || ago >= fits) continue;
+    const x = Math.round(plotW - slot / 2 - ago * slot - 2) + 0.5;
+    g.strokeStyle = COLORS.amber;
+    g.beginPath();
+    g.moveTo(x, 0);
+    g.lineTo(x, plotH);
+    g.stroke();
+    const label = hl.code;
+    const tw = g.measureText(label).width + 6;
+    const left = x + 1 + tw > plotW ? x - tw : x + 1; // near the axis, put the label left of the line
+    g.fillStyle = COLORS.amber;
+    g.fillRect(left, 2, tw, 14);
+    g.fillStyle = COLORS.bg;
+    g.fillText(label, left + 3, 3);
   }
 
   // Last price: a thin solid line and its value on the axis.

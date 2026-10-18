@@ -1,6 +1,7 @@
 import type { Fill } from "./matchingEngine";
+import { presetByCode } from "./presets";
 import type { Simulation } from "./simulation";
-import type { Cents, DepthLevel, Side } from "./types";
+import type { AgentType, Cents, DepthLevel, Side } from "./types";
 
 // What the worker sends the page (D-037). The engine may produce many fills per frame; the feed
 // coalesces everything since the last frame into ONE plain, structured-cloneable object: quotes,
@@ -34,6 +35,18 @@ export interface Candle {
   readonly volume: number;
 }
 
+/** A headline the market has received: when, what, how big, and (after 60 s) who made money. */
+export interface FrameHeadline {
+  /** Sim ms the shock was applied. */
+  readonly time: number;
+  readonly code: string;
+  readonly headline: string;
+  /** The (clamped) fair-value jump, as a fraction: −0.03 = −3%. */
+  readonly fairValuePct: number;
+  /** First-minute P&L by agent type in cents, or null until 60 s have passed (D-047). */
+  readonly pnlByType: Readonly<Partial<Record<AgentType, number>>> | null;
+}
+
 export interface Frame {
   readonly seed: number;
   readonly ticker: string;
@@ -58,6 +71,8 @@ export interface Frame {
   readonly candleMs: number;
   /** Candles created or changed since the last frame, oldest first. */
   readonly candles: readonly Candle[];
+  /** Every headline so far, oldest first (a handful at most, so it is sent whole). */
+  readonly headlines: readonly FrameHeadline[];
 }
 
 export interface FeedOptions {
@@ -109,6 +124,17 @@ export class MarketFeed {
     this.ingest();
   }
 
+  /**
+   * Queue the offline preset `code` (FED, CEO, BEAT, DOWNGRADE) for the start of the next tick.
+   * Returns its headline, or null for an unknown code (nothing is applied).
+   */
+  applyPreset(code: string): string | null {
+    const preset = presetByCode(code);
+    if (preset === undefined) return null;
+    this.sim.applyShock(preset.shock, preset.code);
+    return preset.headline;
+  }
+
   /** Run `ticks` ticks of the simulation and take in their fills. */
   advance(ticks: number): void {
     this.sim.run(ticks);
@@ -134,6 +160,13 @@ export class MarketFeed {
       droppedTrades: this.dropped,
       candleMs: this.candleMs,
       candles: this.dirtyFrom === null ? [] : this.candles.slice(this.dirtyFrom).map((c) => ({ ...c })),
+      headlines: this.sim.shocks.map((s, i) => ({
+        time: s.time,
+        code: s.label,
+        headline: presetByCode(s.label)?.headline ?? s.label,
+        fairValuePct: s.shock.fairValuePct,
+        pnlByType: this.sim.shockImpacts[i].pnlByType,
+      })),
     };
     this.pending = [];
     this.dropped = 0;

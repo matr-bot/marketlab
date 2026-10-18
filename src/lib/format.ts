@@ -39,3 +39,18 @@ export function formatInterval(ms: number): string {
 export function formatQty(qty: number): string {
   return qtyFormat.format(qty);
 }
+
+const TRADER_NAMES: Record<string, string> = {
+  noise: "noise traders",
+  marketMaker: "market makers",
+  value: "value traders",
+  panic: "panic sellers",
+  momentum: "momentum traders",
+  whale: "whales",
+  user: "you",
+};
+
+/** A trader type as people say it: "panic" → "panic sellers". */
+export function traderName(type: string): string {
+  return TRADER_NAMES[type] ?? type;
+}

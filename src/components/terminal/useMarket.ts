@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DEMO_SEED } from "@/engine/demoMarket";
 import { applyFrame, type MarketState } from "@/lib/marketState";
+import type { Attribution } from "@/engine/attribution";
 import type { PresetResult } from "@/engine/feed";
+import type { ShockParams } from "@/engine/fundamental";
 import type { FromWorker, ToWorker } from "@/worker/protocol";
 
 export type MarketStatus = { readonly kind: "opening" } | { readonly kind: "live"; readonly market: MarketState } | { readonly kind: "error"; readonly message: string };
@@ -13,16 +15,28 @@ export type MarketStatus = { readonly kind: "opening" } | { readonly kind: "live
  * request goes out only after the previous frame has arrived, so frames never queue up. While the
  * tab is hidden the browser stops animation frames, so the market pauses with it.
  */
+export interface MarketHandlers {
+  /** The worker accepted or refused a headline. */
+  readonly onShockResult: (result: PresetResult) => void;
+  /** The worker answered a WHO request for a window. */
+  readonly onWho: (attribution: Attribution) => void;
+}
+
 export function useMarket(
-  onShockResult: (result: PresetResult) => void,
+  handlers: MarketHandlers,
   seed: number = DEMO_SEED,
   speed = 1,
-): { status: MarketStatus; sendShock: (code: string) => void } {
+): {
+  status: MarketStatus;
+  sendShock: (code: string) => void;
+  sendParams: (shock: ShockParams, label: string) => void;
+  requestWho: (from: number, to: number) => void;
+} {
   const [status, setStatus] = useState<MarketStatus>({ kind: "opening" });
-  const onShockRef = useRef(onShockResult);
+  const handlersRef = useRef(handlers);
   useEffect(() => {
-    onShockRef.current = onShockResult;
-  }, [onShockResult]);
+    handlersRef.current = handlers;
+  }, [handlers]);
   const workerRef = useRef<Worker | null>(null);
   // Read through a ref so a speed change takes effect on the next frame without restarting the market.
   const speedRef = useRef(speed);
@@ -46,7 +60,11 @@ export function useMarket(
         return;
       }
       if (msg.type === "shock") {
-        onShockRef.current(msg.result);
+        handlersRef.current.onShockResult(msg.result);
+        return;
+      }
+      if (msg.type === "who") {
+        handlersRef.current.onWho(msg.attribution);
         return;
       }
       market = applyFrame(market, msg.frame);
@@ -67,5 +85,7 @@ export function useMarket(
   }, [seed]);
 
   const sendShock = useCallback((code: string) => workerRef.current?.postMessage({ type: "shock", code } satisfies ToWorker), []);
-  return { status, sendShock };
+  const sendParams = useCallback((shock: ShockParams, label: string) => workerRef.current?.postMessage({ type: "shockParams", shock, label } satisfies ToWorker), []);
+  const requestWho = useCallback((from: number, to: number) => workerRef.current?.postMessage({ type: "who", from, to } satisfies ToWorker), []);
+  return { status, sendShock, sendParams, requestWho };
 }

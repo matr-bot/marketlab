@@ -16,8 +16,37 @@ const VOLUME_SHARE = 0.18; // bottom part of the plot used for volume bars
 const STEPS = [1, 2, 5, 10, 20, 25, 50, 100, 200, 500, 1_000, 2_000, 5_000, 10_000];
 
 /** Price chart (GP): candles from engine fills, volume bars, and the last price on the axis. */
-export function PriceChart({ candles, candleMs, last, headlines }: { candles: readonly Candle[]; candleMs: number; last: number | null; headlines: readonly FrameHeadline[] }) {
+/** Where the last drawing put the candles, so a click can be mapped back to a candle. */
+interface Geometry {
+  readonly newest: number;
+  readonly slot: number;
+  readonly plotW: number;
+  readonly fits: number;
+}
+
+/** A headline's marker label: short codes as they are, long AI headlines shortened. */
+export function markerLabel(code: string): string {
+  return code.length <= 12 ? code : `${code.slice(0, 11).trimEnd()}…`;
+}
+
+export function PriceChart({
+  candles,
+  candleMs,
+  last,
+  headlines,
+  selected = null,
+  onSelect,
+}: {
+  candles: readonly Candle[];
+  candleMs: number;
+  last: number | null;
+  headlines: readonly FrameHeadline[];
+  /** Start of the candle picked for WHO, or null. */
+  selected?: number | null;
+  onSelect?: (start: number | null) => void;
+}) {
   const boxRef = useRef<HTMLDivElement>(null);
+  const geometry = useRef<Geometry | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
 
@@ -38,22 +67,44 @@ export function PriceChart({ candles, candleMs, last, headlines }: { candles: re
     const g = canvas.getContext("2d");
     if (g === null) return;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    draw(g, size.w, size.h, candles, candleMs, last, headlines, getComputedStyle(canvas).fontFamily);
-  }, [size, candles, candleMs, last, headlines]);
+    geometry.current = draw(g, size.w, size.h, candles, candleMs, last, headlines, selected, getComputedStyle(canvas).fontFamily);
+  }, [size, candles, candleMs, last, headlines, selected]);
+
+  // Click a candle to see who traded in it (WHO, D-054); click it again to go back to live.
+  const onClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const geo = geometry.current;
+    if (geo === null || onSelect === undefined) return;
+    const x = e.clientX - e.currentTarget.getBoundingClientRect().left;
+    const ago = Math.round((geo.plotW - geo.slot / 2 - 2 - x) / geo.slot);
+    if (x >= geo.plotW || ago < 0 || ago >= geo.fits) return;
+    const start = geo.newest - ago * candleMs;
+    if (!candles.some((c) => c.start === start)) return;
+    onSelect(start === selected ? null : start);
+  };
 
   return (
-    <div ref={boxRef} className={styles.chart} data-testid="chart" data-markers={headlines.map((h) => h.code).join(" ")}>
-      <canvas ref={canvasRef} aria-label="Price chart" role="img" />
+    <div ref={boxRef} className={styles.chart} data-testid="chart" data-markers={headlines.map((h) => h.code).join("|")} data-selected={selected ?? ""} onClick={onClick}>
+      <canvas ref={canvasRef} aria-label="Price chart: click a candle to see who traded in it" role="img" />
     </div>
   );
 }
 
-function draw(g: CanvasRenderingContext2D, w: number, h: number, candles: readonly Candle[], candleMs: number, last: number | null, headlines: readonly FrameHeadline[], font: string) {
+function draw(
+  g: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  candles: readonly Candle[],
+  candleMs: number,
+  last: number | null,
+  headlines: readonly FrameHeadline[],
+  selected: number | null,
+  font: string,
+): Geometry | null {
   g.fillStyle = COLORS.bg;
   g.fillRect(0, 0, w, h);
   const plotW = w - AXIS_W;
   const plotH = h - TIME_H;
-  if (candles.length === 0 || plotW <= MAX_SLOT || plotH <= 20) return;
+  if (candles.length === 0 || plotW <= MAX_SLOT || plotH <= 20) return null;
   g.font = `11px ${font}`;
   g.textBaseline = "middle";
 
@@ -143,13 +194,20 @@ function draw(g: CanvasRenderingContext2D, w: number, h: number, candles: readon
     g.moveTo(x, 0);
     g.lineTo(x, plotH);
     g.stroke();
-    const label = hl.code;
+    const label = markerLabel(hl.code);
     const tw = g.measureText(label).width + 6;
     const left = x + 1 + tw > plotW ? x - tw : x + 1; // near the axis, put the label left of the line
     g.fillStyle = COLORS.amber;
     g.fillRect(left, 2, tw, 14);
     g.fillStyle = COLORS.bg;
     g.fillText(label, left + 3, 3);
+  }
+
+  // The candle picked for WHO: a thin amber frame around its slot.
+  if (selected !== null && (newest - selected) / candleMs < fits) {
+    const x = Math.round(plotW - slot / 2 - ((newest - selected) / candleMs) * slot - 2);
+    g.strokeStyle = COLORS.amber;
+    g.strokeRect(x - slot / 2 + 0.5, 0.5, slot - 1, plotH - 1);
   }
 
   // Last price: a thin solid line and its value on the axis.
@@ -175,4 +233,5 @@ function draw(g: CanvasRenderingContext2D, w: number, h: number, candles: readon
   g.lineTo(plotW + 0.5, plotH);
   g.lineTo(0, plotH + 0.5);
   g.stroke();
+  return { newest, slot, plotW, fits };
 }

@@ -1,4 +1,5 @@
 import { attribute, type Attribution } from "./attribution";
+import type { ShockParams } from "./fundamental";
 import type { Fill } from "./matchingEngine";
 import { Narrator, type ChatMessage } from "./narrator";
 import { presetByCode } from "./presets";
@@ -162,6 +163,16 @@ export class MarketFeed {
     if (preset === undefined) return { ok: false, message: `Unknown headline code "${code.slice(0, 20)}".` };
     const r = this.sim.applyShock(preset.shock, preset.code);
     return r.ok ? { ok: true, code: preset.code, headline: preset.headline } : { ok: false, message: r.message };
+  }
+
+  /**
+   * Queue a headline with explicit params (an AI interpretation or an edited one) for the next tick.
+   * Same 3 s spacing as presets (D-051); the label is for display, the params are what the market
+   * gets and what a replay records (D-052).
+   */
+  applyParams(shock: ShockParams, label: string): PresetResult {
+    const r = this.sim.applyShock(shock, label.slice(0, 120));
+    return r.ok ? { ok: true, code: "NEWS", headline: label.slice(0, 120) } : { ok: false, message: r.message };
   }
 
   /** Run `ticks` ticks of the simulation, with the narrator watching each, and take in their fills. */

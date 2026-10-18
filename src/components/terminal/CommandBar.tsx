@@ -17,7 +17,9 @@ export function CommandBar({ onCommand, reply }: { onCommand: (text: string) => 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const input = inputRef.current;
-      if (input === null || document.activeElement === input || e.metaKey || e.ctrlKey || e.altKey) return;
+      const active = document.activeElement;
+      // Typing in any field (the command bar itself, or a NEWS parameter) stays in that field.
+      if (input === null || active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key.length === 1) input.focus(); // the key itself lands in the bar
     };
     window.addEventListener("keydown", onKey);

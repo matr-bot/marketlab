@@ -1,4 +1,5 @@
 import type { Candle, Frame, FrameHeadline, FrameTrade } from "@/engine/feed";
+import type { ChatMessage } from "@/engine/narrator";
 import type { AgentType } from "@/engine/types";
 
 // What the panels show, folded from the worker's frames. Pure: (state, frame) → new state, so the
@@ -10,6 +11,8 @@ export const MAX_CANDLES = 360;
 export const MAX_TAPE = 100;
 /** Headlines kept for GP markers and the narrator. */
 export const MAX_HEADLINES = 50;
+/** Desk-chat messages kept for the CHAT panel. */
+export const MAX_CHAT = 50;
 
 /** A headline the page knows about, with its first-minute P&L once the worker has sent it. */
 export interface HeadlineState extends FrameHeadline {
@@ -27,6 +30,8 @@ export interface MarketState {
   readonly frameCount: number;
   /** The last MAX_HEADLINES headlines, oldest first. */
   readonly headlines: readonly HeadlineState[];
+  /** The last MAX_CHAT desk-chat messages, oldest first. */
+  readonly chat: readonly ChatMessage[];
 }
 
 export function applyFrame(prev: MarketState | null, frame: Frame): MarketState {
@@ -36,6 +41,7 @@ export function applyFrame(prev: MarketState | null, frame: Frame): MarketState 
     tape: frame.trades.length === 0 && prev ? prev.tape : [...frame.trades].reverse().concat(prev?.tape ?? []).slice(0, MAX_TAPE),
     frameCount: (prev?.frameCount ?? 0) + 1,
     headlines: mergeHeadlines(prev?.headlines ?? [], frame),
+    chat: frame.chat.length === 0 && prev ? prev.chat : [...(prev?.chat ?? []), ...frame.chat].slice(-MAX_CHAT),
   };
 }
 

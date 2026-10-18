@@ -78,12 +78,13 @@ test("the offline headline FED, typed into the command bar, moves the market wit
     await page.waitForTimeout(200);
   }
 
+  // A preset never touches the network (only free-text headlines go to /api/interpret, D-052).
+  expect(requests.filter((u) => !u.startsWith("data:") && !u.includes("/_next/"))).toEqual([]);
+
   await page.keyboard.type("MOON");
   await page.keyboard.press("Enter");
-  await expect(page.getByTestId("command-reply")).toContainText('Unknown command "MOON"');
-  await expect(last).toBeVisible(); // a bad command never stops the market
-
-  expect(requests.filter((u) => !u.startsWith("data:") && !u.includes("/_next/"))).toEqual([]);
+  await expect(page.getByTestId("command-reply")).not.toHaveText("FED · Fed surprise hike 75bps"); // answered, whatever the AI says
+  await expect(last).toBeVisible(); // an unknown word never stops the market
   expect(errors).toEqual([]);
 });
 
@@ -110,9 +111,65 @@ test("typing FED 30 times quickly never freezes the page (D-051)", async ({ page
   await expect.poll(() => page.getByTestId("last-price").textContent(), { timeout: 5_000 }).not.toBe(price);
 
   // Bounded work: one marker per accepted headline, a capped ticker.
-  const markers = (await page.getByTestId("chart").getAttribute("data-markers"))!.split(" ").filter(Boolean);
+  const markers = (await page.getByTestId("chart").getAttribute("data-markers"))!.split("|").filter(Boolean);
   expect(markers.length).toBeGreaterThanOrEqual(1);
   expect(markers.length).toBeLessThanOrEqual(3);
   expect(await page.getByTestId("ticker").locator("span").count()).toBeLessThanOrEqual(20);
   expect(errors).toEqual([]);
+});
+
+test("a custom headline: the AI's params preview, Enter applies, the price reacts, CHAT and WHO explain it (D-052)", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("console", (msg) => {
+    if (msg.type() === "error") errors.push(msg.text());
+  });
+  page.on("pageerror", (err) => errors.push(err.message));
+  // CI has no API key: answer as the AI would (the route's own logic is unit-tested).
+  await page.route("**/api/interpret", (route) =>
+    route.fulfill({
+      json: {
+        ok: true,
+        source: "ai",
+        headline: "Chip supplier halts all deliveries to MLAB",
+        scenario: { shock: { fairValuePct: -0.04, panicSensitivity: 1.8, durationSec: 300, volatilityMultiplier: 1.5, liquidityMultiplier: 0.6 }, reason: "Supply loss cuts expected earnings" },
+      },
+    }),
+  );
+  await page.goto("/");
+  const last = page.getByTestId("last-price");
+  await expect(last).toBeVisible({ timeout: 5_000 });
+  const price = async () => Number((await last.textContent())!.replace(/,/g, ""));
+
+  await page.keyboard.type("Chip supplier halts all deliveries to MLAB");
+  await page.keyboard.press("Enter");
+  const news = page.getByTestId("news");
+  await expect(news).toHaveAttribute("data-phase", "preview");
+  await expect(news.locator("[data-field=fairValuePct]")).toHaveValue("-4");
+  await expect(news.locator("[data-field=liquidityMultiplier]")).toHaveValue("0.6");
+  await expect(news).toContainText("AI's reason: “Supply loss cuts expected earnings”");
+
+  const before = await price();
+  await page.keyboard.press("Enter"); // Enter on the empty command bar applies the preview
+  await expect(news).toHaveAttribute("data-phase", "applied");
+  await expect(page.getByTestId("command-reply")).toHaveText("NEWS · Chip supplier halts all deliveries to MLAB");
+  await expect.poll(price, { timeout: 10_000, intervals: [250] }).toBeLessThanOrEqual(before * 0.99);
+
+  await expect(page.getByTestId("chat").locator("[data-kind=headline]")).toContainText("Chip supplier halts all deliveries to MLAB · fair value -4.0%");
+  await expect(page.getByTestId("who-summary")).toHaveText(/^\d+% of (selling|buying) came from [a-z ]+\.$/);
+  const pcts = await page.getByTestId("who").locator("[data-type]").evaluateAll((rows) => rows.map((r) => Number(r.children[2].textContent!.replace("%", ""))));
+  expect(pcts.length).toBeGreaterThan(1);
+  expect(errors).toEqual([]);
+});
+
+test("with the AI route down, a clear headline falls back to its offline preset and others have no effect (D-052)", async ({ page }) => {
+  await page.route("**/api/interpret", (route) => route.abort());
+  await page.goto("/");
+  await expect(page.getByTestId("last-price")).toBeVisible({ timeout: 5_000 });
+  await page.keyboard.type("Aliens land in Ohio");
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("command-reply")).toHaveText("AI unavailable · try FED, CEO, BEAT or DOWNGRADE.");
+  await page.keyboard.type("MLAB earnings miss, cuts guidance");
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("command-reply")).toHaveText("AI unavailable · used offline preset DOWNGRADE (closest match).");
+  await expect(page.getByTestId("news")).toHaveAttribute("data-phase", "preview");
 });

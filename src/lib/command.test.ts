@@ -19,11 +19,13 @@ describe("parseCommand: offline headlines from the command bar (D-048)", () => {
     expect(parseCommand("   ")).toEqual({ kind: "empty" });
   });
 
-  it("answers anything else with a friendly error listing the presets, never a crash", () => {
-    for (const input of ["MOON", "SHOCK", "FED FED", "Fed raises rates", "SHOCK MOON", "<script>"]) {
-      const c = parseCommand(input);
-      expect(c.kind).toBe("error");
-      if (c.kind === "error") expect(c.message).toBe(`Unknown command "${input}". Headlines available offline: FED, CEO, BEAT, DOWNGRADE.`);
-    }
+  it("sends any other text to the AI as a NEWS headline (D-052), spacing tidied", () => {
+    expect(parseCommand("  Fed   raises rates ")).toEqual({ kind: "news", headline: "Fed raises rates" });
+    expect(parseCommand("FED FED")).toEqual({ kind: "news", headline: "FED FED" });
+    expect(parseCommand("<script>")).toEqual({ kind: "news", headline: "<script>" });
+  });
+
+  it("asks for a headline after a bare SHOCK", () => {
+    expect(parseCommand("SHOCK")).toEqual({ kind: "error", message: "Type a headline after SHOCK, or one of FED, CEO, BEAT, DOWNGRADE." });
   });
 });

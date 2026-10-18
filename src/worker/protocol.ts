@@ -1,4 +1,6 @@
+import type { Attribution } from "@/engine/attribution";
 import type { Frame, PresetResult } from "@/engine/feed";
+import type { ShockParams } from "@/engine/fundamental";
 
 // Messages between the page and the simulation worker (D-037). The page asks for a frame once per
 // animation frame and waits for the answer before asking again, so at most one frame is in flight
@@ -10,10 +12,15 @@ export type ToWorker =
   /** Run the ticks due since the last request at `speed`× real time; answered with a frame. */
   | { readonly type: "frame"; readonly speed: number }
   /** Apply an offline preset headline at the start of the next tick (D-048); answered with `shock`. */
-  | { readonly type: "shock"; readonly code: string };
+  | { readonly type: "shock"; readonly code: string }
+  /** Apply a headline with explicit params (AI or edited, D-052); answered with `shock`. */
+  | { readonly type: "shockParams"; readonly shock: ShockParams; readonly label: string }
+  /** Who moved the price in [from, to) (a clicked candle, D-054); answered with `who`. */
+  | { readonly type: "who"; readonly from: number; readonly to: number };
 
 export type FromWorker =
   | { readonly type: "frame"; readonly frame: Frame }
   /** Whether a headline was accepted, or why not (too soon after the last one, D-051). */
   | { readonly type: "shock"; readonly result: PresetResult }
+  | { readonly type: "who"; readonly attribution: Attribution }
   | { readonly type: "error"; readonly message: string };

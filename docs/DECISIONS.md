@@ -1170,9 +1170,12 @@ truth. Only value traders read it.
 **Decision.** 15 value traders, 0.5 arrivals/s each.
 - Belief `Bᵢ = V·(1 + εᵢ + ηₜ)`: εᵢ ~ N(0, 0.03%) clipped to ±0.08% (once per trader), ηₜ ~ N(0, 0.03%)
   each arrival. The clip is below the smallest threshold, so no trader is a permanent bull or bear.
-- Gap `g = (Bᵢ − mid)/mid`, threshold θᵢ ~ U(0.10%, 0.30%). Beyond it they trade toward belief with a
-  marketable limit at `Bᵢ(1 ∓ θᵢ)`: they take liquidity but never chase past their own view, which is
-  why the recovery after a crash stops near fair value instead of overshooting.
+- Gap `g = (Bᵢ − mid)/mid`, threshold θᵢ ~ U(0.10%, 0.30%). Beyond it they place a **limit order at
+  their margin**, `Bᵢ(1 ∓ θᵢ)`. It trades immediately only when the gap is large enough for that price
+  to reach the other side of the book; just past the trigger, or with a wide spread, it rests (Codex
+  review: an earlier version of this record called it always marketable). Either way they never chase
+  past their own view, which is why the recovery after a crash stops near fair value instead of
+  overshooting.
 - Size `lots(200·(|g| − θ)/θ)`, between 100 and 1,000 shares; position limit **±6,000** (plan: 4,000).
 
 **Why 6,000.** With 4,000, a second FED 10 minutes after the first moved seed 2's price only 0.46%:
@@ -1248,8 +1251,9 @@ once on 3/4/5 with the tuning frozen):
 
 **Targets.**
 - FED moves 2–5% within 60 s and stays above −5%: met on 5 of 6 seeds; **missed on seed 3
-  (out-of-sample), −5.30%.** Not retuned on an out-of-sample seed; the test is `it.fails` with the number,
-  and a hard −8% bound is asserted on every seed.
+  (out-of-sample), −5.30%.** Not retuned on an out-of-sample seed. The test pins the measured
+  −5.30% ± 0.05% for seed 3 and asserts the hard −8% bound on every seed (an earlier `it.fails` would
+  also have accepted a harness crash; Codex review).
 - Panic only after news: met (zero before, 20 traders after, every seed). DOWNGRADE: zero panic, every seed.
 - Market makers pull back visibly: spread ≥ 2×, met (5–14×); total depth within 10¢ ≤ 70%, met (8–16%).
   **"Market makers' share of the best quantity falls by ≥ 50%" moved the wrong way** (it rises, e.g.
@@ -1331,3 +1335,37 @@ with 6 timeouts (was reported as 99.2%); the whole engine **95.69%** (2,019 of 2
 the last gap tests. Every remaining survivor in today's files was reviewed: all are equivalent
 (comparisons whose branches agree, symmetric noise, a 4×10⁻¹⁰ drift term, paths that need time to run
 backwards) except those fixed by new tests.
+
+---
+
+## D-051 · Headline spam is safe: rate limit, bounded history, each headline sent once
+
+**Date:** 2026-10-18 · **Status:** Accepted (Codex review, HIGH)
+
+**Problem.** A burst of valid commands added a permanent log entry and P&L record per headline, every
+tick scanned all P&L records, every frame resent every headline, and the ticker made a DOM node for
+each one and never dropped it: unbounded work in the worker and the page.
+
+**Decision.**
+- **Rate limit in the engine:** `Simulation.applyShock` accepts at most one headline per 3 s of sim
+  time and refuses (as data, `SHOCK_TOO_SOON`, never thrown) while one is pending or the last is
+  under 3 s old. Nothing is queued. The command bar shows "The market is still digesting the last
+  headline. Try again in N s." The rule lives in the engine so no caller can bypass it.
+- **Bounded history:** the last 50 headlines and P&L records are kept. Only records still inside their
+  60 s window are scanned each tick (at most 20, given the spacing), then finalized and left alone.
+- **Each headline is sent once:** frames carry headlines applied since the last frame and P&L records
+  finalized since the last frame, by sequence number. The page keeps its own last 50.
+- **Ticker:** at most 20 DOM items; waiting trades are dropped first, then the oldest.
+- **Commands:** at most 200 characters, refused without being echoed.
+
+**Tested.** 1,000 FED commands, ten per tick for 10 s of sim time: 4 accepted (0, 3, 6, 9 s), at
+most one headline and one P&L record per frame, 4 entries in the log, well inside a 5 s budget. 70
+headlines over a session: 50 kept. Playwright types FED 30 times: the page keeps running (clock and
+prices move), the reply says "still digesting", at most 3 markers, at most 20 ticker items, no errors.
+
+**Floor check (Codex: the caps set no lower bound on the price).** CEO ×20 at the fastest allowed
+spacing (every 3 s), six seeds, 10 minutes after: fair value falls to 29.0% of the start
+(0.94²⁰), and the lowest mid is 28.9–30.4% of the start, within −0.6% to +4.7% of fair value; the
+lowest trade on any seed is $53.99. So the price never falls through fair value; it follows 20
+compounding fraud headlines. That is below the 50% threshold set in review, so an LULD-style band is
+proposed (not built) in the report for 2026-10-18.

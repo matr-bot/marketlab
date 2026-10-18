@@ -164,6 +164,11 @@ describe("computeQuotes: size (D-036)", () => {
     expect(atSigma0({ sigma: 0.5 * P.sigma0 }).bid?.qty).toBe(500); // never above base
   });
 
+  it("shrinks both sides under high volatility: at 4× σ₀ each side quotes 100 shares", () => {
+    const q = computeQuotes(P, inputs({ sigma: 4 * P.sigma0 }));
+    expect([q.bid?.qty, q.ask?.qty]).toEqual([100, 100]);
+  });
+
   it("shrinks the side that would grow inventory and stops at the limit", () => {
     expect([atSigma0({ position: 2_500 }).bid?.qty, atSigma0({ position: 2_500 }).ask?.qty]).toEqual([200, 500]);
     expect(atSigma0({ position: 5_000 }).bid).toBeNull();

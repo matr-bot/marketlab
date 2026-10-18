@@ -10,7 +10,7 @@ const FIXED: PanicTraderParams = { ...DEFAULT_PANIC_PARAMS, dropMin: 0.01, dropM
 
 /** A fake market the test moves by hand; fills are applied by the test through `fill`. */
 function market() {
-  const state = { mid: 18_700, high: 18_700 as number | null, s: 1, position: 0, time: 0 };
+  const state = { mid: 18_700, high: 18_700 as number | null, s: 1, position: 0, time: 0, asked: [] as number[] };
   const resting: RestingOrder[] = [];
   const log: string[] = [];
   let n = 0;
@@ -23,13 +23,16 @@ function market() {
     volatility: { sigma: 4.3e-5, fast: 4.3e-5, slow: 4.3e-5, samples: 30, ready: true },
     fairValue: 18_700,
     panicSensitivity: state.s,
-    maxMidSince: () => state.high,
+    maxMidSince: (since: number) => {
+      state.asked.push(since);
+      return state.high;
+    },
     myOrders: () => [...resting],
     submit: (o: AgentOrder) => {
       if (o.type === "market") log.push(`market ${o.side} ${o.qty}`);
       else {
         resting.push({ id: `P-${++n}`, ownerId: "panic-1", agentType: "panic", side: o.side, price: o.price, qty: o.qty, seq: n });
-        log.push(`limit ${o.side} ${o.qty}@${o.price}`);
+        log.push(`${o.type} ${o.side} ${o.qty}@${o.price}`);
       }
       return { ok: true } as SubmitResult;
     },
@@ -152,11 +155,73 @@ describe("PanicTrader: threshold cascade (D-045), with a fake market", () => {
 
   it("does nothing on a one-sided book and draws its trigger, window and holdings from the ranges", () => {
     const t = trader();
-    const ctx = { ...market().ctx(), book: { tickSize: 1, bestBid: () => null, bestAsk: () => 18_700 } as unknown as BookView };
-    t.act(ctx);
+    const m = market();
+    m.state.high = 40_000; // a huge drawdown if it priced off half a book
+    t.act({ ...m.ctx(), book: { tickSize: 1, bestBid: () => null, bestAsk: () => 18_700 } as unknown as BookView });
+    t.act({ ...m.ctx(), book: { tickSize: 1, bestBid: () => 18_700, bestAsk: () => null } as unknown as BookView });
+    expect([m.log, t.state]).toEqual([[], "calm"]);
     const many = Array.from({ length: 1_000 }, (_, i) => new PanicTrader(Rng.fromSeed(i)));
     expect(many.every((x) => x.drop >= 0.015 && x.drop <= 0.04 && x.windowMs >= 20_000 && x.windowMs <= 90_000 && x.windowMs % 100 === 0)).toBe(true);
     expect(many.every((x) => x.holdings >= 500 && x.holdings <= 3_000 && x.holdings % 100 === 0)).toBe(true);
+  });
+
+  it("places nothing when calm with its holdings full", () => {
+    const t = trader();
+    const m = market();
+    t.act(m.ctx());
+    m.state.time = 1_000;
+    t.act(m.ctx());
+    expect(m.log).toEqual([]);
+  });
+
+  it("looks back over exactly its own window", () => {
+    const t = trader();
+    const m = market();
+    m.state.time = 100_000;
+    t.act(m.ctx());
+    expect(m.state.asked).toEqual([100_000 - 30_000]);
+  });
+
+  it("does not panic with nothing left to sell", () => {
+    const t = trader();
+    const m = market();
+    m.state.position = -1_000; // sold everything earlier
+    m.state.mid = 18_000;
+    t.act(m.ctx());
+    expect([t.state, t.panics, m.log.filter((l) => l.startsWith("market"))]).toEqual(["calm", 0, []]);
+  });
+
+  it("sells U(200, 800) shares per arrival, in whole lots", () => {
+    const t = new PanicTrader(Rng.fromSeed(9), { ...FIXED, holdingsMin: 1_000_000, holdingsMax: 1_000_000, sellMin: 200, sellMax: 800 });
+    const m = market();
+    m.state.mid = 18_000;
+    for (let i = 0; i < 20; i++) {
+      m.state.time = i * 500;
+      t.act(m.ctx());
+    }
+    const sizes = m.log.filter((l) => l.startsWith("market")).map((l) => Number(l.split(" ")[2]));
+    expect(sizes.length).toBeGreaterThan(15);
+    expect(sizes.every((q) => q >= 200 && q <= 800 && q % 100 === 0)).toBe(true);
+    expect(new Set(sizes).size).toBeGreaterThan(3);
+  });
+
+  it("cancels its rebuild bid when it panics, and requotes the bid when the mid or the missing size changes", () => {
+    const t = trader();
+    const m = market();
+    m.state.position = -500;
+    t.act(m.ctx());
+    expect(m.log).toEqual(["limit buy 200@18698"]);
+    m.state.mid = 18_705; // mid moves: new price
+    m.state.high = 18_705;
+    t.act(m.ctx());
+    expect(m.log.slice(1)).toEqual(["cancel P-1", "limit buy 200@18703"]);
+    m.state.position = -400; // 100 filled elsewhere: now 400 missing, still 200 at a time; then 100
+    m.state.position = -100;
+    t.act(m.ctx());
+    expect(m.log.slice(3)).toEqual(["cancel P-2", "limit buy 100@18703"]);
+    m.state.mid = 18_705 * 0.98; // a 2% drop: panic, and the bid goes first
+    t.act(m.ctx());
+    expect(m.log.slice(5)).toEqual(["cancel P-3", "market sell 500"]);
   });
 
   it("builds panic-1 … panic-N", () => {

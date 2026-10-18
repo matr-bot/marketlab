@@ -45,6 +45,19 @@ describe("Fundamental: fair value V (D-043)", () => {
     expect(sd).toBeLessThan(2.0e-5 * 1.03);
   });
 
+  it("scales the step by √(step / 1 s): a 4-second step has twice the 1-second spread", () => {
+    const f = new Fundamental(Rng.fromSeed(8).stream("fundamental"), 18_700, { ...DEFAULT_FUNDAMENTAL_PARAMS, stepMs: 4_000 });
+    const logs = [Math.log(f.value)];
+    for (let t = 4_000; t <= 4_000 * 3_000; t += 4_000) {
+      f.onTickEnd(t);
+      logs.push(Math.log(f.value));
+    }
+    const r = logs.slice(1).map((x, i) => x - logs[i]);
+    const sd = Math.sqrt(r.reduce((s, x) => s + x * x, 0) / r.length);
+    expect(sd).toBeGreaterThan(4.0e-5 * 0.95);
+    expect(sd).toBeLessThan(4.0e-5 * 1.05);
+  });
+
   it("sets panic sensitivity for the shock's duration, then returns to 1", () => {
     const f = quiet();
     f.shock(FED, 10_000);
@@ -60,6 +73,17 @@ describe("Fundamental: fair value V (D-043)", () => {
     expect([f.sensitivityAt(400_000), f.sensitivityAt(499_999), f.sensitivityAt(500_000)]).toEqual([2, 2, 1]);
     for (let i = 0; i < 10; i++) f.shock({ ...FED, panicSensitivity: 3 }, 600_000 + i);
     expect(f.sensitivityAt(600_100)).toBe(3); // never more than the largest single shock (clamped at 3)
+  });
+
+  it("a shock exactly when the previous window ends starts fresh; an overlapping one keeps the original start", () => {
+    const f = quiet();
+    f.shock({ ...FED, panicSensitivity: 3, durationSec: 10 }, 0); // until 10 s
+    f.shock({ ...FED, panicSensitivity: 0.5, durationSec: 10 }, 10_000); // exactly at the end: fresh
+    expect(f.sensitivityAt(15_000)).toBe(0.5);
+    const g = quiet();
+    g.shock({ ...FED, durationSec: 300 }, 0);
+    g.shock({ ...FED, durationSec: 300 }, 100_000);
+    expect(g.sensitivityAt(50_000)).toBe(1.5); // still active between the two headlines
   });
 
   it("a shock after the previous one has ended starts fresh", () => {
@@ -81,6 +105,9 @@ describe("Fundamental: fair value V (D-043)", () => {
     const rng = Rng.fromSeed(1);
     expect(() => new Fundamental(rng, 18_700, { ...DEFAULT_FUNDAMENTAL_PARAMS, sigmaV: -1 })).toThrow("sigmaV must be a non-negative finite number, got -1");
     expect(() => new Fundamental(rng, 18_700, { ...DEFAULT_FUNDAMENTAL_PARAMS, stepMs: 150 })).toThrow("stepMs must be a positive multiple of 100, got 150");
+    expect(() => new Fundamental(rng, 18_700, { ...DEFAULT_FUNDAMENTAL_PARAMS, stepMs: 0 })).toThrow("stepMs must be a positive multiple of 100, got 0");
+    expect(() => new Fundamental(rng, 18_700, { ...DEFAULT_FUNDAMENTAL_PARAMS, stepMs: -100 })).toThrow(/stepMs must be/);
+    expect(() => new Fundamental(rng, 18_700, { ...DEFAULT_FUNDAMENTAL_PARAMS, stepMs: 100.5 })).toThrow(/stepMs must be/);
     expect(() => new Fundamental(rng, 18_700, { ...DEFAULT_FUNDAMENTAL_PARAMS, bound: 1 })).toThrow("bound must be a finite number above 1, got 1");
   });
 });
@@ -94,6 +121,28 @@ describe("MidHistory: the mid once per second", () => {
     h.onTickEnd(3_000, 37_450); // 187.25
     h.onTickEnd(4_000, 37_380); // 186.90
     expect([h.maxSince(0), h.maxSince(3_500), h.maxSince(4_000), h.maxSince(4_001)]).toEqual([18_725, 18_690, 18_690, null]);
+  });
+
+  it("has nothing to say when every sample was one-sided", () => {
+    const h = new MidHistory();
+    h.onTickEnd(1_000, null);
+    h.onTickEnd(2_000, null);
+    expect(h.maxSince(0)).toBeNull();
+  });
+
+  it("holds exactly `capacity` samples, oldest included", () => {
+    const h = new MidHistory(3);
+    [37_600, 37_400, 37_400].forEach((m, i) => h.onTickEnd((i + 1) * 1_000, m));
+    expect(h.maxSince(0)).toBe(18_800);
+    expect(() => new MidHistory(1)).not.toThrow();
+  });
+
+  it("includes the oldest sample it still holds", () => {
+    const h = new MidHistory();
+    h.onTickEnd(1_000, 37_500);
+    expect(h.maxSince(0)).toBe(18_750);
+    h.onTickEnd(2_000, 37_400);
+    expect(h.maxSince(0)).toBe(18_750); // the oldest is the highest
   });
 
   it("keeps only the last `capacity` samples", () => {
@@ -117,6 +166,27 @@ describe("Shocks inside the simulation", () => {
     expect(s.shocks).toEqual([{ time: 5_000, label: "FED", shock: FED, fairValueBefore: before, fairValueAfter: s.fundamental.value }]);
     expect(s.fundamental.value / before).toBeCloseTo(0.97, 9);
     expect(Object.isFrozen(s.shocks[0])).toBe(true);
+  });
+
+  it("walks fair value as the simulation runs, and skips one-sided books in the mid history", () => {
+    const s = new Simulation({ seed: 5, agents: [] }); // no agents: the book stays empty
+    s.run(600);
+    expect(s.fundamental.value).not.toBe(18_700);
+    expect(Math.abs(s.fundamental.value / 18_700 - 1)).toBeLessThan(0.01);
+    expect(s.midHistory.maxSince(0)).toBeNull();
+    const bidsOnly = new Simulation({
+      seed: 5,
+      agents: [{ id: "b", agentType: "user", ratePerSec: 5, create: () => ({ act: (ctx) => void (ctx.myOrders().length === 0 && ctx.submit({ type: "limit", side: "buy", price: 18_650, qty: 100 })) }) }],
+    });
+    bidsOnly.run(100);
+    expect(bidsOnly.engine.book.bestBid()).toBe(18_650);
+    expect(bidsOnly.midHistory.maxSince(0)).toBeNull(); // a bid alone is not a mid
+    const asksOnly = new Simulation({
+      seed: 5,
+      agents: [{ id: "a", agentType: "user", ratePerSec: 5, create: () => ({ act: (ctx) => void (ctx.myOrders().length === 0 && ctx.submit({ type: "limit", side: "sell", price: 18_750, qty: 100 })) }) }],
+    });
+    asksOnly.run(100);
+    expect(asksOnly.midHistory.maxSince(0)).toBeNull(); // nor an ask alone
   });
 
   it("gives agents fair value, sensitivity and the mid history", () => {

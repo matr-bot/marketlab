@@ -16,5 +16,8 @@ export default defineConfig({
     exclude: ["src/engine/determinism.test.ts"],
     environment: "node",
     env: { MARKETLAB_MUTATION: "1" },
+    // Under coverage instrumentation with every file in parallel, the 77-agent tests can take more
+    // than Vitest's default 5 s and fail the dry run; Stryker applies its own per-mutant timeouts.
+    testTimeout: 60_000,
   },
 });

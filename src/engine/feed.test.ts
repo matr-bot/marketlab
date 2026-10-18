@@ -79,10 +79,14 @@ describe("MarketFeed: one coalesced frame per request (D-037)", () => {
     expect(first.candles.map((c) => c.start)).toEqual(candlesFromFills(feed.sim.engine.fills, 10_000).map((c) => c.start));
     expect(feed.frame().candles).toEqual([]); // nothing ran
     expect(feed.frame().trades).toEqual([]);
-    feed.advance(5);
-    const next = feed.frame();
-    expect(next.candles.length).toBeLessThanOrEqual(2);
-    if (next.trades.length > 0) expect(next.candles[next.candles.length - 1].close).toBe(next.trades[next.trades.length - 1].price);
+    let next: Frame;
+    do {
+      feed.advance(1);
+      next = feed.frame();
+    } while (next.trades.length === 0); // until something trades
+    expect(first.candles.length).toBeGreaterThan(5);
+    expect(next.candles.length).toBeLessThanOrEqual(2); // only the open candle (and one just closed)
+    expect(next.candles[next.candles.length - 1].close).toBe(next.trades[next.trades.length - 1].price);
   });
 
   it("reports the status bar's numbers from engine state", () => {
@@ -226,7 +230,7 @@ describe("The real clock decides only HOW MANY ticks run, never what happens in 
     const sent = (r: typeof smooth) => r.frames.flatMap((f) => f.trades);
     expect(sent(jittery)).toEqual(sent(smooth));
     expect(mergeCandles(jittery.frames)).toEqual(mergeCandles(smooth.frames));
-  });
+  }, 30_000); // four 77-agent markets: a few seconds under coverage instrumentation
 });
 
 describe("MarketFeed: headlines (D-048)", () => {
@@ -242,6 +246,13 @@ describe("MarketFeed: headlines (D-048)", () => {
     const later = feed.frame().headlines[0];
     expect(later.pnlByType).not.toBeNull();
     expect(later.pnlByType!.marketMaker).toBeTypeOf("number");
+  });
+
+  it("shows a shock applied with any other label (Tuesday's AI headlines) under that label", () => {
+    const feed = feedOf();
+    feed.sim.applyShock({ fairValuePct: 0.01, panicSensitivity: 1, durationSec: 60 }, "Chip supplier fire");
+    feed.advance(1);
+    expect(feed.frame().headlines[0]).toMatchObject({ code: "Chip supplier fire", headline: "Chip supplier fire", fairValuePct: 0.01 });
   });
 
   it("ignores an unknown code: nothing is applied", () => {

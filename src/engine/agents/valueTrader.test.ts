@@ -101,6 +101,47 @@ describe("ValueTrader: heterogeneous beliefs and thresholds", () => {
     expect(back.log).toEqual([`cancel ${m.resting[0].id}`]);
   });
 
+  it("prices exactly from belief = V·(1 + its own offset): limit at belief·(1 + θ) for a sell", () => {
+    const t = new ValueTrader(Rng.fromSeed(11), { ...P, noiseSd: 0 });
+    const m = fake(18_700.5, 18_139);
+    t.act(m.ctx);
+    const belief = 18_139 * (1 + t.offset);
+    expect(m.resting[0].price).toBe(Math.ceil(belief * (1 + t.theta)));
+    expect(t.offset).not.toBe(0);
+  });
+
+  it("keeps fresh belief noise small: prices stay within ±0.2% of the noiseless price", () => {
+    const t = new ValueTrader(Rng.fromSeed(12));
+    const m = fake(18_700.5, 18_139);
+    const exact = 18_139 * (1 + t.offset) * (1 + t.theta);
+    for (let i = 0; i < 2_000; i++) {
+      m.resting.length = 0;
+      t.act(m.ctx);
+      expect(Math.abs(m.resting[0].price / exact - 1)).toBeLessThan(0.002);
+    }
+  });
+
+  it("requotes when only the price changes (fair value moved)", () => {
+    const t = new ValueTrader(Rng.fromSeed(1), { ...P, noiseSd: 0 });
+    const m = fake(18_700.5, 18_139);
+    t.act(m.ctx);
+    const n = fake(18_700.5, 18_100); // still selling 1,000, at a lower price
+    n.resting.push(...m.resting);
+    t.act(n.ctx);
+    expect(n.log).toEqual([`cancel ${m.resting[0].id}`, expect.stringMatching(/^submit sell 1000@/)]);
+  });
+
+  it("requotes when only the size changes (its position moved)", () => {
+    const t = new ValueTrader(Rng.fromSeed(1), { ...P, noiseSd: 0 });
+    const m = fake(18_700.5, 18_139, -5_500); // room for 500
+    t.act(m.ctx);
+    expect(m.log[0]).toMatch(/^submit sell 500@/);
+    const n = fake(18_700.5, 18_139, -5_700); // room for 300 now
+    n.resting.push(...m.resting);
+    t.act(n.ctx);
+    expect(n.log).toEqual([`cancel ${m.resting[0].id}`, expect.stringMatching(/^submit sell 300@/)]);
+  });
+
   it("builds value-1 … value-N", () => {
     const specs = valueTraders(15, 0.5);
     expect(specs.map((s) => s.id).slice(0, 2)).toEqual(["value-1", "value-2"]);

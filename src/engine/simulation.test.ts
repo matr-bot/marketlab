@@ -388,6 +388,84 @@ describe("Simulation: the agent context", () => {
     }
   });
 
+  it("marks positions to the mid, else the last trade, else the opening price", () => {
+    expect(new Simulation({ seed: 1, agents: [] }).markPrice()).toBe(18_700);
+    const oneSided = new Simulation({
+      seed: 3,
+      agents: [
+        scripted("maker", (ctx) => void (ctx.myOrders().length === 0 && ctx.submit({ type: "limit", side: "sell", price: 18_750, qty: 1_000_000 }))),
+        scripted("taker", (ctx) => void ctx.submit({ type: "market", side: "buy", qty: 1 })),
+      ],
+    });
+    oneSided.run(20);
+    expect(oneSided.markPrice()).toBe(18_750); // asks only: the last trade
+    const bidsOnly = new Simulation({
+      seed: 3,
+      agents: [
+        scripted("maker", (ctx) => void (ctx.myOrders().length === 0 && ctx.submit({ type: "limit", side: "buy", price: 18_650, qty: 1_000_000 }))),
+        scripted("taker", (ctx) => void ctx.submit({ type: "market", side: "sell", qty: 1 })),
+      ],
+    });
+    bidsOnly.run(20);
+    expect(bidsOnly.markPrice()).toBe(18_650); // bids only: the last trade, not half the bid
+    const twoSided = new Simulation({
+      seed: 3,
+      agents: [
+        scripted("maker", (ctx) => {
+          if (ctx.myOrders().length > 0) return;
+          ctx.submit({ type: "limit", side: "sell", price: 18_751, qty: 10 });
+          ctx.submit({ type: "limit", side: "buy", price: 18_650, qty: 10 });
+        }),
+      ],
+    });
+    twoSided.run(20);
+    expect(twoSided.markPrice()).toBe(18_700.5); // the mid, half cent included
+  });
+
+  it("records first-minute P&L by agent type after a headline: exact cents, fixed at 60 s, zero-sum", () => {
+    let trades = 0;
+    const typed = (id: string, agentType: "value" | "marketMaker", script: (ctx: AgentContext) => void): AgentSpec => ({ id, agentType, ratePerSec: 5, create: () => ({ act: script }) });
+    const sim: Simulation = new Simulation({
+      seed: 3,
+      agents: [
+        typed("mm", "marketMaker", (ctx) => {
+          if (ctx.myOrders().length > 0) return;
+          ctx.submit({ type: "limit", side: "sell", price: 18_750, qty: 1_000_000 });
+          ctx.submit({ type: "limit", side: "buy", price: 18_650, qty: 1_000_000 });
+        }),
+        // Buys 100 at market once before the headline, once after it, and once 70 s after it.
+        typed("val", "value", (ctx) => {
+          const shock = sim.shocks[0];
+          if (!shock) {
+            if (trades === 0 && ctx.myOrders().length === 0 && ctx.book.bestAsk() !== null) {
+              ctx.submit({ type: "market", side: "buy", qty: 100 });
+              trades++;
+            }
+            return;
+          }
+          if ((trades === 1 && ctx.time > shock.time) || (trades === 2 && ctx.time > shock.time + 70_000)) {
+            ctx.submit({ type: "market", side: "buy", qty: 100 });
+            trades++;
+          }
+        }),
+      ],
+    });
+    sim.run(50);
+    sim.applyShock({ fairValuePct: -0.03, panicSensitivity: 1, durationSec: 60 }, "TEST");
+    sim.run(1); // applied at 5,000 ms
+    const t = sim.shocks[0].time;
+    sim.run(598); // last tick end 5,000 + 59,900
+    expect(sim.clock.now).toBe(t + 59_900);
+    expect(sim.shockImpacts).toEqual([{ time: t, label: "TEST", pnlByType: null }]);
+    sim.run(1); // tick end exactly 60 s after: now fixed
+    // The trade before the headline is not counted. After it, the value trader paid 18,750 × 100 for
+    // shares marked at the mid 18,700: −5,000¢; the maker the opposite.
+    expect(sim.shockImpacts[0].pnlByType).toEqual({ marketMaker: 5_000, value: -5_000 });
+    sim.run(200); // a third trade after the minute changes nothing
+    expect(trades).toBe(3);
+    expect(sim.shockImpacts[0].pnlByType).toEqual({ marketMaker: 5_000, value: -5_000 });
+  });
+
   it("rejects bad configuration", () => {
     expect(() => new Simulation({ seed: 1, agents: [...noiseTraders(2, 1), ...noiseTraders(1, 1)] })).toThrow("Duplicate agent id: noise-1");
     expect(() => new Simulation({ seed: 1, startPrice: 0, agents: [] })).toThrow(/startPrice must be a positive whole number of ticks/);

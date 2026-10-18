@@ -89,8 +89,15 @@ itself keeps working.
 ## Project status
 
 **Engine steps 1–5 ✅ done** (matching engine, seeded randomness and sim clock, noise traders and
-the simulation loop, realized volatility, Avellaneda–Stoikov market makers), and **the market is
-alive on the live site**. What exists today:
+the simulation loop, realized volatility, Avellaneda–Stoikov market makers), **the market is
+alive on the live site**, and **headlines move it**: type `FED` in the command bar and watch value
+traders reprice, panic sellers cascade and market makers pull back. What exists today:
+
+- [x] Headline shocks: fair value jumps, value traders carry the news into the price, panic sellers
+      cascade (Granovetter thresholds) and value traders buy the overshoot back. Four offline
+      headlines (FED, CEO, BEAT, DOWNGRADE) run with no network call, and each one's first-minute
+      P&L by trader type is recorded (market makers lose to informed traders: adverse selection)
+- [x] A 77-trader crowd: 40 noise traders, 2 market makers, 15 value traders, 20 panic sellers
 
 - [x] A terminal-style UI on [marketlab-nine.vercel.app](https://marketlab-nine.vercel.app): the
       market is already trading when the page loads. Status bar (last price, change, volume, sim
@@ -117,7 +124,7 @@ alive on the live site**. What exists today:
       that widens with volatility, smaller sizes under stress, post-only quotes and inventory
       limits. Profitable against the noise crowd on 6 of 6 runs, including seeds never used to
       tune them
-- [x] 553 unit tests, a browser smoke test in CI, shadow-model comparison, and 97% mutation score
+- [x] 711 unit tests, two browser smoke tests in CI, shadow-model comparison, and 96% mutation score
       (see [Testing](#testing))
 - [x] Engine boundary and determinism rules, enforced by ESLint and checked at runtime
 
@@ -130,10 +137,10 @@ not just "does it work on my example" but "can any small bug slip past the tests
 
 | Check | Result |
 | --- | --- |
-| Unit and property tests (Vitest) | **553 passing** across 21 files |
+| Unit and property tests (Vitest) | **711 passing** across 29 files, plus 1 documented expected failure (an out-of-sample miss, D-047) |
 | Browser smoke test (Playwright, in CI) | Production build: the page loads, prices change within 5 s, no console errors |
 | Randomized shadow-model comparison | Order book and matching engine, 5 seeds × 3,000 operations each, full state compared after **every** step |
-| Mutation score (Stryker) on `src/engine` | **96.79%**: 1,568 of 1,620 mutants detected |
+| Mutation score (Stryker) on `src/engine` | **95.69%**: 2,019 of 2,110 mutants detected (D-050) |
 | Same seed → identical market | The whole fill log and final book of a 10-minute, 40-trader market are fingerprinted and pinned; seed 188 differs |
 | Same seed → same numbers in every browser | Random generator matches the reference C code exactly; `ln`/`exp` bits pinned over 226,000+ inputs; inexact `Math` functions banned by lint **and** by a runtime test |
 | Throughput benchmark | **~1.5 million matching-engine operations per second** with real fills |
@@ -170,7 +177,7 @@ requires identical results. We confirmed the runtime test catches code the lint 
 
 **Mutation testing.** Stryker makes hundreds of small deliberate bugs in the engine (flipping `<`
 to `<=`, deleting a line, changing a constant) and checks that some test fails for each one.
-1,568 of 1,620 are caught. We reviewed the other 52 one by one: they are safety checks that can
+2,019 of 2,110 are caught. We reviewed the survivors one by one: they are safety checks that can
 only run if the engine is already broken, comparisons that only differ when a random time lands
 exactly on a boundary (probability ≈ 0), or alternate math paths that give bit-identical results.
 
@@ -252,7 +259,7 @@ working build on the live site.
 | --- | --- |
 | **Done** | Repo, deploy, layout shell; order book, matching engine, seeded randomness + sim clock, noise traders; realized volatility + Avellaneda–Stoikov market makers (in review) |
 | **Sun 10/18** ✅ | Web Worker + terminal UI (status bar, ticker, price chart, time & sales, order book basics) + market alive on load. **Milestone: prices moving on the live site** |
-| **Mon 10/19** | Value traders (fair value), panic sellers (threshold cascade), headline shock = a fair-value jump |
+| **Mon 10/19** ✅ | Value traders (fair value), panic sellers (threshold cascade), headline shock = a fair-value jump |
 | **Tue 10/20** | AI interpret route for headlines → clamped, editable parameters; headline input; desk-chat narrator (deterministic); "who moved the price?" attribution |
 | **Wed 10/21** | Strategy agent (plain-English strategy via the same route) + glass box + manual buy/sell |
 | **Thu 10/22** | Execution report (slippage split into spread and impact, P&L), tuning |

@@ -267,23 +267,21 @@ stamps its owner id and agent type on every order. Each agent draws arrival time
 `arrivals/<id>` and decisions from `decisions/<id>`, so a behavior change never moves arrival
 times. Computed prices become cents only through `toTick` (buys round down, sells up).
 - MarketMaker — quotes both sides; widens spread and cuts size under stress/inventory risk
-  (Avellaneda–Stoikov, D-033 to D-036)
+  (Avellaneda–Stoikov, D-033 to D-036; k = 1.5 from fill rates, D-049; skew and half-spread
+  capped at 25¢, D-047)
 - NoiseTrader — random small orders; baseline activity
 - MomentumTrader — buys rising / sells falling prices
-- ValueTrader — trades toward a belief about fair value
-- PanicTrader — dumps on sharp drops; sentiment-sensitive
+- ValueTrader — trades toward a belief about fair value (D-044)
+- PanicTrader — dumps on sharp drops; sentiment-sensitive; rebuilds when calm (D-045)
 - Whale — occasional very large orders
 - UserStrategyAgent — executes a validated StrategySpec
 
 Most agents are cheap rule-based code. The LLM shifts their parameters (sentiment, fair value,
 risk tolerance, liquidity, activity rate); it never decides individual trades.
 
-Open tuning (measure each against the D-036 market report):
-- Spread out noise traders' limit orders (less aggressive offsets, and offsets that widen with
-  volatility) so market makers set the best prices most of the time and their withdrawal under
-  stress shows in the visible spread (D-036: today 4× volatility only moves it 1.35¢ → 1.43¢).
-- Recalibrate the market maker's k from fill rates once value traders exist: k = 1.0 was chosen
-  from a P&L sweep in a market with no fair-value anchor (D-033).
+Tuning done Sun 10/18: noise traders spread out and widen with volatility (D-046: 4× volatility
+now widens the visible spread from 1.43¢ to about 5¢); k recalibrated from fill rates (D-049).
+What did not meet its target is in docs/LATER.md.
 
 ## Agent algorithms (use published models; cite them in the glass box)
 - Crowd overall: Chiarella–Iori fundamentalist–chartist–noise (FCN) framework.
@@ -376,8 +374,10 @@ New priority: everything visible. The engine is strong; judges can only grade wh
 
 - **Sun 10/18 ✅ (done Sat 10/17):** Web Worker + terminal UI (status bar, ticker, `GP` chart, `TAPE`, `BOOK` basics)
   + market alive on load. Milestone: prices moving on the live site.
-- **Mon 10/19:** value traders (fair value), panic sellers (threshold cascade), headline shock =
-  a fair-value jump.
+- **Mon 10/19 ✅ (done Sun 10/18, D-043 to D-049):** value traders (fair value), panic sellers
+  (threshold cascade), headline shock = a fair-value jump; offline presets FED / CEO / BEAT /
+  DOWNGRADE from the command bar; noise retune; k = 1.5 from fill rates. Open items in
+  docs/LATER.md.
 - **Tue 10/20:** `/api/interpret` for headlines → clamped, editable parameters; `NEWS` input;
   `CHAT` narrator (deterministic); `WHO` attribution.
 - **Wed 10/21:** strategy agent (StrategySpec via the same route) + glass box + `TKT` manual

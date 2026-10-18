@@ -1,7 +1,7 @@
 // Market sanity report (test-only). Runs a simulation and measures what a careful reviewer would
 // ask about a thin, noise-only market. Every number comes from engine state through the
 // simulation's observer hooks; the report never changes the market.
-import type { AgentSpec } from "../agents/agent";
+import type { AgentContext, AgentSpec } from "../agents/agent";
 import { DEFAULT_MM_PARAMS, MarketMaker, type MarketMakerParams } from "../agents/marketMaker";
 import { noiseTraders, type NoiseTraderParams, DEFAULT_NOISE_PARAMS } from "../agents/noiseTrader";
 import { Simulation } from "../simulation";
@@ -57,6 +57,35 @@ export interface ReportOptions {
   mmParams?: MarketMakerParams;
   /** Multiply the volatility the market makers see (a stub, for "what if volatility were 4×"). */
   mmSigmaMultiplier?: number;
+  /** Multiply the volatility the noise traders see too (D-046: their offsets widen with it). */
+  noiseSigmaMultiplier?: number;
+}
+
+/** Noise traders for a report, optionally seeing a multiplied volatility. */
+function reportNoise(opts: ReportOptions): AgentSpec[] {
+  const mult = opts.noiseSigmaMultiplier ?? 1;
+  return noiseTraders(40, 0.5, opts.noise ?? DEFAULT_NOISE_PARAMS).map((spec) =>
+    mult === 1
+      ? spec
+      : {
+          ...spec,
+          create: (rng) => {
+            const agent = spec.create(rng);
+            return { act: (ctx) => agent.act(withSigma(ctx, mult)) };
+          },
+        },
+  );
+}
+
+/** The same context with every volatility number multiplied (everything else live). */
+function withSigma(ctx: AgentContext, mult: number): AgentContext {
+  const v = ctx.volatility;
+  return {
+    time: ctx.time, book: ctx.book, startPrice: ctx.startPrice, myOrders: ctx.myOrders, submit: ctx.submit, cancel: ctx.cancel,
+    lastTradePrice: ctx.lastTradePrice, position: ctx.position,
+    fairValue: ctx.fairValue, panicSensitivity: ctx.panicSensitivity, maxMidSince: ctx.maxMidSince,
+    volatility: { sigma: v.sigma * mult, fast: v.fast * mult, slow: v.slow * mult, samples: v.samples, ready: v.ready },
+  };
 }
 
 /** Market makers built for a report, optionally seeing a multiplied volatility. */
@@ -69,18 +98,7 @@ function reportMarketMakers(opts: ReportOptions): AgentSpec[] {
     ratePerSec: 5,
     create: () => {
       const mm = new MarketMaker({ ...params, gamma });
-      return {
-        act: (ctx) => {
-          if (mult === 1) return mm.act(ctx);
-          const v = ctx.volatility;
-          mm.act({
-            time: ctx.time, book: ctx.book, startPrice: ctx.startPrice, myOrders: ctx.myOrders, submit: ctx.submit, cancel: ctx.cancel,
-            lastTradePrice: ctx.lastTradePrice, position: ctx.position,
-            fairValue: ctx.fairValue, panicSensitivity: ctx.panicSensitivity, maxMidSince: ctx.maxMidSince,
-            volatility: { sigma: v.sigma * mult, fast: v.fast * mult, slow: v.slow * mult, samples: v.samples, ready: v.ready },
-          });
-        },
-      };
+      return { act: (ctx) => mm.act(mult === 1 ? ctx : withSigma(ctx, mult)) };
     },
   }));
 }
@@ -123,7 +141,7 @@ export function runMarketReport(seed: number, ticks: number, params: NoiseTrader
 
   const sim: Simulation = new Simulation({
     seed,
-    agents: [...noiseTraders(40, 0.5, opts.noise ?? DEFAULT_NOISE_PARAMS), ...reportMarketMakers(opts)],
+    agents: [...reportNoise(opts), ...reportMarketMakers(opts)],
     observer: {
       onArrival: () => {
         const bid = sim.engine.book.bestBid();

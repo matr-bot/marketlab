@@ -20,7 +20,7 @@ describe("Simulation: same seed → identical market", () => {
     const b = demo();
     a.run(TEN_MINUTES);
     b.run(TEN_MINUTES);
-    expect(a.engine.fillCount).toBeGreaterThan(2_000);
+    expect(a.engine.fillCount).toBeGreaterThan(1_000);
     expect(marketFingerprint(a)).toBe(marketFingerprint(b));
   });
 
@@ -239,7 +239,7 @@ describe.skipIf(MUTATION_RUN)("Simulation: the market is alive (sanity bands for
     expect(r.medianSpread).toBeLessThanOrEqual(2);
     expect(r.avgSpread).toBeLessThan(3);
     expect(r.minutesWithoutTrades).toBe(0);
-    expect(r.trades).toBeGreaterThan(10_000);
+    expect(r.trades).toBeGreaterThan(5_000); // about 9,000 since D-046 (was 19,500)
   });
 
   it("stays within ±2% of $187 and has no outsized single-order sweeps (market orders capped at 2,000, D-025)", () => {
@@ -415,9 +415,9 @@ describe("Simulation: the agent context", () => {
   });
 });
 
-// Fingerprints of the 10-minute seed-187 markets (fills + final book). Re-pinned when the ticker
-// became MLAB (D-041): with "MLAB" mapped back to "SPY", the new logs give exactly the old pins
-// (e645d6434f2a0b64 and f713b6e6055aebc3), so only the ticker text changed.
-const PINNED_DEMO_MARKET = "e96d7a43b1a060ac";
+// Fingerprints of the 10-minute seed-187 markets (fills + final book). History: re-pinned when
+// the ticker became MLAB (D-041, text only); re-pinned when noise traders were spread out (D-046,
+// an intended change to the market).
+const PINNED_DEMO_MARKET = "6325214896cd887f";
 // …with two market makers added.
-const PINNED_MM_MARKET = "c14b34b04315fe31";
+const PINNED_MM_MARKET = "ef8a7803dfa1d8c7";

@@ -13,7 +13,7 @@ import { oldestFirst, type Agent, type AgentContext, type AgentSpec } from "./ag
 export interface NoiseTraderParams {
   /** Probability an order is a market order. */
   readonly pMarket: number;
-  /** Limit offset δ = mu·E − theta (cents), E ~ Exp(1): scale. */
+  /** Limit offset δ = mu·E·w − theta (cents), E ~ Exp(1): scale. */
   readonly mu: number;
   /** Limit offset shift (cents); P(δ < 0) = 1 − e^(−theta/mu). */
   readonly theta: number;
@@ -29,12 +29,17 @@ export interface NoiseTraderParams {
   readonly pCancel: number;
   /** Most resting orders a trader keeps; at the cap, the oldest is cancelled before placing. */
   readonly maxResting: number;
+  /** Calm volatility (log return per √s); offsets widen by w = min(volWidenCap, max(1, σ/sigma0)) (D-046). */
+  readonly sigma0: number;
+  readonly volWidenCap: number;
 }
 
 export const DEFAULT_NOISE_PARAMS: NoiseTraderParams = {
   pMarket: 0.1,
-  mu: 8,
-  theta: 2,
+  // 8¢ and 2¢ until D-046: noise limits then held 83% of the best-price quantity, so market makers
+  // pulling back under stress did not show in the visible spread (D-036).
+  mu: 12,
+  theta: 0.5,
   alpha: 1.5,
   xMin: 100,
   limitSizeCap: 25_000,
@@ -43,6 +48,8 @@ export const DEFAULT_NOISE_PARAMS: NoiseTraderParams = {
   marketSizeCap: 2_000,
   pCancel: 0.35,
   maxResting: 5,
+  sigma0: 4.3e-5,
+  volWidenCap: 3,
 };
 
 /** Capped Pareto size: min(cap, ⌊xMin · U^(−1/α)⌋), U strictly inside (0, 1). Whole shares, ≥ xMin. */
@@ -83,7 +90,9 @@ export class NoiseTrader implements Agent {
       return;
     }
     const m = referencePrice(ctx);
-    const delta = p.mu * this.rng.exponential(1) - p.theta;
+    // Real limit-order traders stand further back when the market is volatile (D-046).
+    const widen = Math.min(p.volWidenCap, Math.max(1, ctx.volatility.sigma / p.sigma0));
+    const delta = p.mu * this.rng.exponential(1) * widen - p.theta;
     const tick: Cents = ctx.book.tickSize;
     const price = side === "buy" ? toTick(m - delta, tick, "down") : toTick(m + delta, tick, "up");
     ctx.submit({ type: "limit", side, price, qty: paretoSize(this.rng, p.alpha, p.xMin, p.limitSizeCap) });

@@ -1106,3 +1106,35 @@ red ▼ next to BUYER: a buyer lifting a lower ask than the previous trade's pri
 the common time-and-sales convention and never contradicts its own label. The status-bar price and
 the ticker keep tick-direction coloring: they answer "did the price go up?", TAPE answers "who
 traded?".
+
+---
+
+## D-046 · Noise traders stand further back, and further still when volatile
+
+**Date:** 2026-10-18 · **Status:** Accepted (changes D-024's μ and θ; the D-036 proposal)
+
+**Decision.** Noise limit offsets become `δ = μ·E·w − θ` with μ = 12¢ (was 8¢), θ = 0.5¢ (was 2¢)
+and `w = min(3, max(1, σ/σ₀))`, σ₀ = 4.3×10⁻⁵/√s. Only 4% of noise limits now land at or through
+the mid (was 22%). The widening applies to the distance part only; an aggressive order is not made
+more aggressive by volatility. Real limit-order traders stand back when volatility rises, and this is
+what lets market makers' withdrawal show in the visible spread (D-036).
+
+**Before → after** (D-036 market report: 40 noise traders + 2 market makers, one sim-hour, seeds
+187 / 1 / 2; "4×" = every trader sees 4× volatility):
+
+| | Before (μ 8, θ 2) | After (μ 12, θ 0.5, widening) |
+| --- | --- | --- |
+| Calm: average spread | 1.35 / 1.34 / 1.35¢ | 1.52 / 1.57 / 1.53¢ |
+| Calm: a market maker at the best price | 34 / 33 / 34% | 33 / 35 / 33% |
+| Calm: trades per hour | 19,511 / 19,466 / 19,251 | 9,032 / 9,152 / 8,844 (≈ 2.5 per second) |
+| Calm: MM P&L (mm-1 / mm-2) | +$197/154, +$224/159, +$271/112 | +$452/400, +$550/497, +$489/534 |
+| 4×: average spread | 1.43 / 1.43 / 1.41¢ | **4.99 / 5.25 / 4.91¢** |
+| 4×: a market maker at the best price | 1.1 / 0.9 / 0.6% | 2.6 / 1.6 / 3.3% |
+| 4×: orders sweeping more than 3 levels | 49 / 67 / 55 | 198 / 205 / 202 |
+
+**Targets.** 4× spread ≥ 3¢: met. Calm spread 1.3–2.0¢: met. Market makers at the best price at
+most 10% at 4×: met. **Calm market makers at the best price ≥ 60%: not met (33–35%).** A sweep on
+seed 187 shows the lever is the market makers' k, not μ: at μ = 12, k = 1.5 gives 53% and k = 2.0
+gives 66% (both profitable), while μ = 16–20 lowers profit and barely moves the share (μ = 20 loses
+$1,200+ per maker). k is recalibrated from fill rates in D-049, and this target is checked again there.
+The pinned 10-minute markets were re-pinned for this intended change.

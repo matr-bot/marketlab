@@ -6,7 +6,7 @@ import { oldestFirst, type AgentContext, type AgentOrder } from "./agent";
 import { DEFAULT_NOISE_PARAMS, NoiseTrader, noiseTraders, paretoSize, referencePrice } from "./noiseTrader";
 
 /** A fake market for driving one trader's decisions directly, recording what it does. */
-function fakeContext(opts: { bid?: number | null; ask?: number | null; last?: number | null; orders?: RestingOrder[]; tick?: number } = {}) {
+function fakeContext(opts: { bid?: number | null; ask?: number | null; last?: number | null; orders?: RestingOrder[]; tick?: number; sigma?: number } = {}) {
   const submitted: AgentOrder[] = [];
   const cancelled: string[] = [];
   const book = {
@@ -23,7 +23,7 @@ function fakeContext(opts: { bid?: number | null; ask?: number | null; last?: nu
     panicSensitivity: 1,
     maxMidSince: () => null,
     position: 0,
-    volatility: { sigma: 4.3e-5, fast: 4.3e-5, slow: 4.3e-5, samples: 0, ready: false },
+    volatility: { sigma: opts.sigma ?? 4.3e-5, fast: opts.sigma ?? 4.3e-5, slow: opts.sigma ?? 4.3e-5, samples: 0, ready: false },
     myOrders: () => opts.orders ?? [],
     submit: (o) => {
       submitted.push(o);
@@ -59,14 +59,33 @@ describe("NoiseTrader: decisions match the plan's probabilities (fixed seeds, 20
     expect(Math.abs(markets.length / N - 0.1)).toBeLessThan(5 * Math.sqrt(0.09 / N));
   });
 
-  it("prices limits around the mid: δ = 8·E − 2, about 22% at or through the mid", () => {
+  it("prices limits around the mid: δ = 12·E − 0.5, about 4% at or through the mid (D-046)", () => {
     // Mid is 18,700. Buys sit at toTick(mid − δ, down), sells at toTick(mid + δ, up).
     const through = limits.filter((o) => (o.side === "buy" ? o.price >= 18_700 : o.price <= 18_700)).length;
-    expect(Math.abs(through / limits.length - (1 - Math.exp(-2 / 8)))).toBeLessThan(0.01);
+    expect(Math.abs(through / limits.length - (1 - Math.exp(-0.5 / 12)))).toBeLessThan(0.005);
     const avgDistance = limits.reduce((s, o) => s + (o.side === "buy" ? 18_700 - o.price : o.price - 18_700), 0) / limits.length;
-    expect(avgDistance).toBeGreaterThan(5.5); // E[δ] = 6¢; rounding away from the mid adds up to 1¢
-    expect(avgDistance).toBeLessThan(7);
+    expect(avgDistance).toBeGreaterThan(11.5); // E[δ] = 11.5¢; rounding away from the mid adds up to 1¢
+    expect(avgDistance).toBeLessThan(12.5);
     expect(limits.every((o) => Number.isSafeInteger(o.price))).toBe(true);
+  });
+
+  it("stands further back when volatility is high: w = min(3, max(1, σ/σ₀)) on the distance part only", () => {
+    const avgDistanceAt = (sigma: number) => {
+      const t = new NoiseTrader(Rng.fromSeed(5));
+      const { ctx: c, submitted: s } = fakeContext({ sigma });
+      for (let i = 0; i < 50_000; i++) t.act(c);
+      const lim = s.filter((o): o is Extract<AgentOrder, { type: "limit" }> => o.type === "limit");
+      return lim.reduce((sum, o) => sum + (o.side === "buy" ? 18_700 - o.price : o.price - 18_700), 0) / lim.length;
+    };
+    const calm = avgDistanceAt(4.3e-5 / 2); // below σ₀: never narrower than calm (w = 1)
+    const double = avgDistanceAt(2 * 4.3e-5); // E[δ] = 24 − 0.5
+    const capped = avgDistanceAt(10 * 4.3e-5); // w capped at 3: E[δ] = 36 − 0.5
+    expect(calm).toBeGreaterThan(11.4);
+    expect(calm).toBeLessThan(12.6);
+    expect(double).toBeGreaterThan(23.2);
+    expect(double).toBeLessThan(24.6);
+    expect(capped).toBeGreaterThan(35);
+    expect(capped).toBeLessThan(36.8);
   });
 
   it("draws sizes from a Pareto tail with α ≈ 1.5 (Hill estimator), capped per order type", () => {
@@ -180,7 +199,7 @@ describe("paretoSize and noiseTraders", () => {
     ]);
     expect(specs[0].create(Rng.fromSeed(1))).toBeInstanceOf(NoiseTrader);
     expect(DEFAULT_NOISE_PARAMS).toEqual({
-      pMarket: 0.1, mu: 8, theta: 2, alpha: 1.5, xMin: 100, limitSizeCap: 25_000, marketSizeCap: 2_000, pCancel: 0.35, maxResting: 5,
+      pMarket: 0.1, mu: 12, theta: 0.5, alpha: 1.5, xMin: 100, limitSizeCap: 25_000, marketSizeCap: 2_000, pCancel: 0.35, maxResting: 5, sigma0: 4.3e-5, volWidenCap: 3,
     });
   });
 });

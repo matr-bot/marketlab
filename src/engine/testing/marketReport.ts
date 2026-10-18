@@ -83,7 +83,7 @@ function withSigma(ctx: AgentContext, mult: number): AgentContext {
   return {
     time: ctx.time, book: ctx.book, startPrice: ctx.startPrice, myOrders: ctx.myOrders, submit: ctx.submit, cancel: ctx.cancel,
     lastTradePrice: ctx.lastTradePrice, position: ctx.position,
-    fairValue: ctx.fairValue, panicSensitivity: ctx.panicSensitivity, maxMidSince: ctx.maxMidSince,
+    fairValue: ctx.fairValue, panicSensitivity: ctx.panicSensitivity, liquidityMultiplier: ctx.liquidityMultiplier, maxMidSince: ctx.maxMidSince,
     volatility: { sigma: v.sigma * mult, fast: v.fast * mult, slow: v.slow * mult, samples: v.samples, ready: v.ready },
   };
 }

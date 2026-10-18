@@ -21,6 +21,7 @@ function fakeContext(opts: { bid?: number | null; ask?: number | null; last?: nu
     startPrice: 18_700,
     fairValue: 18_700,
     panicSensitivity: 1,
+    liquidityMultiplier: 1,
     maxMidSince: () => null,
     position: 0,
     volatility: { sigma: opts.sigma ?? 4.3e-5, fast: opts.sigma ?? 4.3e-5, slow: opts.sigma ?? 4.3e-5, samples: 0, ready: false },

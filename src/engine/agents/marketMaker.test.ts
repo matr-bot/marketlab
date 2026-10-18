@@ -164,6 +164,12 @@ describe("computeQuotes: size (D-036)", () => {
     expect(atSigma0({ sigma: 0.5 * P.sigma0 }).bid?.qty).toBe(500); // never above base
   });
 
+  it("scales its size by a headline's liquidity multiplier (D-053)", () => {
+    expect(computeQuotes(P, inputs({ sigma: P.sigma0, liquidity: 0.5 })).bid?.qty).toBe(200); // 250 → whole lots
+    expect(computeQuotes(P, inputs({ sigma: P.sigma0, liquidity: 2 })).ask?.qty).toBe(1_000);
+    expect(computeQuotes(P, inputs({ sigma: P.sigma0 })).bid?.qty).toBe(500);
+  });
+
   it("shrinks both sides under high volatility: at 4× σ₀ each side quotes 100 shares", () => {
     const q = computeQuotes(P, inputs({ sigma: 4 * P.sigma0 }));
     expect([q.bid?.qty, q.ask?.qty]).toEqual([100, 100]);
@@ -215,6 +221,7 @@ describe("MarketMaker.act: requotes only when price or size changes (Step 4+5 ch
       startPrice: 18_700,
       fairValue: 18_700,
       panicSensitivity: 1,
+      liquidityMultiplier: 1,
       maxMidSince: () => null,
       position: state.position,
       volatility: { sigma: state.sigma, fast: state.sigma, slow: state.sigma, samples: 30, ready: true },

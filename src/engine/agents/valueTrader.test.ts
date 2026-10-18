@@ -70,6 +70,7 @@ describe("ValueTrader: heterogeneous beliefs and thresholds", () => {
       volatility: { sigma: 4.3e-5, fast: 4.3e-5, slow: 4.3e-5, samples: 30, ready: true },
       fairValue,
       panicSensitivity: 1,
+      liquidityMultiplier: 1,
       maxMidSince: () => null,
       myOrders: () => [...resting],
       submit: (o: AgentOrder) => {

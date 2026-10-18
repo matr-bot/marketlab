@@ -282,7 +282,7 @@ describe("MarketFeed: headlines (D-048, D-051)", () => {
 
   it("shows a shock applied with any other label (Tuesday's AI headlines) under that label", () => {
     const feed = feedOf();
-    feed.sim.applyShock({ fairValuePct: 0.01, panicSensitivity: 1, durationSec: 60 }, "Chip supplier fire");
+    feed.sim.applyShock({ fairValuePct: 0.01, panicSensitivity: 1, durationSec: 60, volatilityMultiplier: 1, liquidityMultiplier: 1 }, "Chip supplier fire");
     feed.advance(1);
     expect(feed.frame().headlines[0]).toMatchObject({ code: "Chip supplier fire", headline: "Chip supplier fire", fairValuePct: 0.01 });
   });

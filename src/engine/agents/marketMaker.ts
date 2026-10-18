@@ -67,6 +67,8 @@ export interface QuoteInputs {
   readonly othersBestBid: Cents | null;
   readonly othersBestAsk: Cents | null;
   readonly tick: Cents;
+  /** A headline's liquidity multiplier on the base size (default 1, D-053). */
+  readonly liquidity?: number;
 }
 
 export interface Quote {
@@ -104,7 +106,7 @@ export function computeQuotes(p: MarketMakerParams, i: QuoteInputs): Quotes {
   if (i.othersBestBid !== null) askPrice = Math.max(askPrice, i.othersBestBid + i.tick);
 
   // Size: smaller when volatility is high, and on the side that would grow the inventory.
-  const volFactor = Math.max(p.minSizeFactor, Math.min(1, p.sigma0 / i.sigma));
+  const volFactor = Math.max(p.minSizeFactor, Math.min(1, p.sigma0 / i.sigma)) * (i.liquidity ?? 1);
   const lots = (shares: number) => Math.floor(shares / p.lotSize) * p.lotSize;
   const bidQty = Math.min(lots(p.baseSize * volFactor * (1 - Math.max(0, i.position) / p.maxInventory)), lots(p.maxInventory - i.position));
   const askQty = Math.min(lots(p.baseSize * volFactor * (1 - Math.max(0, -i.position) / p.maxInventory)), lots(p.maxInventory + i.position));
@@ -142,6 +144,7 @@ export class MarketMaker implements Agent {
       othersBestBid: bestBid,
       othersBestAsk: bestAsk,
       tick: ctx.book.tickSize,
+      liquidity: ctx.liquidityMultiplier,
     });
 
     // Replace a side only if its price or size changed (D-036): an unchanged quote keeps its

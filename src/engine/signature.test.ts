@@ -97,6 +97,15 @@ describe.skipIf(MUTATION_RUN)("Shock signature: DOWNGRADE, analyst downgrade (fa
   });
 });
 
+describe.skipIf(MUTATION_RUN)("Multipliers move the market in the right direction (D-053)", () => {
+  it("lower liquidity leaves market makers with less depth near the mid (FED, seed 187)", () => {
+    const base = presetByCode("FED")!.shock;
+    const normal = runShockScenario(187, [{ label: "FED", shock: base }]);
+    const thin = runShockScenario(187, [{ label: "FED", shock: { ...base, liquidityMultiplier: 0.25 } }]);
+    expect(thin.mmDepth10After).toBeLessThan(0.6 * normal.mmDepth10After);
+  });
+});
+
 describe.skipIf(MUTATION_RUN)("Repeated headlines (D-045)", () => {
   const FED = presetByCode("FED")!.shock;
 

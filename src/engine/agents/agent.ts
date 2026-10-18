@@ -30,6 +30,8 @@ export interface AgentContext {
   readonly fairValue: number;
   /** Panic sensitivity s of the active headline (1 when none): panic thresholds are divided by it. */
   readonly panicSensitivity: number;
+  /** Liquidity multiplier of the active headline (1 when none): market makers scale their quote size by it. */
+  readonly liquidityMultiplier: number;
   /** Highest mid sampled (once per sim second) at or after `sinceMs`, or null if none. */
   maxMidSince(sinceMs: number): number | null;
   /** This agent's resting orders, oldest first (sorted explicitly by engine sequence; D-026). */

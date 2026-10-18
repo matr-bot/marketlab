@@ -451,7 +451,7 @@ describe("Simulation: the agent context", () => {
       ],
     });
     sim.run(50);
-    sim.applyShock({ fairValuePct: -0.03, panicSensitivity: 1, durationSec: 60 }, "TEST");
+    sim.applyShock({ fairValuePct: -0.03, panicSensitivity: 1, durationSec: 60, volatilityMultiplier: 1, liquidityMultiplier: 1 }, "TEST");
     sim.run(1); // applied at 5,000 ms
     const t = sim.shocks[0].time;
     sim.run(598); // last tick end 5,000 + 59,900

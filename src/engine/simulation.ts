@@ -262,6 +262,7 @@ export class Simulation {
         return fundamental.value;
       },
       panicSensitivity: fundamental.sensitivityAt(time),
+      liquidityMultiplier: fundamental.liquidityAt(time),
       maxMidSince: (sinceMs: number) => history.maxSince(sinceMs),
       get lastTradePrice() {
         return lastTrade();

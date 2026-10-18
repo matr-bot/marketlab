@@ -11,8 +11,12 @@ export interface ShockParams {
   readonly fairValuePct: number;
   /** Panic sensitivity s: panic thresholds are divided by s while the shock lasts. Clamped to [0.5, 3]. */
   readonly panicSensitivity: number;
-  /** How long the sensitivity lasts, in sim seconds. Clamped to [10, 1800]. */
+  /** How long the sensitivity and multipliers last, in sim seconds. Clamped to [10, 1800]. */
   readonly durationSec: number;
+  /** Fair value's random-walk volatility is multiplied by this while the shock lasts (more uncertainty). Clamped to [1, 3]. */
+  readonly volatilityMultiplier: number;
+  /** Market makers' base quote size is multiplied by this while the shock lasts. Clamped to [0.25, 2]. */
+  readonly liquidityMultiplier: number;
 }
 
 export interface FundamentalParams {
@@ -34,6 +38,8 @@ export const SHOCK_LIMITS = {
   fairValuePct: [-0.2, 0.2],
   panicSensitivity: [0.5, 3],
   durationSec: [10, 1_800],
+  volatilityMultiplier: [1, 3],
+  liquidityMultiplier: [0.25, 2],
 } as const;
 
 const clamp = (x: number, [lo, hi]: readonly [number, number]) => Math.min(hi, Math.max(lo, x));
@@ -45,6 +51,8 @@ export function clampShock(s: ShockParams): ShockParams {
     fairValuePct: clamp(s.fairValuePct, SHOCK_LIMITS.fairValuePct),
     panicSensitivity: clamp(s.panicSensitivity, SHOCK_LIMITS.panicSensitivity),
     durationSec: clamp(s.durationSec, SHOCK_LIMITS.durationSec),
+    volatilityMultiplier: clamp(s.volatilityMultiplier, SHOCK_LIMITS.volatilityMultiplier),
+    liquidityMultiplier: clamp(s.liquidityMultiplier, SHOCK_LIMITS.liquidityMultiplier),
   };
 }
 
@@ -54,8 +62,10 @@ export class Fundamental {
   private lnV: number;
   private readonly lnLo: number;
   private readonly lnHi: number;
-  /** Panic sensitivity in force, from when and until when (sim ms). */
+  /** Panic sensitivity and the multipliers in force, from when and until when (sim ms). */
   private s = 1;
+  private vol = 1;
+  private liq = 1;
   private sFrom = 0;
   private sUntil = -1;
 
@@ -78,28 +88,45 @@ export class Fundamental {
     return this.v;
   }
 
+  private activeAt(timeMs: number): boolean {
+    return timeMs >= this.sFrom && timeMs < this.sUntil;
+  }
+
   /** Panic sensitivity at `timeMs`: the active shock's s, or 1. */
   sensitivityAt(timeMs: number): number {
-    return timeMs >= this.sFrom && timeMs < this.sUntil ? this.s : 1;
+    return this.activeAt(timeMs) ? this.s : 1;
+  }
+
+  /** Market makers' size multiplier at `timeMs`: the active shock's, or 1. */
+  liquidityAt(timeMs: number): number {
+    return this.activeAt(timeMs) ? this.liq : 1;
+  }
+
+  /** Fair value's volatility multiplier at `timeMs`: the active shock's, or 1. */
+  volatilityAt(timeMs: number): number {
+    return this.activeAt(timeMs) ? this.vol : 1;
   }
 
   /** Called at every tick end: one random-walk step on the `stepMs` grid. */
   onTickEnd(timeMs: number): void {
     if (timeMs % this.params.stepMs !== 0) return;
-    const sd = this.params.sigmaV * Math.sqrt(this.params.stepMs / 1000);
+    const sd = this.params.sigmaV * this.volatilityAt(timeMs) * Math.sqrt(this.params.stepMs / 1000);
     this.setLn(this.lnV + sd * this.rng.normal() - (sd * sd) / 2);
   }
 
   /**
    * A headline at `timeMs`. V jumps by the shock (shocks compound: each headline is new news). If a
-   * shock is still active, sensitivity becomes the larger of the two and the window runs to the
-   * later end (D-043), so repeated headlines never multiply panic without limit.
+   * shock is still active, each setting takes the more stressed of the two (larger sensitivity and
+   * volatility, smaller liquidity) and the window runs to the later end (D-043, D-053), so repeated
+   * headlines never multiply stress without limit.
    */
   shock(raw: ShockParams, timeMs: number): ShockParams {
     const s = clampShock(raw);
     this.setLn(this.lnV + ln(1 + s.fairValuePct));
-    const active = timeMs >= this.sFrom && timeMs < this.sUntil;
+    const active = this.activeAt(timeMs);
     this.s = active ? Math.max(this.s, s.panicSensitivity) : s.panicSensitivity;
+    this.vol = active ? Math.max(this.vol, s.volatilityMultiplier) : s.volatilityMultiplier;
+    this.liq = active ? Math.min(this.liq, s.liquidityMultiplier) : s.liquidityMultiplier;
     if (!active) this.sFrom = timeMs;
     this.sUntil = Math.max(active ? this.sUntil : -1, timeMs + s.durationSec * 1000);
     return s;

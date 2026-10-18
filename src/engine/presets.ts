@@ -10,10 +10,10 @@ export interface Preset {
 }
 
 export const PRESETS: readonly Preset[] = [
-  { code: "FED", headline: "Fed surprise hike 75bps", shock: { fairValuePct: -0.03, panicSensitivity: 1.5, durationSec: 300 } },
-  { code: "CEO", headline: "CEO arrested for accounting fraud", shock: { fairValuePct: -0.06, panicSensitivity: 2, durationSec: 300 } },
-  { code: "BEAT", headline: "Earnings beat, guidance raised", shock: { fairValuePct: 0.04, panicSensitivity: 0.5, durationSec: 300 } },
-  { code: "DOWNGRADE", headline: "Analyst downgrade to neutral", shock: { fairValuePct: -0.01, panicSensitivity: 1, durationSec: 120 } },
+  { code: "FED", headline: "Fed surprise hike 75bps", shock: { fairValuePct: -0.03, panicSensitivity: 1.5, durationSec: 300, volatilityMultiplier: 1, liquidityMultiplier: 1 } },
+  { code: "CEO", headline: "CEO arrested for accounting fraud", shock: { fairValuePct: -0.06, panicSensitivity: 2, durationSec: 300, volatilityMultiplier: 1, liquidityMultiplier: 1 } },
+  { code: "BEAT", headline: "Earnings beat, guidance raised", shock: { fairValuePct: 0.04, panicSensitivity: 0.5, durationSec: 300, volatilityMultiplier: 1, liquidityMultiplier: 1 } },
+  { code: "DOWNGRADE", headline: "Analyst downgrade to neutral", shock: { fairValuePct: -0.01, panicSensitivity: 1, durationSec: 120, volatilityMultiplier: 1, liquidityMultiplier: 1 } },
 ];
 
 /** The preset with this code (case-insensitive), or undefined. */

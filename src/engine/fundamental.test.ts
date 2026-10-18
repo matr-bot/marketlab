@@ -4,7 +4,7 @@ import { clampShock, DEFAULT_FUNDAMENTAL_PARAMS, Fundamental, MidHistory, type S
 import { Rng } from "./rng";
 import { Simulation } from "./simulation";
 
-const FED: ShockParams = { fairValuePct: -0.03, panicSensitivity: 1.5, durationSec: 300 };
+const FED: ShockParams = { fairValuePct: -0.03, panicSensitivity: 1.5, durationSec: 300, volatilityMultiplier: 1, liquidityMultiplier: 1 };
 const quiet = (start = 18_700) => new Fundamental(Rng.fromSeed(1).stream("fundamental"), start, { ...DEFAULT_FUNDAMENTAL_PARAMS, sigmaV: 0 });
 
 describe("Fundamental: fair value V (D-043)", () => {
@@ -66,10 +66,10 @@ describe("Fundamental: fair value V (D-043)", () => {
 
   it("overlapping shocks: sensitivity is the larger one, the window runs to the later end (no runaway)", () => {
     const f = quiet();
-    f.shock({ ...FED, panicSensitivity: 2, durationSec: 300 }, 0); // until 300 s
-    f.shock({ ...FED, panicSensitivity: 1.5, durationSec: 60 }, 100_000); // ends earlier, smaller s
+    f.shock({ ...FED, panicSensitivity: 2, durationSec: 300, volatilityMultiplier: 1, liquidityMultiplier: 1 }, 0); // until 300 s
+    f.shock({ ...FED, panicSensitivity: 1.5, durationSec: 60, volatilityMultiplier: 1, liquidityMultiplier: 1 }, 100_000); // ends earlier, smaller s
     expect([f.sensitivityAt(150_000), f.sensitivityAt(299_999), f.sensitivityAt(300_000)]).toEqual([2, 2, 1]);
-    f.shock({ ...FED, panicSensitivity: 1.5, durationSec: 300 }, 200_000); // ends later: extends
+    f.shock({ ...FED, panicSensitivity: 1.5, durationSec: 300, volatilityMultiplier: 1, liquidityMultiplier: 1 }, 200_000); // ends later: extends
     expect([f.sensitivityAt(400_000), f.sensitivityAt(499_999), f.sensitivityAt(500_000)]).toEqual([2, 2, 1]);
     for (let i = 0; i < 10; i++) f.shock({ ...FED, panicSensitivity: 3 }, 600_000 + i);
     expect(f.sensitivityAt(600_100)).toBe(3); // never more than the largest single shock (clamped at 3)
@@ -77,26 +77,52 @@ describe("Fundamental: fair value V (D-043)", () => {
 
   it("a shock exactly when the previous window ends starts fresh; an overlapping one keeps the original start", () => {
     const f = quiet();
-    f.shock({ ...FED, panicSensitivity: 3, durationSec: 10 }, 0); // until 10 s
-    f.shock({ ...FED, panicSensitivity: 0.5, durationSec: 10 }, 10_000); // exactly at the end: fresh
+    f.shock({ ...FED, panicSensitivity: 3, durationSec: 10, volatilityMultiplier: 1, liquidityMultiplier: 1 }, 0); // until 10 s
+    f.shock({ ...FED, panicSensitivity: 0.5, durationSec: 10, volatilityMultiplier: 1, liquidityMultiplier: 1 }, 10_000); // exactly at the end: fresh
     expect(f.sensitivityAt(15_000)).toBe(0.5);
     const g = quiet();
-    g.shock({ ...FED, durationSec: 300 }, 0);
-    g.shock({ ...FED, durationSec: 300 }, 100_000);
+    g.shock({ ...FED, durationSec: 300, volatilityMultiplier: 1, liquidityMultiplier: 1 }, 0);
+    g.shock({ ...FED, durationSec: 300, volatilityMultiplier: 1, liquidityMultiplier: 1 }, 100_000);
     expect(g.sensitivityAt(50_000)).toBe(1.5); // still active between the two headlines
   });
 
   it("a shock after the previous one has ended starts fresh", () => {
     const f = quiet();
-    f.shock({ ...FED, panicSensitivity: 3, durationSec: 10 }, 0);
-    f.shock({ ...FED, panicSensitivity: 0.5, durationSec: 10 }, 20_000);
+    f.shock({ ...FED, panicSensitivity: 3, durationSec: 10, volatilityMultiplier: 1, liquidityMultiplier: 1 }, 0);
+    f.shock({ ...FED, panicSensitivity: 0.5, durationSec: 10, volatilityMultiplier: 1, liquidityMultiplier: 1 }, 20_000);
     expect(f.sensitivityAt(25_000)).toBe(0.5);
   });
 
+  it("multipliers (D-053): volatility scales the random walk during the shock; overlaps take the more stressed values", () => {
+    const sdOver = (f: Fundamental, from: number, to: number) => {
+      const logs = [Math.log(f.value)];
+      for (let t = from; t <= to; t += 1_000) {
+        f.onTickEnd(t);
+        logs.push(Math.log(f.value));
+      }
+      const r = logs.slice(1).map((x, i) => x - logs[i]);
+      return Math.sqrt(r.reduce((s, x) => s + x * x, 0) / r.length);
+    };
+    const f = new Fundamental(Rng.fromSeed(21).stream("fundamental"), 18_700);
+    f.shock({ ...FED, fairValuePct: 0, volatilityMultiplier: 3, durationSec: 1_800 }, 0);
+    const during = sdOver(f, 1_000, 1_799_000);
+    const after = sdOver(f, 1_800_000, 3_600_000);
+    expect(during / after).toBeGreaterThan(2.7); // 3× while the shock lasts…
+    expect(during / after).toBeLessThan(3.3);
+    expect([f.volatilityAt(1_799_999), f.volatilityAt(1_800_000)]).toEqual([3, 1]); // …and 1 after
+    const g = quiet();
+    g.shock({ ...FED, volatilityMultiplier: 2, liquidityMultiplier: 0.5, durationSec: 300 }, 0);
+    g.shock({ ...FED, volatilityMultiplier: 1.5, liquidityMultiplier: 0.8, durationSec: 300 }, 100_000);
+    expect([g.volatilityAt(200_000), g.liquidityAt(200_000)]).toEqual([2, 0.5]); // more stressed of the two
+    expect([g.volatilityAt(399_999), g.liquidityAt(400_000)]).toEqual([2, 1]); // to the later end, then calm
+  });
+
   it("clamps any shock into sensible ranges and rejects non-numbers", () => {
-    expect(clampShock({ fairValuePct: -0.9, panicSensitivity: 10, durationSec: 1 })).toEqual({ fairValuePct: -0.2, panicSensitivity: 3, durationSec: 10 });
-    expect(clampShock({ fairValuePct: 0.5, panicSensitivity: 0, durationSec: 99_999 })).toEqual({ fairValuePct: 0.2, panicSensitivity: 0.5, durationSec: 1_800 });
+    expect(clampShock({ fairValuePct: -0.9, panicSensitivity: 10, durationSec: 1, volatilityMultiplier: 1, liquidityMultiplier: 1 })).toEqual({ fairValuePct: -0.2, panicSensitivity: 3, durationSec: 10, volatilityMultiplier: 1, liquidityMultiplier: 1 });
+    expect(clampShock({ fairValuePct: 0.5, panicSensitivity: 0, durationSec: 99_999, volatilityMultiplier: 1, liquidityMultiplier: 1 })).toEqual({ fairValuePct: 0.2, panicSensitivity: 0.5, durationSec: 1_800, volatilityMultiplier: 1, liquidityMultiplier: 1 });
     expect(clampShock(FED)).toEqual(FED);
+    expect(clampShock({ ...FED, volatilityMultiplier: 0.2, liquidityMultiplier: 9 })).toMatchObject({ volatilityMultiplier: 1, liquidityMultiplier: 2 });
+    expect(clampShock({ ...FED, volatilityMultiplier: 50, liquidityMultiplier: 0 })).toMatchObject({ volatilityMultiplier: 3, liquidityMultiplier: 0.25 });
     expect(() => clampShock({ ...FED, fairValuePct: NaN })).toThrow("shock fairValuePct must be a finite number, got NaN");
     expect(() => clampShock({ ...FED, durationSec: Infinity })).toThrow(/durationSec/);
   });

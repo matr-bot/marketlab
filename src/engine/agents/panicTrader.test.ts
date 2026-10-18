@@ -23,6 +23,7 @@ function market() {
     volatility: { sigma: 4.3e-5, fast: 4.3e-5, slow: 4.3e-5, samples: 30, ready: true },
     fairValue: 18_700,
     panicSensitivity: state.s,
+    liquidityMultiplier: 1,
     maxMidSince: (since: number) => {
       state.asked.push(since);
       return state.high;

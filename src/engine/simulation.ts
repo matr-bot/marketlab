@@ -138,6 +138,13 @@ export class Simulation {
     return this.agents.size;
   }
 
+  /** How many agents of one type trade in this market. */
+  agentCountOfType(type: AgentType): number {
+    let n = 0;
+    for (const { spec } of this.agents.values()) if (spec.agentType === type) n++;
+    return n;
+  }
+
   /** Price of the most recent trade, or null before the first trade. */
   get lastTradePrice(): Cents | null {
     return this.last;

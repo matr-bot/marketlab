@@ -1,4 +1,6 @@
+import { attribute, type Attribution } from "./attribution";
 import type { Fill } from "./matchingEngine";
+import { Narrator, type ChatMessage } from "./narrator";
 import { presetByCode } from "./presets";
 import type { Simulation } from "./simulation";
 import type { AgentType, Cents, DepthLevel, Side } from "./types";
@@ -84,7 +86,15 @@ export interface Frame {
   readonly headlines: readonly FrameHeadline[];
   /** First-minute P&L records finalized since the last frame (each sent exactly once). */
   readonly impacts: readonly FrameImpact[];
+  /** Desk-chat messages posted since the last frame (each sent exactly once; D-055). */
+  readonly chat: readonly ChatMessage[];
+  /** Who moved the price over the last 60 s of sim time (D-054). */
+  readonly who: Attribution;
 }
+
+/** WHO looks back this far by default; windows are answered from the last WHO_BUFFER_MS. */
+export const WHO_WINDOW_MS = 60_000;
+export const WHO_BUFFER_MS = 600_000;
 
 export interface FeedOptions {
   /** Candle length in sim ms (default 10 s, D-038). */
@@ -117,6 +127,9 @@ export class MarketFeed {
   /** Index into `candles` of the oldest candle changed since the last frame, or null. */
   private dirtyFrom: number | null = null;
   private pending: FrameTrade[] = [];
+  private readonly narrator: Narrator;
+  /** Fills of the last WHO_BUFFER_MS, oldest first. */
+  private whoFills: Fill[] = [];
   /** Next headline / impact seq to send. */
   private nextHeadline = 0;
   private nextImpact = 0;
@@ -127,6 +140,7 @@ export class MarketFeed {
     readonly seed: number,
     options: FeedOptions = {},
   ) {
+    this.narrator = new Narrator(sim);
     this.candleMs = options.candleMs ?? 10_000;
     this.depthLevels = options.depthLevels ?? 40;
     this.maxTrades = options.maxTradesPerFrame ?? 500;
@@ -150,10 +164,31 @@ export class MarketFeed {
     return r.ok ? { ok: true, code: preset.code, headline: preset.headline } : { ok: false, message: r.message };
   }
 
-  /** Run `ticks` ticks of the simulation and take in their fills. */
+  /** Run `ticks` ticks of the simulation, with the narrator watching each, and take in their fills. */
   advance(ticks: number): void {
-    this.sim.run(ticks);
+    if (!Number.isSafeInteger(ticks) || ticks < 0) throw new RangeError(`ticks must be a non-negative integer, got ${ticks}`);
+    for (let i = 0; i < ticks; i++) {
+      this.sim.step();
+      this.narrator.onTick();
+    }
     this.ingest();
+  }
+
+  /** Who moved the price in [from, to), from the last WHO_BUFFER_MS of fills (D-054). */
+  attribute(from: number, to: number): Attribution {
+    return attribute(this.window(from), from, to);
+  }
+
+  /** The buffered fills with time ≥ from (binary search: the buffer is in time order). */
+  private window(from: number): Fill[] {
+    let lo = 0;
+    let hi = this.whoFills.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (this.whoFills[mid].time < from) lo = mid + 1;
+      else hi = mid;
+    }
+    return this.whoFills.slice(lo);
   }
 
   /** Everything since the last frame, as one object; then starts collecting the next frame. */
@@ -177,6 +212,8 @@ export class MarketFeed {
       candles: this.dirtyFrom === null ? [] : this.candles.slice(this.dirtyFrom).map((c) => ({ ...c })),
       headlines: this.newHeadlines(),
       impacts: this.newImpacts(),
+      chat: this.narrator.take(),
+      who: this.attribute(this.sim.clock.now - WHO_WINDOW_MS, this.sim.clock.now + 1),
     };
     this.pending = [];
     this.dropped = 0;
@@ -205,6 +242,8 @@ export class MarketFeed {
     const fills = this.sim.engine.fillsSince(this.seen);
     for (const f of fills) this.take(f);
     this.seen += fills.length;
+    const keepFrom = this.sim.clock.now - WHO_BUFFER_MS;
+    if (this.whoFills.length > 0 && this.whoFills[0].time < keepFrom) this.whoFills = this.window(keepFrom);
     // At most `maxTrades` wait for the next frame, the newest ones; older ones are only counted.
     if (this.pending.length > this.maxTrades) {
       const cut = this.pending.length - this.maxTrades;
@@ -217,6 +256,7 @@ export class MarketFeed {
     if (this.lastPrice !== null && f.price !== this.lastPrice) this.lastTick = f.price > this.lastPrice ? "up" : "down";
     this.lastPrice = f.price;
     this.volume += f.qty;
+    this.whoFills.push(f);
     this.pending.push({ seq: f.seq, time: f.time, price: f.price, qty: f.qty, aggressor: f.aggressor, tick: this.lastTick });
 
     const start = f.time - (f.time % this.candleMs);

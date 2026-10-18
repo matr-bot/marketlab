@@ -230,6 +230,10 @@ describe("The real clock decides only HOW MANY ticks run, never what happens in 
     const sent = (r: typeof smooth) => r.frames.flatMap((f) => f.trades);
     expect(sent(jittery)).toEqual(sent(smooth));
     expect(mergeCandles(jittery.frames)).toEqual(mergeCandles(smooth.frames));
+    // …and the same desk chat, message for message (the narrator runs per tick, not per frame).
+    const chat = (r: typeof smooth) => r.frames.flatMap((f) => f.chat);
+    expect(chat(jittery)).toEqual(chat(smooth));
+    expect(chat(smooth).some((m) => m.kind === "headline")).toBe(true);
   }, 30_000); // four 77-agent markets: a few seconds under coverage instrumentation
 });
 
@@ -332,6 +336,40 @@ describe("MarketFeed: headlines (D-048, D-051)", () => {
     expect(feed.sim.shocks[0].seq).toBe(20);
     expect(feed.sim.shockImpacts.every((i) => i.pnlByType !== null)).toBe(true);
   }, 30_000);
+});
+
+describe("MarketFeed: WHO and CHAT in frames (D-054, D-055)", () => {
+  it("each frame's WHO is the last 60 s of the fill log, exactly", () => {
+    const feed = feedOf();
+    feed.advance(6_000);
+    feed.applyPreset("FED");
+    feed.advance(300);
+    const f = feed.frame();
+    const now = feed.sim.clock.now;
+    const sold = feed.sim.engine.fills.filter((x) => x.time >= now - 60_000 && x.aggressor === "sell").reduce((t, x) => t + x.qty, 0);
+    expect([f.who.from, f.who.to]).toEqual([now - 60_000, now + 1]);
+    expect(f.who.selling.shares).toBe(sold);
+    expect(Object.values(f.who.selling.pct).reduce((t, x) => t + x!, 0)).toBe(100);
+  });
+
+  it("answers WHO for any window in the last 10 minutes (a clicked candle) and forgets older fills", () => {
+    const feed = feedOf();
+    feed.advance(9_000); // 15 minutes
+    const fills = feed.sim.engine.fills;
+    const candle = feed.attribute(840_000, 850_000);
+    const recount = fills.filter((x) => x.time >= 840_000 && x.time < 850_000).length;
+    expect(candle.trades).toBe(recount);
+    expect(recount).toBeGreaterThan(0);
+    expect(feed.attribute(0, 60_000).trades).toBe(0); // older than 10 minutes: no longer kept
+  });
+
+  it("sends each chat message once", () => {
+    const feed = feedOf();
+    feed.advance(700); // past the first quiet note at 60 s
+    const first = feed.frame().chat;
+    expect(first.length).toBeGreaterThan(0);
+    expect(feed.frame().chat).toEqual([]);
+  });
 });
 
 describe("TickPacer: real ms → whole 100 ms ticks", () => {

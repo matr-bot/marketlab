@@ -1093,3 +1093,16 @@ data. CLAUDE.md now allows exactly two status labels: SIMULATED (always) and REP
 **Checked.** The rename changes only text: with "MLAB" mapped back to "SPY", the new 10-minute fill
 logs give exactly the old pinned fingerprints (e645d6434f2a0b64 and f713b6e6055aebc3), so the two
 pins were updated with no change to the market.
+
+---
+
+## D-042 · TAPE colors prints by aggressor side
+
+**Date:** 2026-10-17 · **Status:** Accepted (changes TAPE's coloring in D-040)
+
+**Decision.** In TAPE each print is green with ▲ if a buyer initiated it and red with ▼ if a seller
+did, and the AGGRESSOR label takes the same color. Coloring by tick direction (D-040) could put a
+red ▼ next to BUYER: a buyer lifting a lower ask than the previous trade's price. Side coloring is
+the common time-and-sales convention and never contradicts its own label. The status-bar price and
+the ticker keep tick-direction coloring: they answer "did the price go up?", TAPE answers "who
+traded?".

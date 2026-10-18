@@ -20,6 +20,15 @@ test("the market is alive on load: prices change within 5 seconds, with no conso
   await expect(page.getByTestId("sim-clock")).toHaveText(/^09:4\d:\d\d\.\d00$/); // warmed up 10 minutes from 09:30
   await expect(page.locator("[data-panel=GP] canvas")).toBeVisible();
   await expect(page.getByTestId("tape").locator("tbody tr").first()).toBeVisible();
+  // Every TAPE print's color agrees with its AGGRESSOR label.
+  const sides = await page.getByTestId("tape").locator("tbody tr").evaluateAll((rows) =>
+    (rows as HTMLTableRowElement[]).map((r) => [r.getAttribute("data-aggressor"), getComputedStyle(r.cells[1]).color, getComputedStyle(r.cells[3]).color, r.cells[3].textContent]),
+  );
+  for (const [aggressor, priceColor, labelColor, label] of sides) {
+    expect(label).toBe(aggressor === "buy" ? "BUYER" : "SELLER");
+    expect(priceColor).toBe(labelColor);
+  }
+  expect(new Set(sides.map((s) => s[1])).size).toBe(2); // both sides appear, in two colors
   await expect(page.getByTestId("book").getByText("SPREAD")).toBeVisible();
   await expect(page.getByTestId("book").getByText(/^(BID|ASK)$/).first()).toBeVisible();
   await expect(page.getByTestId("ticker").locator("span").first()).toBeVisible();

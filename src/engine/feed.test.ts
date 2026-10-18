@@ -92,9 +92,10 @@ describe("MarketFeed: one coalesced frame per request (D-037)", () => {
     expect(f.last).toBe(fills[fills.length - 1].price);
     expect(f.volume).toBe(fills.reduce((s, x) => s + x.qty, 0));
     expect([f.bid, f.ask]).toEqual([book.bestBid(), book.bestAsk()]);
-    expect(f.bids).toEqual(book.depth("buy", 20));
-    expect(f.asks).toEqual(book.depth("sell", 20));
-    expect(f.bids).toHaveLength(20);
+    expect(f.bids).toEqual(book.depth("buy", 40));
+    expect(f.asks).toEqual(book.depth("sell", 40));
+    expect(f.bids.length).toBeLessThanOrEqual(40);
+    expect(book.depth("buy").length).toBeGreaterThan(f.bids.length - 1); // never more than the book has
   });
 
   it("marks each trade up or down vs the previous trade, and an unchanged price keeps the last direction", () => {

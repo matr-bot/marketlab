@@ -31,6 +31,12 @@ test("the market is alive on load: prices change within 5 seconds, with no conso
   expect(new Set(sides.map((s) => s[1])).size).toBe(2); // both sides appear, in two colors
   await expect(page.getByTestId("book").getByText("SPREAD")).toBeVisible();
   await expect(page.getByTestId("book").getByText(/^(BID|ASK)$/).first()).toBeVisible();
+  // The same number of levels on each side, centered on the spread.
+  const book = page.getByTestId("book");
+  const levels = Number(await book.getAttribute("data-levels"));
+  expect(levels).toBeGreaterThan(5);
+  await expect(book.locator("[data-side=ASK]")).toHaveCount(levels);
+  await expect(book.locator("[data-side=BID]")).toHaveCount(levels);
   // Depth bars: one per level, the largest level's bar is full width.
   const bars = await page.locator("[data-testid=book] [data-side] > [aria-hidden]").evaluateAll((els) => els.map((e) => (e as HTMLElement).style.width));
   expect(bars.length).toBeGreaterThan(0);

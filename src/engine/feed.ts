@@ -61,7 +61,7 @@ export interface Frame {
 export interface FeedOptions {
   /** Candle length in sim ms (default 10 s, D-038). */
   readonly candleMs?: number;
-  /** Book levels per side in each frame (default 20). */
+  /** Book levels per side in each frame (default 40: enough to fill a tall BOOK panel). */
   readonly depthLevels?: number;
   /** Most trades sent in one frame (default 500); the rest are counted in `droppedTrades`. */
   readonly maxTradesPerFrame?: number;
@@ -97,7 +97,7 @@ export class MarketFeed {
     options: FeedOptions = {},
   ) {
     this.candleMs = options.candleMs ?? 10_000;
-    this.depthLevels = options.depthLevels ?? 20;
+    this.depthLevels = options.depthLevels ?? 40;
     this.maxTrades = options.maxTradesPerFrame ?? 500;
     if (!Number.isSafeInteger(this.candleMs) || this.candleMs <= 0 || this.candleMs % 100 !== 0) {
       throw new RangeError(`candleMs must be a positive multiple of 100, got ${this.candleMs}`);

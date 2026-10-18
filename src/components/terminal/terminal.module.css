@@ -190,6 +190,12 @@
   padding-left: 0;
 }
 
+.bookHead,
+.bookSpread {
+  flex: 0 0 16px;
+  align-items: center;
+}
+
 .bookHead {
   color: var(--amber);
   border-bottom: 1px solid var(--border);
@@ -206,9 +212,12 @@
   flex-direction: column;
 }
 
-/* Asks grow upward from the spread, so clipping only ever hides the far levels. */
-.bookAsks {
-  justify-content: flex-end;
+/* Both halves hold the same number of levels; rows stretch so the panel is exactly full. */
+.bookAsks > .bookRow,
+.bookBids > .bookRow {
+  flex: 1 1 0;
+  min-height: 16px;
+  align-items: center;
 }
 
 .bookSpread {

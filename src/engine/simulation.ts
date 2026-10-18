@@ -4,7 +4,7 @@ import { MarketRegistry } from "./marketRegistry";
 import type { MatchingEngine, OrderInput, SubmitResult } from "./matchingEngine";
 import { Rng } from "./rng";
 import { SimClock, type TickWindow } from "./simClock";
-import type { CancelResult, Cents, OrderId } from "./types";
+import type { AgentType, CancelResult, Cents, OrderId } from "./types";
 import { DEFAULT_VOLATILITY_PARAMS, VolatilityEstimator, type VolatilityParams } from "./volatility";
 import { DEFAULT_FUNDAMENTAL_PARAMS, Fundamental, MidHistory, type FundamentalParams, type ShockParams } from "./fundamental";
 
@@ -52,6 +52,21 @@ export interface ShockEvent {
   readonly fairValueAfter: number;
 }
 
+/** How long after a headline its P&L impact is measured (D-047). */
+export const IMPACT_HORIZON_MS = 60_000;
+
+/**
+ * Who made and lost money in the first minute after a headline: for each agent type, the change in
+ * (cash + position × mid) from the shock to 60 s later, in whole cents (rounded once, at the end).
+ * `pnlByType` is null until the minute has passed. Market makers losing here is adverse selection:
+ * they trade with value traders who know the news (D-047).
+ */
+export interface ShockImpact {
+  readonly time: number;
+  readonly label: string;
+  readonly pnlByType: Readonly<Partial<Record<AgentType, number>>> | null;
+}
+
 export class Simulation {
   readonly rng: Rng;
   readonly clock = new SimClock();
@@ -68,6 +83,7 @@ export class Simulation {
   readonly midHistory = new MidHistory();
   private readonly pendingShocks: Array<{ shock: ShockParams; label: string }> = [];
   private readonly shockLog: ShockEvent[] = [];
+  private readonly impacts: Array<{ time: number; label: string; start: Map<AgentType, number>; pnlByType: Partial<Record<AgentType, number>> | null }> = [];
   /** Shares and cash (cents) per agent, from fills. */
   private readonly positions = new Map<string, number>();
   private readonly cash = new Map<string, number>();
@@ -125,6 +141,26 @@ export class Simulation {
     return this.shockLog;
   }
 
+  /** Each headline's first-minute P&L by agent type (null until the minute has passed), oldest first. */
+  get shockImpacts(): readonly ShockImpact[] {
+    return this.impacts.map(({ time, label, pnlByType }) => ({ time, label, pnlByType }));
+  }
+
+  /** The mid, or the last trade, or the opening price: what positions are marked to. */
+  markPrice(): number {
+    const bid = this.engine.book.bestBid();
+    const ask = this.engine.book.bestAsk();
+    return bid !== null && ask !== null ? (bid + ask) / 2 : (this.last ?? this.startPrice);
+  }
+
+  /** cash + position × mark price, summed per agent type (cents, unrounded). */
+  private valueByType(): Map<AgentType, number> {
+    const mark = this.markPrice();
+    const out = new Map<AgentType, number>();
+    for (const [id, { spec }] of this.agents) out.set(spec.agentType, (out.get(spec.agentType) ?? 0) + this.cashOf(id) + this.positionOf(id) * mark);
+    return out;
+  }
+
   /** Advance one tick (100 ms): every arrival in the window acts, in exact time order. */
   step(): TickWindow {
     const window = this.clock.advance();
@@ -132,6 +168,7 @@ export class Simulation {
       const before = this.fundamental.value;
       const applied = this.fundamental.shock(shock, window.start);
       this.shockLog.push(Object.freeze({ time: window.start, label, shock: applied, fairValueBefore: before, fairValueAfter: this.fundamental.value }));
+      this.impacts.push({ time: window.start, label, start: this.valueByType(), pnlByType: null });
     }
     for (const arrival of this.scheduler.drain(window.end)) {
       this.observer.onArrival?.(arrival);
@@ -147,6 +184,12 @@ export class Simulation {
     const ask = this.engine.book.bestAsk();
     this.midHistory.onTickEnd(window.end, bid !== null && ask !== null ? bid + ask : null);
     this.fundamental.onTickEnd(window.end);
+    for (const imp of this.impacts) {
+      if (imp.pnlByType !== null || window.end < imp.time + IMPACT_HORIZON_MS) continue;
+      const pnl: Partial<Record<AgentType, number>> = {};
+      for (const [type, v] of this.valueByType()) pnl[type] = Math.round(v - (imp.start.get(type) ?? 0));
+      imp.pnlByType = Object.freeze(pnl);
+    }
     this.observer.onTickEnd?.(window);
     return window;
   }

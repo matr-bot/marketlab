@@ -155,8 +155,8 @@ describe("PanicTrader: threshold cascade (D-045), with a fake market", () => {
     const ctx = { ...market().ctx(), book: { tickSize: 1, bestBid: () => null, bestAsk: () => 18_700 } as unknown as BookView };
     t.act(ctx);
     const many = Array.from({ length: 1_000 }, (_, i) => new PanicTrader(Rng.fromSeed(i)));
-    expect(many.every((x) => x.drop >= 0.005 && x.drop <= 0.03 && x.windowMs >= 20_000 && x.windowMs <= 90_000 && x.windowMs % 100 === 0)).toBe(true);
-    expect(many.every((x) => x.holdings >= 1_000 && x.holdings <= 6_000 && x.holdings % 100 === 0)).toBe(true);
+    expect(many.every((x) => x.drop >= 0.015 && x.drop <= 0.04 && x.windowMs >= 20_000 && x.windowMs <= 90_000 && x.windowMs % 100 === 0)).toBe(true);
+    expect(many.every((x) => x.holdings >= 500 && x.holdings <= 3_000 && x.holdings % 100 === 0)).toBe(true);
   });
 
   it("builds panic-1 … panic-N", () => {

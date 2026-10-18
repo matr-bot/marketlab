@@ -42,14 +42,14 @@ export interface PanicTraderParams {
 }
 
 export const DEFAULT_PANIC_PARAMS: PanicTraderParams = {
-  dropMin: 0.005,
-  dropMax: 0.03,
+  dropMin: 0.015,
+  dropMax: 0.04,
   windowMinSec: 20,
   windowMaxSec: 90,
-  holdingsMin: 1_000,
-  holdingsMax: 6_000,
-  sellMin: 300,
-  sellMax: 1_500,
+  holdingsMin: 500,
+  holdingsMax: 3_000,
+  sellMin: 200,
+  sellMax: 800,
   panicSec: 20,
   cooldownSec: 300,
   rebuildQty: 200,

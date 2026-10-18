@@ -31,6 +31,13 @@ export interface MarketMakerParams {
   readonly minSizeFactor: number;
   /** Calm volatility (log return per √s) that size is measured against. */
   readonly sigma0: number;
+  /**
+   * Caps in cents on the inventory skew |r − s| and on the half-spread δ/2 (D-047). Neither binds in
+   * calm markets; under stress the uncapped formulas can put the reservation price below zero and an
+   * ask at 1¢. A real desk has the same limits: it quotes wide in a crash, never at absurd prices.
+   */
+  readonly maxSkew: number;
+  readonly maxHalfSpread: number;
 }
 
 export const DEFAULT_MM_PARAMS: MarketMakerParams = {
@@ -44,6 +51,8 @@ export const DEFAULT_MM_PARAMS: MarketMakerParams = {
   maxInventory: 5_000,
   minSizeFactor: 0.25,
   sigma0: 4.3e-5,
+  maxSkew: 25,
+  maxHalfSpread: 25,
 };
 
 export interface QuoteInputs {
@@ -65,9 +74,9 @@ export interface Quote {
 }
 
 export interface Quotes {
-  /** Reservation price r = s − q·γ·σc²·τ, in cents (unrounded). */
+  /** Reservation price r = s − q·γ·σc²·τ, skew capped at ±maxSkew, in cents (unrounded). */
   readonly reservation: number;
-  /** Total spread δ = γ·σc²·τ + (2/γ)·ln(1 + γ/k), in cents (unrounded). */
+  /** Total spread δ = γ·σc²·τ + (2/γ)·ln(1 + γ/k), capped at 2·maxHalfSpread, in cents (unrounded). */
   readonly spread: number;
   /** Inventory-risk part of the spread, γ·σc²·τ (cents). */
   readonly riskPart: number;
@@ -80,8 +89,9 @@ export function computeQuotes(p: MarketMakerParams, i: QuoteInputs): Quotes {
   const sigmaCents = i.sigma * i.mid; // cents per √s
   const q = i.position / p.lotSize; // lots
   const riskPart = p.gamma * sigmaCents * sigmaCents * p.tauSec;
-  const reservation = i.mid - q * riskPart;
-  const spread = riskPart + (2 / p.gamma) * ln(1 + p.gamma / p.k);
+  const skew = Math.max(-p.maxSkew, Math.min(p.maxSkew, q * riskPart));
+  const reservation = i.mid - skew;
+  const spread = Math.min(2 * p.maxHalfSpread, riskPart + (2 / p.gamma) * ln(1 + p.gamma / p.k));
 
   let bidPrice = toTick(reservation - spread / 2, i.tick, "down");
   let askPrice = toTick(reservation + spread / 2, i.tick, "up");

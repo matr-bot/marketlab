@@ -69,16 +69,17 @@ describe("computeQuotes: never crosses the spread (post-only, D-035)", () => {
   // High volatility (5¢/√s) and 10 lots of inventory shift the reservation price by 150¢, far
   // enough that unclamped quotes would cross the market.
   const FIVE_CENTS = 5 / 18_700;
+  const UNCAPPED = { ...P, maxSkew: 1e9, maxHalfSpread: 1e9 }; // these cases test the clamp, not the stress caps
 
   it("short: keeps the bid below others' best ask", () => {
-    const q = computeQuotes(P, inputs({ sigma: FIVE_CENTS, position: -1_000, othersBestAsk: 18_701, othersBestBid: 18_700 }));
+    const q = computeQuotes(UNCAPPED, inputs({ sigma: FIVE_CENTS, position: -1_000, othersBestAsk: 18_701, othersBestBid: 18_700 }));
     expect(q.reservation).toBeCloseTo(18_850, 8);
     expect(q.bid!.price).toBe(18_700); // clamped to bestAsk − 1
     expect(q.ask!.price).toBeGreaterThan(18_850);
   });
 
   it("long: keeps the ask above others' best bid", () => {
-    const q = computeQuotes(P, inputs({ sigma: FIVE_CENTS, position: 1_000, othersBestBid: 18_750 }));
+    const q = computeQuotes(UNCAPPED, inputs({ sigma: FIVE_CENTS, position: 1_000, othersBestBid: 18_750 }));
     expect(q.ask!.price).toBe(18_751); // clamped to bestBid + 1
     expect(q.bid!.price).toBeLessThan(18_560);
   });
@@ -118,6 +119,34 @@ describe("computeQuotes: never crosses the spread (post-only, D-035)", () => {
       if (q.bid && ba !== null) expect(q.bid.price).toBeLessThan(ba);
       if (q.ask && bb !== null) expect(q.ask.price).toBeGreaterThan(bb);
     }
+  });
+});
+
+describe("computeQuotes: stress caps (D-047)", () => {
+  // 40× calm volatility and a full long inventory: uncapped, r = s − 50 · 0.01 · (40σ₀·s)² · 60 is
+  // about $7,700 below the mid, so the ask would land at the 1¢ floor (found by the crash test).
+  const crash = inputs({ sigma: 40 * P.sigma0, position: 5_000 - 100 });
+
+  it("caps the inventory skew at 25¢ and the half-spread at 25¢", () => {
+    const q = computeQuotes(P, crash);
+    expect(q.reservation).toBe(18_700 - 25);
+    expect(q.spread).toBe(50);
+    expect(q.ask?.price).toBe(18_700); // was the 1¢ floor before the cap
+    expect(q.bid).toBeNull(); // at the long limit it adds no inventory
+  });
+
+  it("never quotes further than skew + half-spread = 50¢ from the mid, at any volatility or inventory", () => {
+    for (const mult of [1, 4, 40, 400]) {
+      for (let pos = -4_900; pos <= 4_900; pos += 700) {
+        const q = computeQuotes(P, inputs({ sigma: mult * P.sigma0, position: pos }));
+        for (const side of [q.bid, q.ask]) if (side) expect(Math.abs(side.price - 18_700)).toBeLessThanOrEqual(51);
+      }
+    }
+  });
+
+  it("does not bind in a calm market: the worked example is unchanged", () => {
+    const q = computeQuotes(P, inputs({ position: 1_000 }));
+    expect(q.reservation).toBeCloseTo(18_694, 10);
   });
 });
 
@@ -332,6 +361,6 @@ describe("Market makers in the live market (one sim-hour, seed 187)", () => {
       ["mm-2", "marketMaker", 5],
     ]);
     expect(specs[0].create(undefined as never)).toBeInstanceOf(MarketMaker);
-    expect(DEFAULT_MM_PARAMS).toEqual({ gamma: 0.01, k: 1, tauSec: 60, lotSize: 100, baseSize: 500, maxInventory: 5_000, minSizeFactor: 0.25, sigma0: 4.3e-5 });
+    expect(DEFAULT_MM_PARAMS).toEqual({ gamma: 0.01, k: 1, tauSec: 60, lotSize: 100, baseSize: 500, maxInventory: 5_000, minSizeFactor: 0.25, sigma0: 4.3e-5, maxSkew: 25, maxHalfSpread: 25 });
   });
 });

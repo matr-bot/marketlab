@@ -44,7 +44,7 @@ test("the market is alive on load: prices change within 5 seconds, with no conso
   await expect(page.getByTestId("ticker").locator("span").first()).toBeVisible();
   await expect(page.getByTestId("status-bar")).toContainText("MLAB");
   await expect(page.getByTestId("status-bar").getByText("SIMULATED", { exact: true })).toBeVisible();
-  await expect(page.getByTestId("status-bar")).toContainText("Simulated market · every trade from 42 agents");
+  await expect(page.getByTestId("status-bar")).toContainText("Simulated market · every trade from 77 agents");
   await expect(page.locator("[data-panel=GP]")).toContainText("MLAB PRICE · 10S CANDLES");
   await expect(page.getByText(/not running/i)).toHaveCount(0);
 

@@ -32,13 +32,15 @@ function mergeCandles(frames: readonly Frame[]): Candle[] {
 }
 
 describe("createDemoMarket: what every page load opens on", () => {
-  it("is MLAB from $187.00 with 40 noise traders and two market makers, seed 187, warmed up 10 minutes", () => {
+  it("is MLAB from $187.00 with 77 agents (40 noise, 2 market makers, 15 value, 20 panic), seed 187, warmed up 10 minutes", () => {
     const sim = createDemoMarket();
     expect([DEMO_SEED, WARMUP_TICKS, sim.engine.ticker, sim.startPrice]).toEqual([187, 6_000, "MLAB", 18_700]);
     sim.run(WARMUP_TICKS);
     expect(sim.engine.fillCount).toBeGreaterThan(1_000);
     expect(sim.volatility.view.ready).toBe(true); // ready at 125 s, long before the page opens
-    expect(new Set(sim.engine.fills.flatMap((f) => [f.buy.agentType, f.sell.agentType]))).toEqual(new Set(["noise", "marketMaker"]));
+    expect(sim.agentCount).toBe(77);
+    // Panic sellers never trade in a calm market (D-045): no false panics during the warm-up.
+    expect(new Set(sim.engine.fills.flatMap((f) => [f.buy.agentType, f.sell.agentType]))).toEqual(new Set(["noise", "marketMaker", "value"]));
   });
 });
 
@@ -88,7 +90,7 @@ describe("MarketFeed: one coalesced frame per request (D-037)", () => {
     const f = feed.frame();
     const fills = feed.sim.engine.fills;
     const book = feed.sim.engine.book;
-    expect(f).toMatchObject({ seed: 187, ticker: "MLAB", time: 120_000, open: 18_700, agents: 42, candleMs: 10_000 });
+    expect(f).toMatchObject({ seed: 187, ticker: "MLAB", time: 120_000, open: 18_700, agents: 77, candleMs: 10_000 });
     expect(f.last).toBe(fills[fills.length - 1].price);
     expect(f.volume).toBe(fills.reduce((s, x) => s + x.qty, 0));
     expect([f.bid, f.ask]).toEqual([book.bestBid(), book.bestAsk()]);
@@ -103,7 +105,7 @@ describe("MarketFeed: one coalesced frame per request (D-037)", () => {
     feed.advance(3_000);
     const trades = feed.frame().trades;
     expect(trades.length).toBeGreaterThan(100);
-    let dir: FrameTrade["tick"] = "up";
+    let dir: FrameTrade["tick"] = trades[0].tick; // the frame starts mid-session (newest 500 trades)
     for (let i = 1; i < trades.length; i++) {
       if (trades[i].price !== trades[i - 1].price) dir = trades[i].price > trades[i - 1].price ? "up" : "down";
       expect(trades[i].tick, `trade ${i}`).toBe(dir);

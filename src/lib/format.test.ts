@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatChange, formatMid, formatPercent, formatPrice, formatQty } from "./format";
+import { formatChange, formatInterval, formatMid, formatPercent, formatPrice, formatQty } from "./format";
 
 describe("display formatting: exact cents, never rounded", () => {
   it.each([
@@ -27,6 +27,10 @@ describe("display formatting: exact cents, never rounded", () => {
 
   it("shows a half-cent mid exactly", () => {
     expect([formatMid(18_699, 18_701), formatMid(18_699, 18_700), formatMid(5, 6)]).toEqual(["187.00", "186.995", "0.055"]);
+  });
+
+  it("labels candle intervals", () => {
+    expect([formatInterval(10_000), formatInterval(60_000), formatInterval(300_000), formatInterval(90_000), formatInterval(500)]).toEqual(["10S", "1M", "5M", "90S", "0.5S"]);
   });
 
   it("formats share counts with separators", () => {

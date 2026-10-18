@@ -95,6 +95,12 @@
   color: var(--down);
 }
 
+.subtitle {
+  color: var(--dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .spacer {
   flex: 1;
 }

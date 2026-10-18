@@ -41,6 +41,8 @@ export interface Frame {
   readonly time: number;
   /** The opening reference price; change is measured against it. */
   readonly open: Cents;
+  /** Agents trading in this market (every trade comes from one of them). */
+  readonly agents: number;
   readonly last: Cents | null;
   /** Shares traded since the open. */
   readonly volume: number;
@@ -121,6 +123,7 @@ export class MarketFeed {
       ticker: this.sim.engine.ticker,
       time: this.sim.clock.now,
       open: this.sim.startPrice,
+      agents: this.sim.agentCount,
       last: this.lastPrice,
       volume: this.volume,
       bid: book.bestBid(),

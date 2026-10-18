@@ -407,6 +407,12 @@ describe("Simulation: the agent context", () => {
     const sim = demo();
     expect([sim.engine.ticker, sim.engine.book.tickSize, sim.startPrice]).toEqual(["MLAB", 1, 18_700]);
   });
+
+  it("counts its agents", () => {
+    expect(demo().agentCount).toBe(40);
+    expect(demo(187, [...noiseTraders(40, 0.5), ...marketMakers()]).agentCount).toBe(42);
+    expect(new Simulation({ seed: 1, agents: [] }).agentCount).toBe(0);
+  });
 });
 
 // Fingerprints of the 10-minute seed-187 markets (fills + final book). Re-pinned when the ticker

@@ -38,6 +38,7 @@ export function StatusBar({ frame }: { frame: Frame }) {
         <span className={styles.label}>ASK</span>
         <span className={styles.num}>{frame.ask === null ? "—" : formatPrice(frame.ask)}</span>
       </span>
+      <span className={styles.subtitle}>Simulated market · every trade from {formatQty(frame.agents)} agents</span>
       <span className={styles.spacer} />
       <span className={styles.num} data-testid="sim-clock">
         {formatSimTime(frame.time)}

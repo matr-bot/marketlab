@@ -71,6 +71,11 @@ export class Simulation {
     }
   }
 
+  /** How many agents trade in this market. */
+  get agentCount(): number {
+    return this.agents.size;
+  }
+
   /** Price of the most recent trade, or null before the first trade. */
   get lastTradePrice(): Cents | null {
     return this.last;

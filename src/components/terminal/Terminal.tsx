@@ -1,6 +1,7 @@
 "use client";
 
 import { Panel } from "@/components/Panel";
+import { formatInterval } from "@/lib/format";
 import { BookPanel } from "./BookPanel";
 import { PriceChart } from "./PriceChart";
 import { StatusBar } from "./StatusBar";
@@ -31,7 +32,7 @@ export function Terminal() {
       <StatusBar frame={frame} />
       <TickerTape ticker={frame.ticker} trades={frame.trades} frameCount={frameCount} />
       <main className={styles.grid}>
-        <Panel number={1} code="GP" title={`${frame.ticker} PRICE`} className={styles.gp}>
+        <Panel number={1} code="GP" title={`${frame.ticker} PRICE · ${formatInterval(frame.candleMs)} CANDLES`} className={styles.gp}>
           <PriceChart candles={candles} candleMs={frame.candleMs} last={frame.last} />
         </Panel>
         <Panel number={4} code="TAPE" title="TIME & SALES" className={styles.tape}>

@@ -30,6 +30,11 @@ export function formatMid(bid: number, ask: number): string {
   return sum % 2 === 0 ? formatPrice(sum / 2) : `${formatPrice((sum - 1) / 2)}5`;
 }
 
+/** A candle interval for labels: 10_000 → "10S", 60_000 → "1M", 90_000 → "90S". */
+export function formatInterval(ms: number): string {
+  return ms % 60_000 === 0 ? `${ms / 60_000}M` : `${ms / 1000}S`;
+}
+
 /** Shares with thousands separators: 1340 → "1,340". */
 export function formatQty(qty: number): string {
   return qtyFormat.format(qty);

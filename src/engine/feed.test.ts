@@ -88,7 +88,7 @@ describe("MarketFeed: one coalesced frame per request (D-037)", () => {
     const f = feed.frame();
     const fills = feed.sim.engine.fills;
     const book = feed.sim.engine.book;
-    expect(f).toMatchObject({ seed: 187, ticker: "MLAB", time: 120_000, open: 18_700, candleMs: 10_000 });
+    expect(f).toMatchObject({ seed: 187, ticker: "MLAB", time: 120_000, open: 18_700, agents: 42, candleMs: 10_000 });
     expect(f.last).toBe(fills[fills.length - 1].price);
     expect(f.volume).toBe(fills.reduce((s, x) => s + x.qty, 0));
     expect([f.bid, f.ask]).toEqual([book.bestBid(), book.bestAsk()]);

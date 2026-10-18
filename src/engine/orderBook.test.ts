@@ -53,7 +53,7 @@ function expectInvariants(book: OrderBook) {
 describe("OrderBook", () => {
   describe("empty book", () => {
     it("has no prices, spread, or orders", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       expect(book.bestBid()).toBeNull();
       expect(book.bestAsk()).toBeNull();
       expect(book.spread()).toBeNull();
@@ -65,7 +65,7 @@ describe("OrderBook", () => {
 
   describe("adding orders", () => {
     it("tracks best bid, best ask and spread in cents", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       place(book, order("buy", 10_000));
       place(book, order("buy", 10_005));
       place(book, order("sell", 10_020));
@@ -77,7 +77,7 @@ describe("OrderBook", () => {
     });
 
     it("sorts bids high-to-low and asks low-to-high regardless of arrival order", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       for (const p of [99, 97, 100, 98]) place(book, order("buy", p));
       for (const p of [103, 101, 104, 102]) place(book, order("sell", p));
       expect(book.depth("buy").map((l) => l.price)).toEqual([100, 99, 98, 97]);
@@ -85,7 +85,7 @@ describe("OrderBook", () => {
     });
 
     it("aggregates quantity and order count per level", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       place(book, order("buy", 100, 5));
       place(book, order("buy", 100, 7));
       place(book, order("buy", 99, 3));
@@ -96,13 +96,13 @@ describe("OrderBook", () => {
     });
 
     it("limits depth to the requested number of levels", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       for (const p of [101, 102, 103]) place(book, order("sell", p));
       expect(book.depth("sell", 2).map((l) => l.price)).toEqual([101, 102]);
     });
 
     it("returns every level for depth(Infinity) and none for depth(0)", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       for (const p of [101, 102, 103]) place(book, order("sell", p));
       expect(book.depth("sell", Infinity)).toHaveLength(3);
       expect(book.depth("sell", 5)).toHaveLength(3);
@@ -110,7 +110,7 @@ describe("OrderBook", () => {
     });
 
     it.each([-1, 1.5, NaN, -Infinity])("throws for an invalid depth limit %s", (maxLevels) => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       for (const p of [101, 102, 103]) place(book, order("sell", p));
       expect(() => book.depth("sell", maxLevels)).toThrow(
         /maxLevels must be a non-negative integer or Infinity/,
@@ -118,7 +118,7 @@ describe("OrderBook", () => {
     });
 
     it("returns a snapshot that cannot mutate the book", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       const placed = place(book, order("buy", 100, 5, { id: "a" })) as { qty: number };
       placed.qty = 999;
       expect(book.get("a")?.qty).toBe(5);
@@ -126,7 +126,7 @@ describe("OrderBook", () => {
     });
 
     it("returns the stored order with an increasing sequence number across both sides", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       const a = book.add({ id: "a", ownerId: "mm", agentType: "marketMaker", side: "buy", price: 100, qty: 5 });
       const b = place(book, { id: "b", ownerId: "mm", agentType: "marketMaker", side: "sell", price: 105, qty: 7 });
       expect(a).toEqual({
@@ -138,7 +138,7 @@ describe("OrderBook", () => {
     });
 
     it("does not consume a sequence number for a rejected order", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       place(book, order("buy", 100));
       expect(book.add(order("buy", -1)).ok).toBe(false);
       expect(place(book, order("buy", 99)).seq).toBe(1);
@@ -147,7 +147,7 @@ describe("OrderBook", () => {
 
   describe("price-time priority", () => {
     it("gives priority to the better price, then the earlier order", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       place(book, order("buy", 100, 10, { id: "early" }));
       place(book, order("buy", 100, 10, { id: "late" }));
       expect(book.bestOrder("buy")?.id).toBe("early");
@@ -157,7 +157,7 @@ describe("OrderBook", () => {
     });
 
     it("keeps time priority after a partial fill", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       place(book, order("sell", 105, 10, { id: "first" }));
       place(book, order("sell", 105, 10, { id: "second" }));
       expect(book.reduce("first", 4)).toBe(6);
@@ -166,14 +166,14 @@ describe("OrderBook", () => {
     });
 
     it("does not change seq on a partial fill", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       const placed = place(book, order("buy", 100, 10, { id: "a" }));
       book.reduce("a", 3);
       expect(book.get("a")?.seq).toBe(placed.seq);
     });
 
     it("loses its place when cancelled and re-added", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       place(book, order("buy", 100, 10, { id: "a" }));
       place(book, order("buy", 100, 10, { id: "b" }));
       book.cancel("a");
@@ -184,7 +184,7 @@ describe("OrderBook", () => {
 
   describe("cancel", () => {
     it("removes the order, returns it, and drops empty levels", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       const a = place(book, order("buy", 100, 10, { id: "a" }));
       place(book, order("buy", 99, 10, { id: "b" }));
       expect(book.cancel("a")).toEqual({ ok: true, order: a });
@@ -195,7 +195,7 @@ describe("OrderBook", () => {
     });
 
     it("removes an order from the middle of a level", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       for (const id of ["a", "b", "c"]) place(book, order("sell", 110, 5, { id }));
       book.cancel("b");
       expect(book.ordersAt("sell", 110).map((o) => o.id)).toEqual(["a", "c"]);
@@ -203,7 +203,7 @@ describe("OrderBook", () => {
     });
 
     it("returns UNKNOWN_ORDER for unknown or already-cancelled ids", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       place(book, order("buy", 100, 10, { id: "a" }));
       expect(book.cancel("nope")).toEqual({
         ok: false,
@@ -215,7 +215,7 @@ describe("OrderBook", () => {
     });
 
     it("cancels a partially filled order, removing only its remaining quantity", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       place(book, order("buy", 100, 10, { id: "a" }));
       place(book, order("buy", 100, 4, { id: "b" }));
       book.reduce("a", 6);
@@ -225,7 +225,7 @@ describe("OrderBook", () => {
     });
 
     it("removes the level when its only, partially filled order is cancelled", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       place(book, order("sell", 105, 10, { id: "a" }));
       book.reduce("a", 9);
       book.cancel("a");
@@ -234,7 +234,7 @@ describe("OrderBook", () => {
     });
 
     it("treats a fully filled order as gone: cancel fails, reduce throws, id is reusable", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       place(book, order("buy", 100, 5, { id: "a" }));
       book.reduce("a", 5);
       expect(book.cancel("a").ok).toBe(false);
@@ -245,7 +245,7 @@ describe("OrderBook", () => {
 
   describe("orders by owner", () => {
     it("lists an owner's orders across both sides in arrival order", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       place(book, order("buy", 100, 10, { id: "m1", ownerId: "mm" }));
       place(book, order("buy", 99, 10, { id: "n1", ownerId: "noise" }));
       place(book, order("sell", 105, 10, { id: "m2", ownerId: "mm" }));
@@ -257,7 +257,7 @@ describe("OrderBook", () => {
     });
 
     it("cancelAll removes only that owner's orders and returns them", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       place(book, order("buy", 100, 10, { id: "m1", ownerId: "mm" }));
       place(book, order("buy", 100, 5, { id: "n1", ownerId: "noise" }));
       place(book, order("sell", 105, 10, { id: "m2", ownerId: "mm" }));
@@ -272,14 +272,14 @@ describe("OrderBook", () => {
     });
 
     it("cancelAll for an owner with no orders is a no-op", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       place(book, order("buy", 100, 10, { ownerId: "mm" }));
       expect(book.cancelAll("nobody")).toEqual([]);
       expect(book.size).toBe(1);
     });
 
     it("reflects partial fills and drops fully filled or cancelled orders", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       place(book, order("buy", 100, 10, { id: "a", ownerId: "mm" }));
       place(book, order("buy", 99, 10, { id: "b", ownerId: "mm" }));
       place(book, order("buy", 98, 10, { id: "c", ownerId: "mm" }));
@@ -290,14 +290,14 @@ describe("OrderBook", () => {
     });
 
     it("forgets an owner once their last order is gone", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       place(book, order("buy", 100, 10, { id: "a", ownerId: "mm" }));
       book.reduce("a", 10);
       expect(book.ownerCount).toBe(0);
     });
 
     it("does not register an owner for a rejected order", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       book.add(order("buy", -1, 10, { ownerId: "ghost" }));
       expect(book.ownerCount).toBe(0);
       expect(book.ordersOf("ghost")).toEqual([]);
@@ -306,7 +306,7 @@ describe("OrderBook", () => {
 
   describe("reduce (engine-only, throws on misuse)", () => {
     it("removes the order when reduced to zero", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       place(book, order("sell", 105, 10, { id: "a" }));
       expect(book.reduce("a", 10)).toBe(0);
       expect(book.size).toBe(0);
@@ -314,36 +314,36 @@ describe("OrderBook", () => {
     });
 
     it.each([0, -1, 11, 2.5, NaN])("rejects invalid quantity %s", (qty) => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       place(book, order("sell", 105, 10, { id: "a" }));
       expect(() => book.reduce("a", qty)).toThrow(RangeError);
       expect(book.get("a")?.qty).toBe(10);
     });
 
     it("names the allowed range in its error", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       place(book, order("buy", 100, 5, { id: "a" }));
       expect(() => book.reduce("a", 6)).toThrow(/reduce qty must be an integer in 1\.\.5, got 6/);
     });
 
     it("rejects unknown ids", () => {
-      expect(() => new OrderBook("SPY").reduce("nope", 1)).toThrow(/Unknown order id/);
+      expect(() => new OrderBook("MLAB").reduce("nope", 1)).toThrow(/Unknown order id/);
     });
   });
 
   describe("rejections return reason codes (money is integer cents)", () => {
     it.each([0, -100, 100.5, 0.1 + 0.2, NaN, Infinity])("rejects price %s as INVALID_PRICE", (price) => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       expect(reasonOf(book.add(order("buy", price)))).toBe("INVALID_PRICE");
       expect(book.size).toBe(0);
     });
 
     it.each([0, -5, 1.5, NaN])("rejects quantity %s as INVALID_QTY", (qty) => {
-      expect(reasonOf(new OrderBook("SPY").add(order("buy", 100, qty)))).toBe("INVALID_QTY");
+      expect(reasonOf(new OrderBook("MLAB").add(order("buy", 100, qty)))).toBe("INVALID_QTY");
     });
 
     it("includes a readable message with the offending value", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       expect(book.add(order("buy", 1.5))).toMatchObject({
         message: "price must be an integer number of cents in 1..100000000, got 1.5",
       });
@@ -353,21 +353,21 @@ describe("OrderBook", () => {
       expect(book.add(order("buy", 100, 10, { side: "hold" as Side }))).toMatchObject({
         message: "Invalid side: hold",
       });
-      expect(new OrderBook("SPY", 5).add(order("buy", 101))).toMatchObject({
+      expect(new OrderBook("MLAB", 5).add(order("buy", 101))).toMatchObject({
         message: "price 101 is not a multiple of tick size 5",
       });
     });
 
     it.each([1, 4, 6, 10_001, 10_004])("rejects %i on a 5-cent tick as OFF_TICK", (price) => {
-      expect(reasonOf(new OrderBook("SPY", 5).add(order("buy", price)))).toBe("OFF_TICK");
+      expect(reasonOf(new OrderBook("MLAB", 5).add(order("buy", price)))).toBe("OFF_TICK");
     });
 
     it.each([5, 10, 10_000])("accepts %i on a 5-cent tick", (price) => {
-      expect(new OrderBook("SPY", 5).add(order("buy", price)).ok).toBe(true);
+      expect(new OrderBook("MLAB", 5).add(order("buy", price)).ok).toBe(true);
     });
 
     it("rejects duplicate ids, including across sides, and leaves the original intact", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       place(book, order("buy", 100, 10, { id: "a" }));
       const dup = book.add(order("sell", 200, 10, { id: "a" }));
       expect(dup).toEqual({ ok: false, reason: "DUPLICATE_ID", message: "Duplicate order id: a" });
@@ -376,13 +376,13 @@ describe("OrderBook", () => {
     });
 
     it.each(["", 42, null, undefined])("rejects order id %j as INVALID_ID", (id) => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       expect(reasonOf(book.add(order("buy", 100, 10, { id: id as string })))).toBe("INVALID_ID");
       expect(book.size).toBe(0);
     });
 
     it.each(["", 7, null, undefined])("rejects ownerId %j as INVALID_OWNER", (ownerId) => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       const result = book.add(order("buy", 100, 10, { ownerId: ownerId as string }));
       expect(reasonOf(result)).toBe("INVALID_OWNER");
       expect(book.size).toBe(0);
@@ -390,20 +390,20 @@ describe("OrderBook", () => {
     });
 
     it.each(["", "trader", "Noise", 3, null, undefined])("rejects agentType %j as INVALID_AGENT_TYPE", (agentType) => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       const result = book.add(order("buy", 100, 10, { agentType: agentType as AgentType }));
       expect(reasonOf(result)).toBe("INVALID_AGENT_TYPE");
       expect(book.size).toBe(0);
     });
 
     it("stores the agent type on the resting order", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       expect(place(book, order("sell", 105, 10, { id: "w", agentType: "whale" })).agentType).toBe("whale");
       expect(book.get("w")?.agentType).toBe("whale");
     });
 
     it("checks the agent type after the owner and before duplicates", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       place(book, order("buy", 100, 10, { id: "a" }));
       const bad = "x" as AgentType;
       expect(reasonOf(book.add(order("buy", 100, 10, { ownerId: "", agentType: bad })))).toBe("INVALID_OWNER");
@@ -414,7 +414,7 @@ describe("OrderBook", () => {
     });
 
     it("names the bad id or owner in the message", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       expect(book.add(order("buy", 100, 10, { id: "" }))).toMatchObject({
         message: 'order id must be a non-empty string, got ""',
       });
@@ -425,22 +425,22 @@ describe("OrderBook", () => {
 
     it("rejects an invalid side", () => {
       const bad = order("buy", 100, 10, { side: "hold" as Side });
-      expect(reasonOf(new OrderBook("SPY").add(bad))).toBe("INVALID_SIDE");
+      expect(reasonOf(new OrderBook("MLAB").add(bad))).toBe("INVALID_SIDE");
     });
 
     it.each([0, -1, 0.5])("throws for an invalid tick size %s (configuration error)", (tick) => {
-      expect(() => new OrderBook("SPY", tick)).toThrow(RangeError);
+      expect(() => new OrderBook("MLAB", tick)).toThrow(RangeError);
     });
 
     it("rejects a tick size larger than the maximum price (no price could be valid)", () => {
-      expect(() => new OrderBook("SPY", 100_000_001)).toThrow(
+      expect(() => new OrderBook("MLAB", 100_000_001)).toThrow(
         "tickSize 100000001 is larger than the maximum price 100000000, so no price would be valid",
       );
-      expect(() => new OrderBook("SPY", 100_000_000)).not.toThrow(); // exactly at the cap: one valid price
+      expect(() => new OrderBook("MLAB", 100_000_000)).not.toThrow(); // exactly at the cap: one valid price
     });
 
     it("names the bad tick size in its error", () => {
-      expect(() => new OrderBook("SPY", 0)).toThrow(
+      expect(() => new OrderBook("MLAB", 0)).toThrow(
         /tickSize must be a positive integer number of cents, got 0/,
       );
     });
@@ -453,7 +453,7 @@ describe("OrderBook", () => {
       ["sell", 100], // at the best bid
       ["sell", 95], // through the best bid
     ] as const)("rejects a %s at %i as WOULD_CROSS when bid=100 ask=105", (side, price) => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       place(book, order("buy", 100));
       place(book, order("sell", 105));
       const result = book.add(order(side, price));
@@ -463,7 +463,7 @@ describe("OrderBook", () => {
     });
 
     it("allows orders inside the spread", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       place(book, order("buy", 100));
       place(book, order("sell", 105));
       place(book, order("buy", 102));
@@ -477,7 +477,7 @@ describe("OrderBook", () => {
 
   describe("spread on a one-sided book", () => {
     it("is null with only bids", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       place(book, order("buy", 100));
       expect(book.bestBid()).toBe(100);
       expect(book.bestAsk()).toBeNull();
@@ -485,7 +485,7 @@ describe("OrderBook", () => {
     });
 
     it("is null with only asks", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       place(book, order("sell", 105));
       expect(book.bestBid()).toBeNull();
       expect(book.spread()).toBeNull();
@@ -494,7 +494,7 @@ describe("OrderBook", () => {
 
   describe("price level cleanup", () => {
     it("removes a non-best level and leaves its neighbours intact", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       for (const [id, p] of [["a", 100], ["b", 99], ["c", 98]] as const) {
         place(book, order("buy", p, 10, { id }));
       }
@@ -505,7 +505,7 @@ describe("OrderBook", () => {
     });
 
     it("leaves no trace of an emptied level: ordersAt, depth and levelCount all agree", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       place(book, order("sell", 105, 3, { id: "a" }));
       place(book, order("sell", 105, 4, { id: "b" }));
       book.cancel("a");
@@ -517,7 +517,7 @@ describe("OrderBook", () => {
     });
 
     it("starts a fresh level with zero totals when a price is reused", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       place(book, order("buy", 100, 10, { id: "a" }));
       book.cancel("a");
       place(book, order("buy", 100, 3, { id: "b" }));
@@ -525,7 +525,7 @@ describe("OrderBook", () => {
     });
 
     it("reports whether an id is resting with has()", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       place(book, order("buy", 100, 5, { id: "a" }));
       expect(book.has("a")).toBe(true);
       expect(book.has("b")).toBe(false);
@@ -534,7 +534,7 @@ describe("OrderBook", () => {
     });
 
     it("returns an empty list for a price that never had orders", () => {
-      expect(new OrderBook("SPY").ordersAt("buy", 100)).toEqual([]);
+      expect(new OrderBook("MLAB").ordersAt("buy", 100)).toEqual([]);
     });
   });
 
@@ -546,7 +546,7 @@ describe("OrderBook", () => {
     });
 
     it("accepts an order exactly at the price and size limits", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       expect(place(book, order("buy", MAX_PRICE_CENTS, MAX_ORDER_QTY))).toMatchObject({
         price: MAX_PRICE_CENTS,
         qty: MAX_ORDER_QTY,
@@ -554,21 +554,21 @@ describe("OrderBook", () => {
     });
 
     it.each([MAX_PRICE_CENTS + 1, MAX + 1, 2 ** 60, 1e21])("rejects price %s as INVALID_PRICE", (price) => {
-      expect(reasonOf(new OrderBook("SPY").add(order("buy", price)))).toBe("INVALID_PRICE");
+      expect(reasonOf(new OrderBook("MLAB").add(order("buy", price)))).toBe("INVALID_PRICE");
     });
 
     it.each([MAX_ORDER_QTY + 1, MAX, MAX + 1, 1e21])("rejects quantity %s as INVALID_QTY", (qty) => {
-      expect(reasonOf(new OrderBook("SPY").add(order("buy", 100, qty)))).toBe("INVALID_QTY");
+      expect(reasonOf(new OrderBook("MLAB").add(order("buy", 100, qty)))).toBe("INVALID_QTY");
     });
 
     it("throws for an unsafe tick size", () => {
-      expect(() => new OrderBook("SPY", MAX + 1)).toThrow(RangeError);
+      expect(() => new OrderBook("MLAB", MAX + 1)).toThrow(RangeError);
     });
 
     // Regression for the review finding: two orders summing past 2^53 - 1 used to corrupt
     // the level total permanently. That order size is now rejected up front.
     it("cannot be pushed into an inexact level total", () => {
-      const book = new OrderBook("SPY");
+      const book = new OrderBook("MLAB");
       expect(reasonOf(book.add(order("buy", 100, MAX, { id: "huge" })))).toBe("INVALID_QTY");
       for (let i = 0; i < 1_000; i++) place(book, order("buy", 100, MAX_ORDER_QTY));
       place(book, order("buy", 100, 2, { id: "small" }));

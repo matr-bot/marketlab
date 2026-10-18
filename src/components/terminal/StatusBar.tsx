@@ -17,6 +17,9 @@ export function StatusBar({ frame }: { frame: Frame }) {
     <header className={styles.status} data-testid="status-bar">
       <span className={styles.brand}>MARKETLAB</span>
       <span className={styles.ticker}>{frame.ticker}</span>
+      <span className={styles.simTag} title="A simulated market: no real security, no real money">
+        SIMULATED
+      </span>
       <span ref={lastRef} className={styles.last} data-testid="last-price">
         {formatPrice(last)}
       </span>

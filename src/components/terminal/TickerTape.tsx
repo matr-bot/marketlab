@@ -20,7 +20,7 @@ interface Item {
 }
 
 /**
- * The scrolling ticker: each trade slides in from the right as `SPY 1,340 @ 187.42 ▲`, green or red
+ * The scrolling ticker: each trade slides in from the right as `MLAB 1,340 @ 187.42 ▲`, green or red
  * by tick direction. It speeds up when trades queue up and slows when quiet. This strip is the one
  * place smooth scrolling is allowed; the numbers inside never change once printed.
  */

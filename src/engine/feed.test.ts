@@ -32,9 +32,9 @@ function mergeCandles(frames: readonly Frame[]): Candle[] {
 }
 
 describe("createDemoMarket: what every page load opens on", () => {
-  it("is SPY from $187.00 with 40 noise traders and two market makers, seed 187, warmed up 10 minutes", () => {
+  it("is MLAB from $187.00 with 40 noise traders and two market makers, seed 187, warmed up 10 minutes", () => {
     const sim = createDemoMarket();
-    expect([DEMO_SEED, WARMUP_TICKS, sim.engine.ticker, sim.startPrice]).toEqual([187, 6_000, "SPY", 18_700]);
+    expect([DEMO_SEED, WARMUP_TICKS, sim.engine.ticker, sim.startPrice]).toEqual([187, 6_000, "MLAB", 18_700]);
     sim.run(WARMUP_TICKS);
     expect(sim.engine.fillCount).toBeGreaterThan(1_000);
     expect(sim.volatility.view.ready).toBe(true); // ready at 125 s, long before the page opens
@@ -88,7 +88,7 @@ describe("MarketFeed: one coalesced frame per request (D-037)", () => {
     const f = feed.frame();
     const fills = feed.sim.engine.fills;
     const book = feed.sim.engine.book;
-    expect(f).toMatchObject({ seed: 187, ticker: "SPY", time: 120_000, open: 18_700, candleMs: 10_000 });
+    expect(f).toMatchObject({ seed: 187, ticker: "MLAB", time: 120_000, open: 18_700, candleMs: 10_000 });
     expect(f.last).toBe(fills[fills.length - 1].price);
     expect(f.volume).toBe(fills.reduce((s, x) => s + x.qty, 0));
     expect([f.bid, f.ask]).toEqual([book.bestBid(), book.bestAsk()]);

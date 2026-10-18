@@ -23,6 +23,8 @@ test("the market is alive on load: prices change within 5 seconds, with no conso
   await expect(page.getByTestId("book").getByText("SPREAD")).toBeVisible();
   await expect(page.getByTestId("book").getByText(/^(BID|ASK)$/).first()).toBeVisible();
   await expect(page.getByTestId("ticker").locator("span").first()).toBeVisible();
+  await expect(page.getByTestId("status-bar")).toContainText("MLAB");
+  await expect(page.getByTestId("status-bar").getByText("SIMULATED", { exact: true })).toBeVisible();
   await expect(page.getByText(/not running/i)).toHaveCount(0);
 
   expect(errors).toEqual([]);

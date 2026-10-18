@@ -67,7 +67,7 @@ export function runBookWorkload(seed: number, steps = 3_000): WorkloadResult {
   ];
 
   const { next: rand, int, pick } = rng(seed);
-  const book = new OrderBook("SPY", TICK);
+  const book = new OrderBook("MLAB", TICK);
   const shadow = new ShadowBook(TICK);
   const allIds: string[] = [];
   const seen = new Map<string, number>();
@@ -169,8 +169,8 @@ export function runEngineWorkload(seed: number, steps = 3_000): WorkloadResult {
   const TYPES: readonly AgentType[] = ["noise", "marketMaker", "momentum", "panic", "whale"];
 
   const { next: rand, int, pick } = rng(seed);
-  const engine = new MarketRegistry().create("SPY", TICK);
-  const shadow = new ShadowEngine("SPY", TICK);
+  const engine = new MarketRegistry().create("MLAB", TICK);
+  const shadow = new ShadowEngine("MLAB", TICK);
   const allIds: string[] = [];
   const seen = new Map<string, number>();
   const count = (outcome: string) => seen.set(outcome, (seen.get(outcome) ?? 0) + 1);
@@ -233,7 +233,7 @@ export function runEngineWorkload(seed: number, steps = 3_000): WorkloadResult {
     else if (op < 0.99) {
       // Live orders, orders that already filled or were cancelled, and ids never issued.
       const r = rand();
-      const id = r < 0.5 ? pick(live).id : r < 0.8 && allIds.length ? pick(allIds) : `SPY-${10_000_000 + step}`;
+      const id = r < 0.5 ? pick(live).id : r < 0.8 && allIds.length ? pick(allIds) : `MLAB-${10_000_000 + step}`;
       const expected = shadow.cancel(id);
       sameFast(engine.cancel(id), expected, toEqual);
       count(expected.ok ? "cancel:live" : "cancel:missing");

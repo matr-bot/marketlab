@@ -95,7 +95,7 @@ describe("NoiseTrader: decisions match the plan's probabilities (fixed seeds, 20
 describe("NoiseTrader: cancellations", () => {
   it("cancels about 35% of the time when it has resting orders, and then places nothing", () => {
     const trader = new NoiseTrader(Rng.fromSeed(1));
-    const orders = [resting("SPY-1", 1), resting("SPY-2", 2)];
+    const orders = [resting("MLAB-1", 1), resting("MLAB-2", 2)];
     let cancels = 0;
     for (let i = 0; i < 100_000; i++) {
       const { ctx, submitted, cancelled } = fakeContext({ orders });
@@ -109,7 +109,7 @@ describe("NoiseTrader: cancellations", () => {
   });
 
   it("chooses the order to cancel from an oldest-first list, whatever order the book reports (D-026)", () => {
-    const orders = [resting("SPY-7", 7), resting("SPY-3", 3), resting("SPY-12", 12), resting("SPY-9", 9)];
+    const orders = [resting("MLAB-7", 7), resting("MLAB-3", 3), resting("MLAB-12", 12), resting("MLAB-9", 9)];
     const shuffled = [orders[2], orders[0], orders[3], orders[1]];
     for (let seed = 0; seed < 200; seed++) {
       const a = fakeContext({ orders });
@@ -121,18 +121,18 @@ describe("NoiseTrader: cancellations", () => {
     }
   });
 
-  it("sorts by engine sequence, not by id text (SPY-12 is newer than SPY-9)", () => {
-    expect(oldestFirst([resting("SPY-12", 12), resting("SPY-9", 9), resting("SPY-10", 10)]).map((o) => o.id)).toEqual(["SPY-9", "SPY-10", "SPY-12"]);
+  it("sorts by engine sequence, not by id text (MLAB-12 is newer than MLAB-9)", () => {
+    expect(oldestFirst([resting("MLAB-12", 12), resting("MLAB-9", 9), resting("MLAB-10", 10)]).map((o) => o.id)).toEqual(["MLAB-9", "MLAB-10", "MLAB-12"]);
   });
 
   it("at the 5-order cap, cancels its oldest order before placing a new one", () => {
-    const orders = [5, 1, 4, 2, 3].map((s) => resting(`SPY-${s}`, s));
+    const orders = [5, 1, 4, 2, 3].map((s) => resting(`MLAB-${s}`, s));
     let checked = 0;
     for (let seed = 0; seed < 300; seed++) {
       const { ctx, submitted, cancelled } = fakeContext({ orders });
       new NoiseTrader(Rng.fromSeed(seed)).act(ctx);
       if (submitted.length === 1) {
-        expect(cancelled).toEqual(["SPY-1"]);
+        expect(cancelled).toEqual(["MLAB-1"]);
         checked++;
       }
     }

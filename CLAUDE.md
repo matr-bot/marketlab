@@ -105,7 +105,10 @@ company's name, logo or exact screens.
 
 ### No "AI dashboard" tells
 - No LIVE badge, glowing dot or "live" indicator anywhere. The moving numbers show it is live.
-- The only status label is a small REPLAY label, shown during rewind.
+- Status labels: a small permanent SIMULATED label next to the ticker (the market is not real),
+  and a small REPLAY label shown during rewind. Nothing else.
+- The ticker is fictional: MLAB (MarketLab), never a real symbol. A real fund's name next to a
+  price it has never traded at is the first thing a finance judge would spot (D-041).
 - The market is ALREADY RUNNING when the page loads (calm regime, demo seed). Never show
   "engine not running" as a first impression. If the warm-up takes longer than about 1 second,
   show a brief "OPENING MARKET" state instead of a frozen screen.
@@ -113,14 +116,14 @@ company's name, logo or exact screens.
 ### Layout
 - **Top status bar:** ticker, last price, change and % change, volume, sim clock.
 - **Scrolling ticker tape** under the status bar: one thin strip where every trade slides
-  sideways, like an exchange ticker. Format: `SPY 1,340 @ 187.42 ▲`, green or red by whether the
+  sideways, like an exchange ticker. Format: `MLAB 1,340 @ 187.42 ▲`, green or red by whether the
   trade was up or down from the previous trade. Injected headlines scroll through it in amber. It
   speeds up when trading is busy and slows when it is quiet. The ticker is the ONE place smooth
   scrolling is allowed; the numbers inside it never animate.
-- **Command bar:** typing a code such as `SPY GP` and pressing Enter opens that function in the
+- **Command bar:** typing a code such as `MLAB GP` and pressing Enter opens that function in the
   active panel (see Command bar below).
 - **A grid of numbered panels** (1, 2, 3, …). Each header shows its number and code, e.g.
-  `1 GP · SPY PRICE`. Typing a code opens that function in the active panel; the default layout
+  `1 GP · MLAB PRICE`. Typing a code opens that function in the active panel; the default layout
   below is what every page load shows.
 - **Bottom shortcut strip** with color-coded keys: yellow for market/function keys, green for
   GO/Enter, red for cancel/Esc.
@@ -136,10 +139,10 @@ It follows the demo story, cause → reaction → your result → reveal, and th
 works from it without opening any panels.
 
 ```
-┌ status bar: SPY  187.42  +0.35 +0.19%  VOL 1,204,300  09:41:27.300  SEED 187 ──────────────┐
-├ ticker: … SPY 1,340 @ 187.42 ▲ … SPY 200 @ 187.41 ▼ … FED SURPRISE HIKE 75BPS … ──────────────┤
+┌ status bar: MLAB  187.42  +0.35 +0.19%  VOL 1,204,300  09:41:27.300  SEED 187 ─────────────┐
+├ ticker: … MLAB 1,340 @ 187.42 ▲ … MLAB 200 @ 187.41 ▼ … FED SURPRISE HIKE 75BPS … ────────────┤
 ├ command bar: > _ ───────────────────────────────────────────────────────────────────────────┤
-│ 1 GP · SPY PRICE                                          │ 5 BOOK · SPY DEPTH              │
+│ 1 GP · MLAB PRICE                                         │ 5 BOOK · MLAB DEPTH             │
 │ (largest panel: ~2/3 width, ~half the height;            │                                 │
 │  candles + headline and trade markers)                    ├─────────────────────────────────┤
 │                                                           │ 6 TKT · ORDER TICKET            │
@@ -203,7 +206,7 @@ fill log, so every number in it is true. In Learn mode it also says where to loo
 - Exact prices and sizes (e.g. 1,340 shares), never rounded.
 
 ## Command bar
-Accepts function codes (`SPY GP`, `BOOK`, `HELP`, …), commands (`SHOCK <headline>`, `RUN`,
+Accepts function codes (`MLAB GP`, `BOOK`, `HELP`, …), commands (`SHOCK <headline>`, `RUN`,
 `PAUSE`, `REWIND`, `RERUN`, `WHATIF`) and plain words. Known codes and commands are matched
 first; any other input is treated as a headline. Friendly errors, never crashes.
 

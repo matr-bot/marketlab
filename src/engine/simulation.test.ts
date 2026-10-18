@@ -303,7 +303,7 @@ describe("Simulation: the agent context", () => {
         }),
         scripted("probe", (ctx) => {
           if (othersOrder !== null && results.length === 0) {
-            results.push(ctx.cancel(othersOrder), ctx.cancel("SPY-999999"));
+            results.push(ctx.cancel(othersOrder), ctx.cancel("MLAB-999999"));
           }
         }),
       ],
@@ -311,7 +311,7 @@ describe("Simulation: the agent context", () => {
     sim.run(100);
     expect(results).toEqual([
       { ok: false, reason: "UNKNOWN_ORDER", message: `Unknown order id: ${othersOrder}` },
-      { ok: false, reason: "UNKNOWN_ORDER", message: "Unknown order id: SPY-999999" },
+      { ok: false, reason: "UNKNOWN_ORDER", message: "Unknown order id: MLAB-999999" },
     ]);
     expect(sim.engine.book.get(othersOrder!)).toBeDefined(); // still resting
   });
@@ -403,13 +403,15 @@ describe("Simulation: the agent context", () => {
     expect([sim.clock.tickCount, sim.engine.fillCount, sim.engine.book.size]).toEqual([0, 0, 0]);
   });
 
-  it("defaults to SPY at $187.00 with penny ticks", () => {
+  it("defaults to MLAB at $187.00 with penny ticks", () => {
     const sim = demo();
-    expect([sim.engine.ticker, sim.engine.book.tickSize, sim.startPrice]).toEqual(["SPY", 1, 18_700]);
+    expect([sim.engine.ticker, sim.engine.book.tickSize, sim.startPrice]).toEqual(["MLAB", 1, 18_700]);
   });
 });
 
-// Fingerprint of the 10-minute seed-187 demo market (fills + final book).
-const PINNED_DEMO_MARKET = "e645d6434f2a0b64";
-// Fingerprint of the 10-minute seed-187 market with two market makers added.
-const PINNED_MM_MARKET = "f713b6e6055aebc3";
+// Fingerprints of the 10-minute seed-187 markets (fills + final book). Re-pinned when the ticker
+// became MLAB (D-041): with "MLAB" mapped back to "SPY", the new logs give exactly the old pins
+// (e645d6434f2a0b64 and f713b6e6055aebc3), so only the ticker text changed.
+const PINNED_DEMO_MARKET = "e96d7a43b1a060ac";
+// …with two market makers added.
+const PINNED_MM_MARKET = "c14b34b04315fe31";

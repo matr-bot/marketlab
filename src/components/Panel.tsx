@@ -11,7 +11,7 @@ type PanelProps = {
   children: ReactNode;
 };
 
-/** A numbered terminal panel: header `1 GP · SPY PRICE`, then its body. */
+/** A numbered terminal panel: header `1 GP · MLAB PRICE`, then its body. */
 export function Panel({ number, code, title, className, children }: PanelProps) {
   return (
     <section className={`${styles.panel} ${className ?? ""}`} aria-label={`${code} ${title}`} data-panel={code}>

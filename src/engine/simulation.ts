@@ -54,7 +54,7 @@ export class Simulation {
 
   constructor(config: SimulationConfig) {
     this.rng = Rng.fromSeed(config.seed);
-    this.engine = new MarketRegistry().create(config.ticker ?? "SPY", config.tickSize ?? 1);
+    this.engine = new MarketRegistry().create(config.ticker ?? "MLAB", config.tickSize ?? 1);
     this.startPrice = config.startPrice ?? DEFAULT_START_PRICE;
     if (!Number.isSafeInteger(this.startPrice) || this.startPrice <= 0 || this.startPrice % this.engine.book.tickSize !== 0) {
       throw new RangeError(`startPrice must be a positive whole number of ticks in cents, got ${this.startPrice}`);

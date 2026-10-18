@@ -1078,3 +1078,18 @@ though the frames slice them differently.
   strip starts already full, since the market is already running.
 - **Panel numbers** follow the default layout (1 GP, 4 TAPE, 5 BOOK); panels that have not shipped
   are not drawn and the grid closes up, so today's numbers stay valid as panels 2, 3, 6–8 arrive.
+
+---
+
+## D-041 · A fictional ticker, MLAB, and a SIMULATED label
+
+**Date:** 2026-10-17 · **Status:** Accepted (supersedes the "SPY" ticker in D-038 and D-040)
+
+**Decision.** The market's ticker is MLAB (MarketLab), the engine default and the demo market alike,
+and the status bar carries a small permanent SIMULATED label next to it. SPY is a real fund that has
+never traded near $187, which finance judges would spot at once; a real symbol also implies real
+data. CLAUDE.md now allows exactly two status labels: SIMULATED (always) and REPLAY (during rewind).
+
+**Checked.** The rename changes only text: with "MLAB" mapped back to "SPY", the new 10-minute fill
+logs give exactly the old pinned fingerprints (e645d6434f2a0b64 and f713b6e6055aebc3), so the two
+pins were updated with no change to the market.

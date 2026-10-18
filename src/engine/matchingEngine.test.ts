@@ -30,7 +30,7 @@ function accepted(result: SubmitResult) {
 
 /** Engine with asks 100×5 (a1), 101×5 (a2), 103×10 (a3) and a bid 99×10 (b1). Returns their ids. */
 function ladder() {
-  const e = new MatchingEngine("SPY");
+  const e = new MatchingEngine("MLAB");
   const a1 = accepted(e.submit(lim("sell", 100, 5, { agentType: "marketMaker" }), 0)).orderId;
   const a2 = accepted(e.submit(lim("sell", 101, 5), 0)).orderId;
   const a3 = accepted(e.submit(lim("sell", 103, 10), 0)).orderId;
@@ -44,38 +44,38 @@ describe("MatchingEngine", () => {
   describe("order ids (D-014)", () => {
     it("assigns <ticker>-1, -2, -3 … in order of acceptance", () => {
       const { e, a1, a2, a3, b1 } = ladder();
-      expect([a1, a2, a3, b1]).toEqual(["SPY-1", "SPY-2", "SPY-3", "SPY-4"]);
-      expect(accepted(e.submit(mkt("buy", 1), 0)).orderId).toBe("SPY-5");
+      expect([a1, a2, a3, b1]).toEqual(["MLAB-1", "MLAB-2", "MLAB-3", "MLAB-4"]);
+      expect(accepted(e.submit(mkt("buy", 1), 0)).orderId).toBe("MLAB-5");
     });
 
     it("never reuses an id, even after the order is cancelled or filled", () => {
-      const e = new MatchingEngine("SPY");
+      const e = new MatchingEngine("MLAB");
       const first = accepted(e.submit(lim("sell", 100, 1), 0)).orderId;
       e.cancel(first);
       const second = accepted(e.submit(lim("sell", 100, 1), 0)).orderId;
       accepted(e.submit(mkt("buy", 1), 0)); // fills `second` completely
       const third = accepted(e.submit(lim("sell", 100, 1), 0)).orderId;
       expect(new Set([first, second, third]).size).toBe(3);
-      expect(third).toBe("SPY-4");
+      expect(third).toBe("MLAB-4");
     });
 
     it("does not use up an id for a rejected order", () => {
-      const e = new MatchingEngine("SPY");
+      const e = new MatchingEngine("MLAB");
       expect(e.submit(lim("buy", 0, 1), 0).ok).toBe(false);
       expect(e.submit(mkt("buy", 1), 0)).toMatchObject({ reason: "NO_LIQUIDITY" });
-      expect(accepted(e.submit(lim("buy", 100, 1), 0)).orderId).toBe("SPY-1");
+      expect(accepted(e.submit(lim("buy", 100, 1), 0)).orderId).toBe("MLAB-1");
     });
 
     it("ignores an id supplied by the caller", () => {
-      const e = new MatchingEngine("SPY");
+      const e = new MatchingEngine("MLAB");
       const sneaky = { ...lim("buy", 100, 1), id: "mine" } as OrderInput;
-      expect(accepted(e.submit(sneaky, 0)).orderId).toBe("SPY-1");
+      expect(accepted(e.submit(sneaky, 0)).orderId).toBe("MLAB-1");
       expect(e.book.has("mine")).toBe(false);
     });
 
     it("numbers each market independently", () => {
       const reg = new MarketRegistry();
-      const spy = reg.create("SPY");
+      const spy = reg.create("MLAB");
       const nvda = reg.create("NVDA");
       accepted(spy.submit(lim("buy", 100, 1), 0));
       expect(accepted(nvda.submit(lim("buy", 100, 1), 0)).orderId).toBe("NVDA-1");
@@ -109,7 +109,7 @@ describe("MatchingEngine", () => {
     });
 
     it("fills a sell limit against bids, best (highest) first", () => {
-      const e = new MatchingEngine("SPY");
+      const e = new MatchingEngine("MLAB");
       accepted(e.submit(lim("buy", 98, 5), 0));
       accepted(e.submit(lim("buy", 99, 5), 0));
       expect(fillSummary(e.submit(lim("sell", 98, 8), 0))).toEqual([[99, 5], [98, 3]]);
@@ -143,7 +143,7 @@ describe("MatchingEngine", () => {
     });
 
     it("is rejected with NO_LIQUIDITY when the other side is empty (D-011)", () => {
-      const e = new MatchingEngine("SPY");
+      const e = new MatchingEngine("MLAB");
       accepted(e.submit(lim("buy", 99, 10), 0));
       const r = e.submit(mkt("buy", 5), 0);
       expect(r).toMatchObject({ ok: false, reason: "NO_LIQUIDITY" });
@@ -161,7 +161,7 @@ describe("MatchingEngine", () => {
 
   describe("price-time priority among resting orders", () => {
     it("fills the earlier order at a price first", () => {
-      const e = new MatchingEngine("SPY");
+      const e = new MatchingEngine("MLAB");
       const first = accepted(e.submit(lim("sell", 100, 5), 0)).orderId;
       const second = accepted(e.submit(lim("sell", 100, 5), 0)).orderId;
       const r = accepted(e.submit(mkt("buy", 7), 0));
@@ -169,7 +169,7 @@ describe("MatchingEngine", () => {
     });
 
     it("keeps a partially filled resting order at the front of its queue", () => {
-      const e = new MatchingEngine("SPY");
+      const e = new MatchingEngine("MLAB");
       const first = accepted(e.submit(lim("sell", 100, 10), 0)).orderId;
       const second = accepted(e.submit(lim("sell", 100, 10), 0)).orderId;
       accepted(e.submit(mkt("buy", 4), 0));
@@ -179,7 +179,7 @@ describe("MatchingEngine", () => {
 
   describe("self-trade prevention (D-008)", () => {
     it("cancels the submitter's own resting order instead of trading with it", () => {
-      const e = new MatchingEngine("SPY");
+      const e = new MatchingEngine("MLAB");
       const mine = accepted(e.submit(lim("sell", 100, 5, { ownerId: "mm" }), 0)).orderId;
       const r = accepted(e.submit(lim("buy", 100, 5, { ownerId: "mm" }), 0));
       expect(r.fills).toEqual([]);
@@ -190,7 +190,7 @@ describe("MatchingEngine", () => {
     });
 
     it("keeps matching against other owners behind the cancelled order", () => {
-      const e = new MatchingEngine("SPY");
+      const e = new MatchingEngine("MLAB");
       const mine = accepted(e.submit(lim("sell", 100, 5, { ownerId: "mm" }), 0)).orderId;
       const theirs = accepted(e.submit(lim("sell", 100, 5, { ownerId: "other" }), 0)).orderId;
       const r = accepted(e.submit(mkt("buy", 5, { ownerId: "mm" }), 0));
@@ -199,7 +199,7 @@ describe("MatchingEngine", () => {
     });
 
     it("lets a market order end with no fills if only the submitter's own orders were there", () => {
-      const e = new MatchingEngine("SPY");
+      const e = new MatchingEngine("MLAB");
       accepted(e.submit(lim("sell", 100, 5, { ownerId: "mm" }), 0));
       const r = accepted(e.submit(mkt("buy", 5, { ownerId: "mm" }), 0));
       expect(r.fills).toEqual([]);
@@ -215,7 +215,7 @@ describe("MatchingEngine", () => {
       const r = accepted(e.submit(lim("buy", 102, 3, { ownerId: "panic1", agentType: "panic" }), 1_500));
       expect(r.fills).toHaveLength(1);
       const f = r.fills[0];
-      expect(f).toMatchObject({ seq: 0, time: 1_500, ticker: "SPY", price: 100, qty: 3, aggressor: "buy" });
+      expect(f).toMatchObject({ seq: 0, time: 1_500, ticker: "MLAB", price: 100, qty: 3, aggressor: "buy" });
       expect(f.buy).toMatchObject({ orderId: r.orderId, ownerId: "panic1", agentType: "panic", limitPrice: 102 });
       expect(f.sell).toMatchObject({ orderId: a1, agentType: "marketMaker", limitPrice: 100 });
     });
@@ -240,7 +240,7 @@ describe("MatchingEngine", () => {
     });
 
     it("gives the resting side the quote from when it arrived, not the current one", () => {
-      const e = new MatchingEngine("SPY");
+      const e = new MatchingEngine("MLAB");
       accepted(e.submit(lim("buy", 99, 5), 0));
       accepted(e.submit(lim("sell", 101, 5), 0)); // arrives seeing bid 99, ask none
       accepted(e.submit(lim("sell", 100, 5), 0)); // arrives seeing 99 / 101
@@ -270,14 +270,14 @@ describe("MatchingEngine", () => {
     });
 
     it("keeps a half-cent mid exact by storing it doubled", () => {
-      const e = new MatchingEngine("SPY");
+      const e = new MatchingEngine("MLAB");
       accepted(e.submit(lim("buy", 100, 1), 0));
       accepted(e.submit(lim("sell", 101, 1), 0));
       expect(accepted(e.submit(lim("buy", 100, 1), 0)).arrival.midX2).toBe(201); // mid = 100.5
     });
 
     it("marks what is missing when a side is empty", () => {
-      const e = new MatchingEngine("SPY");
+      const e = new MatchingEngine("MLAB");
       expect(accepted(e.submit(lim("buy", 99, 1), 0)).arrival).toEqual({ bid: null, ask: null, midX2: null, touch: null });
       // Bid exists, no asks: a buy sees no touch, a sell's touch is the bid.
       expect(accepted(e.submit(lim("buy", 98, 1), 0)).arrival).toEqual({ bid: 99, ask: null, midX2: null, touch: null });
@@ -320,7 +320,7 @@ describe("MatchingEngine", () => {
     });
 
     it("cancels all of one owner's orders", () => {
-      const e = new MatchingEngine("SPY");
+      const e = new MatchingEngine("MLAB");
       const q1 = accepted(e.submit(lim("buy", 99, 1, { ownerId: "mm" }), 0)).orderId;
       const q2 = accepted(e.submit(lim("sell", 101, 1, { ownerId: "mm" }), 0)).orderId;
       const q3 = accepted(e.submit(lim("sell", 102, 1, { ownerId: "other" }), 0)).orderId;
@@ -370,7 +370,7 @@ describe("MatchingEngine", () => {
     ];
 
     it.each(cases)("rejects %s", (_label, order, reason) => {
-      const e = new MatchingEngine("SPY", 2);
+      const e = new MatchingEngine("MLAB", 2);
       accepted(e.submit(lim("sell", 100, 5), 0));
       accepted(e.submit(lim("buy", 98, 5), 0));
       const before = [e.book.depth("buy"), e.book.depth("sell"), e.fillCount, e.trackedArrivals];
@@ -379,16 +379,16 @@ describe("MatchingEngine", () => {
     });
 
     it("reports an invalid order before an empty book", () => {
-      expect(new MatchingEngine("SPY").submit(mkt("buy", 0), 0)).toMatchObject({ reason: "INVALID_QTY" });
+      expect(new MatchingEngine("MLAB").submit(mkt("buy", 0), 0)).toMatchObject({ reason: "INVALID_QTY" });
     });
 
     it("names the bad order type in its message", () => {
-      const r = new MatchingEngine("SPY").submit({ ...mkt("buy", 1), type: "stop" } as unknown as OrderInput, 0);
+      const r = new MatchingEngine("MLAB").submit({ ...mkt("buy", 1), type: "stop" } as unknown as OrderInput, 0);
       expect(!r.ok && r.message).toBe('order type must be "limit" or "market", got "stop"');
     });
 
     it.each([-1, 1.5, NaN])("throws for an invalid time %s (engine misuse)", (time) => {
-      expect(() => new MatchingEngine("SPY").submit(lim("buy", 100, 1), time)).toThrow(
+      expect(() => new MatchingEngine("MLAB").submit(lim("buy", 100, 1), time)).toThrow(
         /time must be a non-negative integer number of ms/,
       );
     });
@@ -405,21 +405,21 @@ describe("MatchingEngine", () => {
 describe("MarketRegistry", () => {
   it("holds one independent market per ticker, in creation order", () => {
     const reg = new MarketRegistry();
-    const spy = reg.create("SPY");
+    const spy = reg.create("MLAB");
     const nvda = reg.create("NVDA", 5);
     accepted(spy.submit(lim("buy", 100, 1), 0));
-    expect(reg.get("SPY")).toBe(spy);
+    expect(reg.get("MLAB")).toBe(spy);
     expect(reg.get("NVDA")).toBe(nvda);
     expect(nvda.book.size).toBe(0);
     expect(nvda.book.tickSize).toBe(5);
     expect(reg.get("AAPL")).toBeUndefined();
-    expect(reg.tickers()).toEqual(["SPY", "NVDA"]);
+    expect(reg.tickers()).toEqual(["MLAB", "NVDA"]);
   });
 
   it("throws on a duplicate ticker (setup bug)", () => {
     const reg = new MarketRegistry();
-    reg.create("SPY");
-    expect(() => reg.create("SPY")).toThrow("Market already exists: SPY");
+    reg.create("MLAB");
+    expect(() => reg.create("MLAB")).toThrow("Market already exists: MLAB");
   });
 
   it.each(["", "spy", "1ABC", "TOOLONGTICKER", "SP Y"])("throws on an invalid ticker %j", (ticker) => {
@@ -427,7 +427,7 @@ describe("MarketRegistry", () => {
   });
 
   it("throws on a non-string ticker even if it prints like a valid one", () => {
-    const sneaky = { toString: () => "SPY" } as unknown as string;
+    const sneaky = { toString: () => "MLAB" } as unknown as string;
     expect(() => new MarketRegistry().create(sneaky)).toThrow(
       "ticker must be 1-10 uppercase letters, digits or dots, starting with a letter, got {}",
     );

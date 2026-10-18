@@ -130,7 +130,7 @@ traders reprice, panic sellers cascade and market makers pull back. What exists 
       that widens with volatility, smaller sizes under stress, post-only quotes and inventory
       limits. Profitable against the noise crowd on 6 of 6 runs, including seeds never used to
       tune them
-- [x] 720 unit tests, three browser smoke tests in CI, shadow-model comparison, and 96% mutation score
+- [x] 809 unit tests, five browser smoke tests in CI, shadow-model comparison, and 96% mutation score
       (see [Testing](#testing))
 - [x] Engine boundary and determinism rules, enforced by ESLint and checked at runtime
 
@@ -143,8 +143,8 @@ not just "does it work on my example" but "can any small bug slip past the tests
 
 | Check | Result |
 | --- | --- |
-| Unit and property tests (Vitest) | **720 passing** across 29 files |
-| Browser smoke tests (Playwright, in CI) | Production build: the page loads and prices move; FED from the command bar moves the market with no network call; FED typed 30 times never freezes the page |
+| Unit and property tests (Vitest) | **809 passing** across 34 files (plus a live AI check, run by hand) |
+| Browser smoke tests (Playwright, in CI) | Production build: the page loads and prices move; FED moves the market with no network call; FED typed 30 times never freezes the page; a custom headline goes through the AI preview to a market reaction, CHAT and WHO; with the AI route down, the offline fallback works |
 | Randomized shadow-model comparison | Order book and matching engine, 5 seeds × 3,000 operations each, full state compared after **every** step |
 | Mutation score (Stryker) on `src/engine` | **95.69%**: 2,019 of 2,110 mutants detected (D-050) |
 | Same seed → identical market | The whole fill log and final book of a 10-minute, 40-trader market are fingerprinted and pinned; seed 188 differs |

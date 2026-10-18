@@ -264,7 +264,7 @@ working build on the live site.
 | **Wed 10/21** | Strategy agent (plain-English strategy via the same route) + glass box + manual buy/sell |
 | **Thu 10/22** | Execution report (slippage split into spread and impact, P&L), tuning |
 | **Fri 10/23** | Feature freeze, bug bash, demo script, backup video |
-| **If time** | Sharpe ratio and max drawdown in the execution report |
+| **If time** | Sharpe ratio and max drawdown in the execution report; a Limit Up–Limit Down trading band (±5%, the real rule for large stocks), with the CEO headline as the halt demo |
 | **Cut unless ahead** | Momentum traders, whale, missions, full depth view, realism panel, Learn/Pro modes, rewind, what-if reruns, ask-the-AI, shortcut strip |
 
 **Never cut:** the market moving on screen, the headline reaction, "who moved the price?", the

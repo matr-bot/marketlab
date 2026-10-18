@@ -386,7 +386,10 @@ New priority: everything visible. The engine is strong; judges can only grade wh
 - **Fri 10/23:** feature freeze, bug bash, demo script, backup video.
 - **Cut unless ahead:** momentum, whale, missions, full depth view, realism panel, Learn/Pro,
   rewind, what-if, `ASK`, shortcut strip.
-- **If time:** Sharpe ratio and max drawdown in `EXR`.
+- **If time:** Sharpe ratio and max drawdown in `EXR`; a Limit Up–Limit Down band (±5% around the
+  5-minute average price, the real rule for large stocks: a 15 s limit state, then a short trading
+  pause), with CEO as the halt demo (D-051). When it is built, check FED on the demo seed (187) so
+  the main demo never halts unexpectedly.
 
 Never cut: the market moving on screen, the headline reaction, "who moved the price?", the
 strategy agent + glass box, the execution report.

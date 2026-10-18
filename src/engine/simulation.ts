@@ -6,6 +6,7 @@ import { Rng } from "./rng";
 import { SimClock, type TickWindow } from "./simClock";
 import type { CancelResult, Cents, OrderId } from "./types";
 import { DEFAULT_VOLATILITY_PARAMS, VolatilityEstimator, type VolatilityParams } from "./volatility";
+import { DEFAULT_FUNDAMENTAL_PARAMS, Fundamental, MidHistory, type FundamentalParams, type ShockParams } from "./fundamental";
 
 // The simulation loop (D-023). Each tick: advance the clock 100 ms, take every agent arrival in
 // that window in exact time order, and let each agent act at its arrival's timestamp. Orders
@@ -25,6 +26,8 @@ export interface SimulationConfig {
   readonly agents: readonly AgentSpec[];
   /** Realized-volatility settings (default: 5 s sampling, 30 s and 120 s half-lives). */
   readonly volatility?: VolatilityParams;
+  /** Fair-value settings (default: a slow random walk, D-043). */
+  readonly fundamental?: FundamentalParams;
   /** Optional hooks for reports and tests; they observe only and cannot change anything. */
   readonly observer?: SimulationObserver;
 }
@@ -38,6 +41,17 @@ export interface SimulationObserver {
 
 export const DEFAULT_START_PRICE: Cents = 18_700;
 
+/** A headline applied to the market: when, what it was called, and the (clamped) shock it caused. */
+export interface ShockEvent {
+  /** Sim ms: the start of the tick it was applied in. */
+  readonly time: number;
+  readonly label: string;
+  readonly shock: ShockParams;
+  /** Fair value just before and just after the jump, in cents. */
+  readonly fairValueBefore: number;
+  readonly fairValueAfter: number;
+}
+
 export class Simulation {
   readonly rng: Rng;
   readonly clock = new SimClock();
@@ -48,6 +62,12 @@ export class Simulation {
   private readonly observer: SimulationObserver;
   private last: Cents | null = null;
   readonly volatility: VolatilityEstimator;
+  /** Fair value (random stream "fundamental") and the active shock's panic sensitivity. */
+  readonly fundamental: Fundamental;
+  /** The mid once per second, for drawdown windows. */
+  readonly midHistory = new MidHistory();
+  private readonly pendingShocks: Array<{ shock: ShockParams; label: string }> = [];
+  private readonly shockLog: ShockEvent[] = [];
   /** Shares and cash (cents) per agent, from fills. */
   private readonly positions = new Map<string, number>();
   private readonly cash = new Map<string, number>();
@@ -61,6 +81,7 @@ export class Simulation {
     }
     this.observer = config.observer ?? {};
     this.volatility = new VolatilityEstimator(config.volatility ?? DEFAULT_VOLATILITY_PARAMS);
+    this.fundamental = new Fundamental(this.rng.stream("fundamental"), this.startPrice, config.fundamental ?? DEFAULT_FUNDAMENTAL_PARAMS);
     this.scheduler = new ArrivalScheduler(this.rng); // streams "arrivals/<id>"
     const decisions = this.rng.stream("decisions");
     for (const spec of config.agents) {
@@ -91,9 +112,27 @@ export class Simulation {
     return this.cash.get(agentId) ?? 0;
   }
 
+  /**
+   * Queue a headline. It is applied at the start of the next tick, before any agent acts, so the
+   * same seed + the same shocks at the same ticks always give the same market (D-043).
+   */
+  applyShock(shock: ShockParams, label: string): void {
+    this.pendingShocks.push({ shock, label });
+  }
+
+  /** Every headline applied so far, oldest first. */
+  get shocks(): readonly ShockEvent[] {
+    return this.shockLog;
+  }
+
   /** Advance one tick (100 ms): every arrival in the window acts, in exact time order. */
   step(): TickWindow {
     const window = this.clock.advance();
+    for (const { shock, label } of this.pendingShocks.splice(0)) {
+      const before = this.fundamental.value;
+      const applied = this.fundamental.shock(shock, window.start);
+      this.shockLog.push(Object.freeze({ time: window.start, label, shock: applied, fairValueBefore: before, fairValueAfter: this.fundamental.value }));
+    }
     for (const arrival of this.scheduler.drain(window.end)) {
       this.observer.onArrival?.(arrival);
       const agent = this.agents.get(arrival.sourceId)!;
@@ -104,6 +143,10 @@ export class Simulation {
       const ask = this.engine.book.bestAsk();
       this.volatility.sample(window.end, bid !== null && ask !== null ? bid + ask : null);
     }
+    const bid = this.engine.book.bestBid();
+    const ask = this.engine.book.bestAsk();
+    this.midHistory.onTickEnd(window.end, bid !== null && ask !== null ? bid + ask : null);
+    this.fundamental.onTickEnd(window.end);
     this.observer.onTickEnd?.(window);
     return window;
   }
@@ -123,11 +166,18 @@ export class Simulation {
     const engine = this.engine;
     const lastTrade = () => this.last;
     const position = () => this.positionOf(spec.id);
+    const fundamental = this.fundamental;
+    const history = this.midHistory;
     return {
       time,
       book: engine.book,
       startPrice: this.startPrice,
       volatility: this.volatility.view,
+      get fairValue() {
+        return fundamental.value;
+      },
+      panicSensitivity: fundamental.sensitivityAt(time),
+      maxMidSince: (sinceMs: number) => history.maxSince(sinceMs),
       get lastTradePrice() {
         return lastTrade();
       },

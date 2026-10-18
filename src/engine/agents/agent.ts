@@ -26,6 +26,12 @@ export interface AgentContext {
   readonly position: number;
   /** Realized volatility of the mid (log return per √second of sim time; D-029 to D-032). */
   readonly volatility: VolatilityView;
+  /** Fair value in cents (unrounded). Only value traders use it: everyone else trades without knowing it (D-043). */
+  readonly fairValue: number;
+  /** Panic sensitivity s of the active headline (1 when none): panic thresholds are divided by it. */
+  readonly panicSensitivity: number;
+  /** Highest mid sampled (once per sim second) at or after `sinceMs`, or null if none. */
+  maxMidSince(sinceMs: number): number | null;
   /** This agent's resting orders, oldest first (sorted explicitly by engine sequence; D-026). */
   myOrders(): RestingOrder[];
   submit(order: AgentOrder): SubmitResult;

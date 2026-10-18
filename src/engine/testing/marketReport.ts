@@ -76,6 +76,7 @@ function reportMarketMakers(opts: ReportOptions): AgentSpec[] {
           mm.act({
             time: ctx.time, book: ctx.book, startPrice: ctx.startPrice, myOrders: ctx.myOrders, submit: ctx.submit, cancel: ctx.cancel,
             lastTradePrice: ctx.lastTradePrice, position: ctx.position,
+            fairValue: ctx.fairValue, panicSensitivity: ctx.panicSensitivity, maxMidSince: ctx.maxMidSince,
             volatility: { sigma: v.sigma * mult, fast: v.fast * mult, slow: v.slow * mult, samples: v.samples, ready: v.ready },
           });
         },

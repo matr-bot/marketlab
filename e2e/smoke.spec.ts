@@ -31,6 +31,10 @@ test("the market is alive on load: prices change within 5 seconds, with no conso
   expect(new Set(sides.map((s) => s[1])).size).toBe(2); // both sides appear, in two colors
   await expect(page.getByTestId("book").getByText("SPREAD")).toBeVisible();
   await expect(page.getByTestId("book").getByText(/^(BID|ASK)$/).first()).toBeVisible();
+  // Depth bars: one per level, the largest level's bar is full width.
+  const bars = await page.locator("[data-testid=book] [data-side] > [aria-hidden]").evaluateAll((els) => els.map((e) => (e as HTMLElement).style.width));
+  expect(bars.length).toBeGreaterThan(0);
+  expect(bars).toContain("100%");
   await expect(page.getByTestId("ticker").locator("span").first()).toBeVisible();
   await expect(page.getByTestId("status-bar")).toContainText("MLAB");
   await expect(page.getByTestId("status-bar").getByText("SIMULATED", { exact: true })).toBeVisible();

@@ -153,6 +153,7 @@
 }
 
 .bookRow {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr 1fr 1.4fr 1.4fr;
   padding: 0 8px;
@@ -160,8 +161,28 @@
 }
 
 .bookRow > span {
+  position: relative;
+  z-index: 1;
   text-align: right;
   padding-left: 8px;
+}
+
+/* Depth bar: behind the row, growing from the price side (last child, out of the grid flow). */
+.bookRow > .depthBar {
+  position: absolute;
+  z-index: 0;
+  top: 1px;
+  bottom: 1px;
+  right: 0;
+  padding: 0;
+}
+
+.depthBid {
+  background: rgba(31, 214, 96, 0.16);
+}
+
+.depthAsk {
+  background: rgba(255, 64, 64, 0.16);
 }
 
 .bookRow > span:first-child {

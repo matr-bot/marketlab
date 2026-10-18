@@ -417,7 +417,7 @@ describe("Simulation: the agent context", () => {
 
 // Fingerprints of the 10-minute seed-187 markets (fills + final book). History: re-pinned when
 // the ticker became MLAB (D-041, text only); re-pinned when noise traders were spread out (D-046,
-// an intended change to the market).
+// an intended change to the market); the market-maker pin again when k became 1.5 (D-049).
 const PINNED_DEMO_MARKET = "6325214896cd887f";
 // …with two market makers added.
-const PINNED_MM_MARKET = "ef8a7803dfa1d8c7";
+const PINNED_MM_MARKET = "2d8706e88f16a3ae";

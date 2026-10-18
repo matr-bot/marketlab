@@ -38,7 +38,10 @@ export const DEFAULT_VALUE_PARAMS: ValueTraderParams = {
   thetaMax: 0.003,
   q0: 200,
   maxOrder: 1_000,
-  maxInventory: 4_000,
+  // 4,000 in the plan. A second FED 10 minutes after the first did not move seed 2's price: value
+  // traders, still net short from the first headline, ran out of room to sell, and noise bids
+  // absorbed the rest (D-044). 6,000 restores the cascade; 8,000 changed nothing further.
+  maxInventory: 6_000,
   lotSize: 100,
 };
 

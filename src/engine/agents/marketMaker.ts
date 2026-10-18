@@ -42,9 +42,10 @@ export interface MarketMakerParams {
 
 export const DEFAULT_MM_PARAMS: MarketMakerParams = {
   gamma: 0.01,
-  // 1.5 in the plan; 1.0 after the P&L investigation (D-033): at 1.5 the market maker's spread did
-  // not cover the permanent price impact of noise market orders and it lost money on 5 of 6 runs.
-  k: 1.0,
+  // Fitted from fill rates in the full demo market (D-049): quoting at k = 1.5 measures k = 1.52, a
+  // self-consistent fit; profitable on 12 of 12 calm runs. (D-033 had set 1.0 by a P&L sweep, in a
+  // market with no value traders to anchor the price.)
+  k: 1.5,
   tauSec: 60,
   lotSize: 100,
   baseSize: 500,

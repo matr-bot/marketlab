@@ -130,7 +130,8 @@ describe("Shock response: a sudden 4× volatility regime (Step 4+5 change 1)", (
     };
     for (let i = 0; i < 200; i++) feed(sigma0); // calm, long enough to settle
     const spread = () => {
-      const q = computeQuotes(DEFAULT_MM_PARAMS, { mid: 18_700, sigma: pickSigma(e), position: 0, othersBestBid: null, othersBestAsk: null, tick: 1 });
+      // k = 1, the value these response times were measured with (D-031).
+      const q = computeQuotes({ ...DEFAULT_MM_PARAMS, k: 1 }, { mid: 18_700, sigma: pickSigma(e), position: 0, othersBestBid: null, othersBestAsk: null, tick: 1 });
       return metric === "formula" ? q.spread : q.ask!.price - q.bid!.price;
     };
     const calm = spread();

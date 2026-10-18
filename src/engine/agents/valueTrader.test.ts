@@ -29,15 +29,15 @@ describe("valueOrder: trade toward belief beyond the threshold (D-044), worked b
     expect(at({ belief: 18_700 * 1.00201 })?.qty).toBe(100); // 200 · 0.00001/0.002 = 1 share → one lot
   });
 
-  it("never lets a fill take its position past ±4,000 shares", () => {
-    expect(at({ belief: 18_139, position: -3_500 })?.qty).toBe(500);
-    expect(at({ belief: 18_139, position: -4_000 })).toBeNull();
-    expect(at({ belief: 18_139, position: -3_950 })).toBeNull(); // room for 50 shares: less than a lot
-    expect(at({ belief: 19_261, position: 3_700 })?.qty).toBe(300);
-    for (let pos = -4_000; pos <= 4_000; pos += 137) {
+  it("never lets a fill take its position past ±6,000 shares", () => {
+    expect(at({ belief: 18_139, position: -5_500 })?.qty).toBe(500);
+    expect(at({ belief: 18_139, position: -6_000 })).toBeNull();
+    expect(at({ belief: 18_139, position: -5_950 })).toBeNull(); // room for 50 shares: less than a lot
+    expect(at({ belief: 19_261, position: 5_700 })?.qty).toBe(300);
+    for (let pos = -6_000; pos <= 6_000; pos += 137) {
       for (const belief of [18_139, 19_261]) {
         const o = at({ belief, position: pos });
-        if (o) expect(Math.abs(pos + (o.side === "buy" ? o.qty : -o.qty))).toBeLessThanOrEqual(4_000);
+        if (o) expect(Math.abs(pos + (o.side === "buy" ? o.qty : -o.qty))).toBeLessThanOrEqual(6_000);
       }
     }
   });

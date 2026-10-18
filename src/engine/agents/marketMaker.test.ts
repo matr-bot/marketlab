@@ -7,7 +7,8 @@ import { computeQuotes, DEFAULT_MM_PARAMS, MarketMaker, marketMakers, othersBest
 import { noiseTraders } from "./noiseTrader";
 import { MAX_PRICE_CENTS } from "../validation";
 
-const P = DEFAULT_MM_PARAMS;
+/** The hand-worked examples below use k = 1/¢ (the default is 1.5 since D-049; formulas are the same). */
+const P = { ...DEFAULT_MM_PARAMS, k: 1 };
 const MUTATION_RUN = process.env.MARKETLAB_MUTATION === "1";
 /** σ such that σ × mid = 1¢ per √s at a $187.00 mid, so γσc²τ = γ·60. */
 const ONE_CENT = 1 / 18_700;
@@ -232,7 +233,7 @@ describe("MarketMaker.act: requotes only when price or size changes (Step 4+5 ch
   it("places a bid and an ask, then leaves them alone while nothing changes (keeps time priority)", () => {
     const state = { bid: 18_699, ask: 18_701, sigma: P.sigma0, position: 0 };
     const m = fakeMarket(state);
-    const mm = new MarketMaker();
+    const mm = new MarketMaker(P);
     mm.act(m.ctx());
     expect(m.log).toEqual(["submit buy 500@18698", "submit sell 500@18702"]);
     m.log.length = 0;
@@ -243,7 +244,7 @@ describe("MarketMaker.act: requotes only when price or size changes (Step 4+5 ch
   it("replaces only the side whose price or size changed", () => {
     const state = { bid: 18_699, ask: 18_701, sigma: P.sigma0, position: 0 };
     const m = fakeMarket(state);
-    const mm = new MarketMaker();
+    const mm = new MarketMaker(P);
     mm.act(m.ctx());
     m.log.length = 0;
     state.position = 2_500; // bid size 500 → 200 and reservation drops ~1.2¢: both sides change
@@ -258,14 +259,14 @@ describe("MarketMaker.act: requotes only when price or size changes (Step 4+5 ch
 
   it("prices off the opening price, not half the ask, when others have only one side", () => {
     const m = fakeMarket({ bid: null, ask: 18_801, sigma: P.sigma0, position: 0 });
-    new MarketMaker().act(m.ctx());
+    new MarketMaker(P).act(m.ctx());
     expect(m.log).toEqual(["submit buy 500@18698", "submit sell 500@18702"]); // around startPrice 18,700
   });
 
   it("cancels a side that can no longer be quoted and places nothing there", () => {
     const state = { bid: 18_699, ask: 18_701, sigma: P.sigma0, position: 0 };
     const m = fakeMarket(state);
-    const mm = new MarketMaker();
+    const mm = new MarketMaker(P);
     mm.act(m.ctx());
     const askId = m.resting.find((o) => o.side === "sell")!.id;
     m.log.length = 0;
@@ -279,7 +280,7 @@ describe("MarketMaker.act: requotes only when price or size changes (Step 4+5 ch
   it("cancels before placing, and never keeps more than one quote per side", () => {
     const state = { bid: 18_699, ask: 18_701, sigma: P.sigma0, position: 0 };
     const m = fakeMarket(state);
-    const mm = new MarketMaker();
+    const mm = new MarketMaker(P);
     mm.act(m.ctx());
     m.log.length = 0;
     state.bid = 18_690; // the mid stays 18,700 but both quotes are re-sized by a position change
@@ -361,6 +362,6 @@ describe("Market makers in the live market (one sim-hour, seed 187)", () => {
       ["mm-2", "marketMaker", 5],
     ]);
     expect(specs[0].create(undefined as never)).toBeInstanceOf(MarketMaker);
-    expect(DEFAULT_MM_PARAMS).toEqual({ gamma: 0.01, k: 1, tauSec: 60, lotSize: 100, baseSize: 500, maxInventory: 5_000, minSizeFactor: 0.25, sigma0: 4.3e-5, maxSkew: 25, maxHalfSpread: 25 });
+    expect(DEFAULT_MM_PARAMS).toEqual({ gamma: 0.01, k: 1.5, tauSec: 60, lotSize: 100, baseSize: 500, maxInventory: 5_000, minSizeFactor: 0.25, sigma0: 4.3e-5, maxSkew: 25, maxHalfSpread: 25 });
   });
 });

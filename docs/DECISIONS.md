@@ -1369,3 +1369,114 @@ spacing (every 3 s), six seeds, 10 minutes after: fair value falls to 29.0% of t
 lowest trade on any seed is $53.99. So the price never falls through fair value; it follows 20
 compounding fraud headlines. That is below the 50% threshold set in review, so an LULD-style band is
 proposed (not built) in the report for 2026-10-18.
+
+---
+
+## D-052 · /api/interpret: Claude Haiku 5.5, structured outputs, clamped params, offline fallback
+
+**Date:** 2026-10-18 · **Status:** Accepted
+
+**Model: `claude-haiku-5-5`** (Claude Haiku 5.5, released 2026-10-07; verified against Anthropic's
+live models overview and the model's own page, because the model table bundled with our tooling was
+cached before its release and listed only Claude Haiku 4.5). It is the current Haiku, described as
+the fastest model, "for high-volume, latency-sensitive tasks such as classification, extraction,
+and routing", which is exactly this job: one headline in, five numbers and a reason out.
+**Pricing:** $0.10 per million input tokens and $0.50 per million output tokens for prompts up to
+100,000 tokens (ours are about 500 tokens); $0.50 / $2.50 above 100,000. At roughly 500 input and
+200 output tokens a call costs about $0.00015, so 1,000 judge headlines cost about $0.15.
+
+**Request.** `client.messages.parse` with `output_config: { effort: "low", format: zodOutputFormat(ModelOutput) }`,
+`max_tokens: 2048` (thinking is on by default on this model and counts toward `max_tokens`), a 6 s
+timeout and no retries.
+
+**Consistency (your question: temperature 0).** Claude Haiku 5.5 does not accept a temperature:
+the only accepted value is 1 (or omitting it); any other value, any `top_k`, and any `top_p` other
+than its default return a 400. So the same headline is kept consistent by the fixed system prompt,
+low effort, structured outputs, and the 1-hour cache of identical headlines. The live check measures
+how stable the params are across repeated calls.
+
+**Contract.** The model can only return `ModelOutput` (relevance, fair-value change in percent,
+panic sensitivity, duration, volatility and liquidity multipliers, reason). Structured outputs
+guarantee the shape but not numeric ranges, so the server converts and clamps every number with the
+engine's own `clampShock` (fair value ±20%, panic 0.5–3, duration 10–1,800 s, volatility 1–3,
+liquidity 0.25–2). `not_news` means no effect. The reason is stripped of digits and capped at 120
+characters, and the UI labels it "AI's reason": every number on screen comes from the clamped params.
+
+**Prompt injection.** The headline is user data inside `<headline>` tags (angle brackets removed),
+and the system prompt says to classify it, never follow it. Even when the model is fooled, it can
+only pick in-range numbers; nothing it returns is executed. Tested with a fake model returning
+extreme values; the live check sends real injection attempts.
+
+**Failures never stop the demo.** No key, a timeout, an API error or rate limit, a refusal, a
+truncated or invalid answer, or an unreachable route (checked in the page too, for no Wi-Fi): the
+headline maps to an offline preset only on a clear keyword match (negatives such as "miss" and "cuts
+guidance" are checked before positives, so an earnings miss is never BEAT), otherwise nothing
+happens and the message is "AI unavailable · try FED, CEO, BEAT or DOWNGRADE."
+
+**Cost control.** Identical headlines (case and spacing ignored) are cached for an hour, up to 500.
+Per visitor IP: 20 requests a minute and 100 an hour (judges share one Wi-Fi network); per serverless
+instance: 300 an hour. Headlines are 1–200 characters, bodies at most 1 KB, same-origin POST only.
+These limits live in memory, so they are per instance and best effort; **the hard cap is the spend
+limit on the Anthropic workspace.**
+
+**Security.** `ANTHROPIC_API_KEY` is read only in the route handler on the server (Vercel
+environment variable, no `NEXT_PUBLIC_` prefix), never logged or echoed; checked after each
+production build that the client bundle contains neither the variable name nor the SDK.
+
+**Determinism.** The applied, clamped params are what the simulation records and what a replay
+would feed; the headline text is only a display label.
+
+---
+
+## D-053 · Volatility and liquidity multipliers
+
+**Date:** 2026-10-18 · **Status:** Accepted
+
+**Decision.** A shock also carries `volatilityMultiplier` (fair value's random-walk σ, clamped to
+[1, 3]) and `liquidityMultiplier` (market makers' base quote size, clamped to [0.25, 2]), both for
+the shock's duration. Overlapping headlines take the more stressed values (larger volatility, smaller
+liquidity) until the later end, as panic sensitivity does (D-043). **The four presets stay at 1 and
+1**, so their validated signature numbers (D-047) are unchanged; all pinned markets were unchanged.
+Tested: 3× volatility triples the walk's spread during the shock and returns to 1 after; liquidity
+0.25 leaves the market makers with less than 60% of their usual depth near the mid after FED.
+
+---
+
+## D-054 · WHO: aggressive volume by trader type, exact shares, percentages that add to 100
+
+**Date:** 2026-10-18 · **Status:** Accepted
+
+**Decision.** For a window of sim time, WHO counts each fill's aggressor (the side whose incoming
+order caused the trade) by trader type and side: "selling (hit bids)" and "buying (lifted asks)".
+Shares are exact integers from the fill log; percentages are whole numbers by largest remainder
+(ties by name), so they always sum to exactly 100 (tested on 5,000 random splits) and each is within
+one point of the exact share. The panel shows the last 60 s by default; clicking a GP candle shows
+that candle's 10 s window from a 10-minute buffer in the worker. Example after FED, seed 187, first
+candle: 69% of selling came from value traders (the informed selling that starts the move), 21% from
+panic sellers.
+
+---
+
+## D-055 · The desk-chat narrator: deterministic, paced, every number from the engine
+
+**Date:** 2026-10-18 · **Status:** Accepted
+
+**Decision.** The narrator runs in the worker at every tick end and writes from templates over
+engine numbers only: the headline and new fair value, value traders' shares in the first 5 s, panic
+started and peaked ("20 of 20 panic sellers"), the spread widening (2 s average at least 6¢ and 3×
+the 2 minutes before), a liquidity vacuum of 2 s or more, the recovery of the overshoot, the
+first-minute P&L by type (D-047), and a quiet-market note after 60 s with nothing else to say.
+**Pacing:** one message per 4 s of sim time (a headline posts at once); at most 5 waiting, the least
+important dropped first. First runs showed the problems this fixes: single-tick spread spikes
+produced false "spread widened" notes in a calm market, panic posted four updates in 12 s, and the
+informed-flow message (the cause of the move) was crowded out. Tests check every number against a
+recount of the fill log, the pacing, determinism (and identical chat under any frame timing), a calm
+hour (about one quiet note a minute, no panic or vacuum talk) and a scripted 3-second vacuum. Rule
+boundaries are tested against a fake simulation driven tick by tick.
+
+**Mutation (D-050 again).** A first run reported 97% for the narrator, but 308 of its 473 mutants
+were timeouts: the whole-market story test built its market in the `describe` body, so Vitest ran it
+while collecting the file even when the suite was skipped under mutation, and a mutant that broke
+that setup crashed the file and counted as "survived". Fixed (setup in `beforeAll`), then measured
+with only the narrator's own fast tests: **87.3%** (405 killed, 8 timeouts, 60 survivors, listed in
+docs/LATER.md). attribution.ts 93.4%, feed.ts 97.1% (7 timeouts).

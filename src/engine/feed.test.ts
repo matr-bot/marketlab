@@ -363,6 +363,30 @@ describe("MarketFeed: WHO and CHAT in frames (D-054, D-055)", () => {
     expect(feed.attribute(0, 60_000).trades).toBe(0); // older than 10 minutes: no longer kept
   });
 
+  it("answers a window that starts exactly at a fill's time, including that fill", () => {
+    const feed = feedOf();
+    feed.advance(600);
+    const f = feed.sim.engine.fills.at(-1)!;
+    expect(feed.attribute(f.time, f.time + 1).trades).toBe(feed.sim.engine.fills.filter((x) => x.time === f.time).length);
+  });
+
+  it("applyParams: applies a headline with explicit params, label at most 120 characters, same spacing as presets", () => {
+    const feed = feedOf();
+    const shock = { fairValuePct: -0.02, panicSensitivity: 1, durationSec: 60, volatilityMultiplier: 1, liquidityMultiplier: 1 };
+    const label = "x".repeat(150);
+    expect(feed.applyParams(shock, label)).toEqual({ ok: true, code: "NEWS", headline: "x".repeat(120) });
+    expect(feed.applyParams(shock, "again")).toEqual({ ok: false, message: "The market is still digesting the last headline. Try again in 3 s." });
+    feed.advance(1);
+    expect(feed.sim.shocks[0].label).toBe("x".repeat(120));
+    expect(feed.sim.shocks[0].shock).toEqual(shock);
+  });
+
+  it("advance refuses a negative or fractional tick count", () => {
+    const feed = feedOf();
+    expect(() => feed.advance(-1)).toThrow("ticks must be a non-negative integer, got -1");
+    expect(() => feed.advance(1.5)).toThrow("ticks must be a non-negative integer, got 1.5");
+  });
+
   it("sends each chat message once", () => {
     const feed = feedOf();
     feed.advance(700); // past the first quiet note at 60 s

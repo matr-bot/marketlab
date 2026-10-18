@@ -98,6 +98,12 @@ traders reprice, panic sellers cascade and market makers pull back. What exists 
       headlines (FED, CEO, BEAT, DOWNGRADE) run with no network call, and each one's first-minute
       P&L by trader type is recorded (market makers lose to informed traders: adverse selection)
 - [x] A 77-trader crowd: 40 noise traders, 2 market makers, 15 value traders, 20 panic sellers
+- [x] Any headline, typed in plain English, becomes clamped, editable market parameters
+      (Claude Haiku 5.5 with structured outputs; the AI only produces data, never numbers shown
+      as results), with an offline fallback so the demo never depends on the network
+- [x] A desk-chat narrator that explains the move from engine numbers ("Value traders sold 20,749
+      shares in the first 5 s", "Market makers lost $29,281 to informed traders"), and "who moved
+      the price?" for the last minute or any clicked candle, with exact shares
 
 - [x] A terminal-style UI on [marketlab-nine.vercel.app](https://marketlab-nine.vercel.app): the
       market is already trading when the page loads. Status bar (last price, change, volume, sim
@@ -260,7 +266,7 @@ working build on the live site.
 | **Done** | Repo, deploy, layout shell; order book, matching engine, seeded randomness + sim clock, noise traders; realized volatility + Avellaneda–Stoikov market makers (in review) |
 | **Sun 10/18** ✅ | Web Worker + terminal UI (status bar, ticker, price chart, time & sales, order book basics) + market alive on load. **Milestone: prices moving on the live site** |
 | **Mon 10/19** ✅ | Value traders (fair value), panic sellers (threshold cascade), headline shock = a fair-value jump |
-| **Tue 10/20** | AI interpret route for headlines → clamped, editable parameters; headline input; desk-chat narrator (deterministic); "who moved the price?" attribution |
+| **Tue 10/20** ✅ | AI interpret route for headlines → clamped, editable parameters; headline input; desk-chat narrator (deterministic); "who moved the price?" attribution |
 | **Wed 10/21** | Strategy agent (plain-English strategy via the same route) + glass box + manual buy/sell |
 | **Thu 10/22** | Execution report (slippage split into spread and impact, P&L), tuning |
 | **Fri 10/23** | Feature freeze, bug bash, demo script, backup video |

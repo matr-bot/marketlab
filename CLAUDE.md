@@ -378,8 +378,9 @@ New priority: everything visible. The engine is strong; judges can only grade wh
   (threshold cascade), headline shock = a fair-value jump; offline presets FED / CEO / BEAT /
   DOWNGRADE from the command bar; noise retune; k = 1.5 from fill rates. Open items in
   docs/LATER.md.
-- **Tue 10/20:** `/api/interpret` for headlines → clamped, editable parameters; `NEWS` input;
-  `CHAT` narrator (deterministic); `WHO` attribution.
+- **Tue 10/20 ✅ (done Sun 10/18, D-052 to D-055):** `/api/interpret` for headlines
+  (claude-haiku-5-5) → clamped, editable parameters; `NEWS` input; `CHAT` narrator
+  (deterministic); `WHO` attribution.
 - **Wed 10/21:** strategy agent (StrategySpec via the same route) + glass box + `TKT` manual
   buy/sell.
 - **Thu 10/22:** `EXR` execution report (slippage split, P&L), tuning.

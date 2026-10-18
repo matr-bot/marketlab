@@ -18,6 +18,13 @@ describe("wholePercents: whole numbers that always add up to exactly 100 (D-054)
     expect(wholePercents({ panic: 1, noise: 1, value: 1 })).toEqual({ noise: 34, panic: 33, value: 33 });
   });
 
+  it("gives the leftover point to the largest remainder, not the largest share", () => {
+    // value 58.2% (remainder 0.2), panic 41.8% (remainder 0.8): the spare point goes to panic.
+    expect(wholePercents({ value: 291, panic: 209 })).toEqual({ value: 58, panic: 42 });
+    // 1/7 each is 14.29%: 14 each, and the two spare points go to the first two names (equal remainders).
+    expect(wholePercents({ a: 1, b: 1, c: 1, d: 1, e: 1, f: 1, g: 1 })).toEqual({ a: 15, b: 15, c: 14, d: 14, e: 14, f: 14, g: 14 });
+  });
+
   it("is exact when the shares divide evenly, and ignores types with no shares", () => {
     expect(wholePercents({ panic: 62, noise: 38, value: 0 })).toEqual({ panic: 62, noise: 38 });
     expect(wholePercents({})).toEqual({});
@@ -52,6 +59,19 @@ describe("attribute: aggressive volume by trader type over a window", () => {
     expect(a.selling).toEqual({ shares: 500, byType: { panic: 300, value: 200 }, pct: { panic: 60, value: 40 } });
     expect(a.buying).toEqual({ shares: 100, byType: { noise: 100 }, pct: { noise: 100 } });
     expect(topType(a.selling)).toEqual({ type: "panic", pct: 60, shares: 300 });
+  });
+
+  it("topType: the largest share wins whatever the order; ties go to the first name alphabetically", () => {
+    const side = (byType: Record<string, number>) => ({ shares: 0, byType, pct: wholePercents(byType) });
+    expect(topType(side({ value: 200, panic: 300 }))?.type).toBe("panic"); // larger arrives later
+    expect(topType(side({ panic: 300, value: 200 }))?.type).toBe("panic");
+    expect(topType(side({ value: 300, panic: 300 }))?.type).toBe("panic"); // tie, either order
+    expect(topType(side({ panic: 300, value: 300 }))?.type).toBe("panic");
+  });
+
+  it("includes a fill exactly at the window's start and excludes one exactly at its end", () => {
+    expect(attribute([fill(1_000, 5, "buy", "noise", "noise")], 1_000, 2_000).trades).toBe(1);
+    expect(attribute([fill(2_000, 5, "buy", "noise", "noise")], 1_000, 2_000).trades).toBe(0);
   });
 
   it("says nothing for an empty window", () => {

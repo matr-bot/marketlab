@@ -163,7 +163,7 @@ describe("Shocks inside the simulation", () => {
     s.applyShock(FED, "FED");
     expect(s.shocks).toEqual([]); // queued, not applied yet
     s.step();
-    expect(s.shocks).toEqual([{ time: 5_000, label: "FED", shock: FED, fairValueBefore: before, fairValueAfter: s.fundamental.value }]);
+    expect(s.shocks).toEqual([{ seq: 0, time: 5_000, label: "FED", shock: FED, fairValueBefore: before, fairValueAfter: s.fundamental.value }]);
     expect(s.fundamental.value / before).toBeCloseTo(0.97, 9);
     expect(Object.isFrozen(s.shocks[0])).toBe(true);
   });

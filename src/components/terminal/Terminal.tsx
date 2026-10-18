@@ -1,6 +1,9 @@
 "use client";
 
+import { useCallback, useState } from "react";
 import { Panel } from "@/components/Panel";
+import type { PresetResult } from "@/engine/feed";
+import { parseCommand } from "@/lib/command";
 import { formatInterval } from "@/lib/format";
 import { BookPanel } from "./BookPanel";
 import { CommandBar } from "./CommandBar";
@@ -16,7 +19,15 @@ import { useMarket } from "./useMarket";
  * shipped yet are simply not drawn, and the grid closes up around the ones that have.
  */
 export function Terminal() {
-  const { status, sendShock } = useMarket();
+  const [reply, setReply] = useState("Type FED, CEO, BEAT or DOWNGRADE and press Enter to send a headline.");
+  // The worker decides whether a headline is accepted (at most one per 3 s of sim time, D-051).
+  const onShockResult = useCallback((r: PresetResult) => setReply(r.ok ? `${r.code} · ${r.headline}` : r.message), []);
+  const { status, sendShock } = useMarket(onShockResult);
+  const onCommand = (text: string) => {
+    const cmd = parseCommand(text);
+    if (cmd.kind === "error") setReply(cmd.message);
+    if (cmd.kind === "shock") sendShock(cmd.code);
+  };
 
   if (status.kind === "opening") return <div className={styles.opening}>OPENING MARKET</div>;
   if (status.kind === "error") {
@@ -27,15 +38,15 @@ export function Terminal() {
     );
   }
 
-  const { frame, candles, tape, frameCount } = status.market;
+  const { frame, candles, tape, frameCount, headlines } = status.market;
   return (
     <div className={styles.shell}>
       <StatusBar frame={frame} />
       <TickerTape ticker={frame.ticker} trades={frame.trades} headlines={frame.headlines} frameCount={frameCount} />
-      <CommandBar onShock={sendShock} />
+      <CommandBar onCommand={onCommand} reply={reply} />
       <main className={styles.grid}>
         <Panel number={1} code="GP" title={`${frame.ticker} PRICE · ${formatInterval(frame.candleMs)} CANDLES`} className={styles.gp}>
-          <PriceChart candles={candles} candleMs={frame.candleMs} last={frame.last} headlines={frame.headlines} />
+          <PriceChart candles={candles} candleMs={frame.candleMs} last={frame.last} headlines={headlines} />
         </Panel>
         <Panel number={4} code="TAPE" title="TIME & SALES" className={styles.tape}>
           <TapePanel tape={tape} />

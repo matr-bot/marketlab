@@ -41,8 +41,18 @@ export interface SimulationObserver {
 
 export const DEFAULT_START_PRICE: Cents = 18_700;
 
+/** At most one headline per this much sim time (D-051): the market digests one before the next. */
+export const SHOCK_SPACING_MS = 3_000;
+/** Headlines (and their P&L records) kept; older ones are dropped. */
+export const SHOCK_HISTORY = 50;
+
+/** Accepted, or refused because the last headline was too recent (returned as data, never thrown). */
+export type ShockResult = { readonly ok: true } | { readonly ok: false; readonly reason: "SHOCK_TOO_SOON"; readonly message: string };
+
 /** A headline applied to the market: when, what it was called, and the (clamped) shock it caused. */
 export interface ShockEvent {
+  /** 0, 1, 2, … in the order applied; never reused, so a reader can tell new headlines from old. */
+  readonly seq: number;
   /** Sim ms: the start of the tick it was applied in. */
   readonly time: number;
   readonly label: string;
@@ -62,9 +72,19 @@ export const IMPACT_HORIZON_MS = 60_000;
  * they trade with value traders who know the news (D-047).
  */
 export interface ShockImpact {
+  /** The headline's `seq`. */
+  readonly seq: number;
   readonly time: number;
   readonly label: string;
   readonly pnlByType: Readonly<Partial<Record<AgentType, number>>> | null;
+}
+
+interface ImpactRecord {
+  readonly seq: number;
+  readonly time: number;
+  readonly label: string;
+  readonly start: Map<AgentType, number>;
+  pnlByType: Partial<Record<AgentType, number>> | null;
 }
 
 export class Simulation {
@@ -81,9 +101,14 @@ export class Simulation {
   readonly fundamental: Fundamental;
   /** The mid once per second, for drawdown windows. */
   readonly midHistory = new MidHistory();
-  private readonly pendingShocks: Array<{ shock: ShockParams; label: string }> = [];
+  private pendingShock: { shock: ShockParams; label: string } | null = null;
+  private lastShockTime: number | null = null;
+  private shockSeq = 0;
+  /** The last SHOCK_HISTORY headlines and their P&L records (open or finalized). */
   private readonly shockLog: ShockEvent[] = [];
-  private readonly impacts: Array<{ time: number; label: string; start: Map<AgentType, number>; pnlByType: Partial<Record<AgentType, number>> | null }> = [];
+  private readonly impacts: ImpactRecord[] = [];
+  /** Only records still inside their 60 s window are scanned each tick (at most 20, given the spacing). */
+  private openImpacts: ImpactRecord[] = [];
   /** Shares and cash (cents) per agent, from fills. */
   private readonly positions = new Map<string, number>();
   private readonly cash = new Map<string, number>();
@@ -130,10 +155,18 @@ export class Simulation {
 
   /**
    * Queue a headline. It is applied at the start of the next tick, before any agent acts, so the
-   * same seed + the same shocks at the same ticks always give the same market (D-043).
+   * same seed + the same shocks at the same ticks always give the same market (D-043). Refused,
+   * with nothing queued, if one is already waiting or the last was under SHOCK_SPACING_MS of sim
+   * time ago (D-051), so a burst of commands can never pile up work.
    */
-  applyShock(shock: ShockParams, label: string): void {
-    this.pendingShocks.push({ shock, label });
+  applyShock(shock: ShockParams, label: string): ShockResult {
+    const at = this.clock.now; // the next tick starts here
+    if (this.pendingShock !== null || (this.lastShockTime !== null && at < this.lastShockTime + SHOCK_SPACING_MS)) {
+      const waitMs = this.pendingShock !== null ? SHOCK_SPACING_MS : this.lastShockTime! + SHOCK_SPACING_MS - at;
+      return { ok: false, reason: "SHOCK_TOO_SOON", message: `The market is still digesting the last headline. Try again in ${Math.ceil(waitMs / 1000)} s.` };
+    }
+    this.pendingShock = { shock, label };
+    return { ok: true };
   }
 
   /** Every headline applied so far, oldest first. */
@@ -143,7 +176,7 @@ export class Simulation {
 
   /** Each headline's first-minute P&L by agent type (null until the minute has passed), oldest first. */
   get shockImpacts(): readonly ShockImpact[] {
-    return this.impacts.map(({ time, label, pnlByType }) => ({ time, label, pnlByType }));
+    return this.impacts.map(({ seq, time, label, pnlByType }) => ({ seq, time, label, pnlByType }));
   }
 
   /** The mid, or the last trade, or the opening price: what positions are marked to. */
@@ -164,11 +197,19 @@ export class Simulation {
   /** Advance one tick (100 ms): every arrival in the window acts, in exact time order. */
   step(): TickWindow {
     const window = this.clock.advance();
-    for (const { shock, label } of this.pendingShocks.splice(0)) {
+    if (this.pendingShock !== null) {
+      const { shock, label } = this.pendingShock;
+      this.pendingShock = null;
+      this.lastShockTime = window.start;
+      const seq = this.shockSeq++;
       const before = this.fundamental.value;
       const applied = this.fundamental.shock(shock, window.start);
-      this.shockLog.push(Object.freeze({ time: window.start, label, shock: applied, fairValueBefore: before, fairValueAfter: this.fundamental.value }));
-      this.impacts.push({ time: window.start, label, start: this.valueByType(), pnlByType: null });
+      this.shockLog.push(Object.freeze({ seq, time: window.start, label, shock: applied, fairValueBefore: before, fairValueAfter: this.fundamental.value }));
+      const record: ImpactRecord = { seq, time: window.start, label, start: this.valueByType(), pnlByType: null };
+      this.impacts.push(record);
+      this.openImpacts.push(record);
+      if (this.shockLog.length > SHOCK_HISTORY) this.shockLog.shift();
+      if (this.impacts.length > SHOCK_HISTORY) this.impacts.shift();
     }
     for (const arrival of this.scheduler.drain(window.end)) {
       this.observer.onArrival?.(arrival);
@@ -184,8 +225,9 @@ export class Simulation {
     const ask = this.engine.book.bestAsk();
     this.midHistory.onTickEnd(window.end, bid !== null && ask !== null ? bid + ask : null);
     this.fundamental.onTickEnd(window.end);
-    for (const imp of this.impacts) {
-      if (imp.pnlByType !== null || window.end < imp.time + IMPACT_HORIZON_MS) continue;
+    // Records open in sequence order and all last 60 s, so the due ones are always at the front.
+    while (this.openImpacts.length > 0 && window.end >= this.openImpacts[0].time + IMPACT_HORIZON_MS) {
+      const imp = this.openImpacts.shift()!;
       const pnl: Partial<Record<AgentType, number>> = {};
       for (const [type, v] of this.valueByType()) pnl[type] = Math.round(v - (imp.start.get(type) ?? 0));
       imp.pnlByType = Object.freeze(pnl);

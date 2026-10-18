@@ -6,8 +6,9 @@ import { referencePrice } from "./noiseTrader";
 
 // Value trader: a fundamentalist (D-044). It believes the stock is worth roughly fair value V, with
 // its own small, persistent offset plus a little fresh noise each time it looks. When the market is
-// far enough from its belief (beyond its own threshold), it trades toward the belief with a
-// marketable limit order that stops at belief ∓ threshold, so it never chases past its own view.
+// far enough from its belief (beyond its own threshold), it places a limit order at its margin,
+// belief ∓ threshold. That order trades immediately only when the gap is large enough to reach the
+// other side of the book; otherwise it rests. Either way it never chases past its own view.
 // Sources: Chiarella & Iori (2002), "A simulation analysis of the microstructure of double auction
 // markets", Quantitative Finance 2(5) (fundamentalist component); Farmer & Joshi (2002), "The price
 // dynamics of common trading strategies", JEBO 49 (value investors with entry thresholds and

@@ -51,3 +51,33 @@ describe("applyFrame: the page's view of the market, folded from frames", () => 
     expect([s.candles, s.tape, s.frameCount]).toEqual([[], [], 1]);
   });
 });
+
+describe("applyFrame: headlines", () => {
+  it("keeps each headline once and attaches its first-minute P&L when it arrives", () => {
+    const feed = new MarketFeed(createDemoMarket(), DEMO_SEED);
+    feed.advance(100);
+    let state = applyFrame(null, feed.frame());
+    feed.applyPreset("FED");
+    feed.advance(1);
+    state = applyFrame(state, feed.frame());
+    expect(state.headlines.map((h) => [h.code, h.pnlByType])).toEqual([["FED", null]]);
+    for (let i = 0; i < 61; i++) {
+      feed.advance(10);
+      state = applyFrame(state, feed.frame());
+    }
+    expect(state.headlines).toHaveLength(1);
+    expect(state.headlines[0].pnlByType?.marketMaker).toBeTypeOf("number");
+  });
+
+  it("keeps the last 50 headlines", () => {
+    const feed = new MarketFeed(createDemoMarket(), DEMO_SEED);
+    let state: MarketState | null = null;
+    for (let i = 0; i < 55; i++) {
+      feed.applyPreset("DOWNGRADE");
+      feed.advance(30);
+      state = applyFrame(state, feed.frame());
+    }
+    expect(state!.headlines).toHaveLength(50);
+    expect(state!.headlines[0].seq).toBe(5);
+  });
+});

@@ -10,6 +10,11 @@ describe("parseCommand: offline headlines from the command bar (D-048)", () => {
     expect(["FED", "CEO", "BEAT", "DOWNGRADE"].map((c) => parseCommand(c).kind)).toEqual(["shock", "shock", "shock", "shock"]);
   });
 
+  it("refuses anything over 200 characters without echoing it", () => {
+    expect(parseCommand("F".repeat(201))).toEqual({ kind: "error", message: "Commands are at most 200 characters." });
+    expect(parseCommand(" ".repeat(197) + "FED").kind).toBe("shock"); // exactly 200 is fine
+  });
+
   it("treats blank input as nothing", () => {
     expect(parseCommand("   ")).toEqual({ kind: "empty" });
   });

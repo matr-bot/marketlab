@@ -10,6 +10,8 @@ const BASE_SPEED = 50; // px per second when quiet
 const MAX_SPEED = 260;
 /** Waiting items beyond this many strip widths are skipped, so the strip shows recent trades (D-040). */
 const MAX_BACKLOG_WIDTHS = 2;
+/** At most this many items exist in the strip; the oldest are dropped (D-051). */
+export const MAX_TICKER_ITEMS = 20;
 /** On the first frame (the warm-up), only the most recent trades enter the strip. */
 const FIRST_FRAME_TRADES = 12;
 
@@ -31,7 +33,6 @@ export function TickerTape({ ticker, trades, headlines, frameCount }: { ticker: 
   const boxRef = useRef<HTMLDivElement>(null);
   const items = useRef<Item[]>([]);
   const seenFrame = useRef(0);
-  const seenHeadlines = useRef(0);
 
   // New trades from this frame join the end of the queue.
   useEffect(() => {
@@ -40,8 +41,9 @@ export function TickerTape({ ticker, trades, headlines, frameCount }: { ticker: 
     seenFrame.current = frameCount;
     const queue = items.current;
     const width = box.clientWidth;
-    // New headlines first: drop the trades still waiting to enter, then the headline enters next.
-    for (const h of headlines.slice(seenHeadlines.current)) {
+    // New headlines first (each arrives in exactly one frame): drop the trades still waiting to
+    // enter, then the headline enters next.
+    for (const h of headlines) {
       for (let i = queue.length - 1; i >= 0; i--) if (queue[i].x >= width && !queue[i].headline) queue.splice(i, 1)[0].el.remove();
       const el = document.createElement("span");
       el.className = `${styles.tickerItem} ${styles.headlineItem}`;
@@ -53,7 +55,6 @@ export function TickerTape({ ticker, trades, headlines, frameCount }: { ticker: 
       el.style.transform = `translateX(${item.x}px)`;
       queue.push(item);
     }
-    seenHeadlines.current = headlines.length;
     const fresh = frameCount === 1 ? trades.slice(-FIRST_FRAME_TRADES) : trades;
     for (const t of fresh) {
       const el = document.createElement("span");
@@ -76,6 +77,18 @@ export function TickerTape({ ticker, trades, headlines, frameCount }: { ticker: 
       skipped.el.remove();
       for (let j = i; j < queue.length; j++) queue[j].x -= skipped.w;
       waiting -= skipped.w;
+    }
+    // Never more than MAX_TICKER_ITEMS nodes: drop waiting trades first, then the oldest items.
+    while (queue.length > MAX_TICKER_ITEMS) {
+      const waitingTrade = queue.findIndex((it) => it.x >= width && !it.headline);
+      if (waitingTrade >= 0) {
+        // Not on screen yet: remove it and close the gap behind it.
+        const [dropped] = queue.splice(waitingTrade, 1);
+        dropped.el.remove();
+        for (let j = waitingTrade; j < queue.length; j++) queue[j].x -= dropped.w;
+      } else {
+        queue.shift()!.el.remove(); // the oldest, at the left edge
+      }
     }
   }, [frameCount, trades, headlines, ticker]);
 

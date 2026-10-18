@@ -31,8 +31,8 @@ scope.onmessage = (event) => {
       lastRequestAt = now;
       scope.postMessage({ type: "frame", frame: feed.frame() });
     } else if (msg.type === "shock") {
-      // The command bar only sends known codes; an unknown one is ignored rather than stopping the market.
-      feed?.applyPreset(msg.code);
+      // Never throws: an unknown code or a headline too soon after the last one is refused as data.
+      if (feed !== null) scope.postMessage({ type: "shock", result: feed.applyPreset(msg.code) });
     }
   } catch (err) {
     scope.postMessage({ type: "error", message: err instanceof Error ? err.message : String(err) });

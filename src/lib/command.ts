@@ -9,9 +9,12 @@ export type Command =
   | { readonly kind: "error"; readonly message: string };
 
 const CODES = PRESETS.map((p) => p.code).join(", ");
+/** Longest accepted command (D-051). */
+export const MAX_COMMAND_LENGTH = 200;
 
 /** `FED`, `fed`, `SHOCK FED` or `MLAB FED` → that preset; anything else → a friendly error. */
 export function parseCommand(input: string): Command {
+  if (input.length > MAX_COMMAND_LENGTH) return { kind: "error", message: `Commands are at most ${MAX_COMMAND_LENGTH} characters.` };
   const words = input.trim().split(/\s+/).filter((w) => w.length > 0);
   if (words.length === 0) return { kind: "empty" };
   const rest = words[0].toUpperCase() === "SHOCK" || words[0].toUpperCase() === "MLAB" ? words.slice(1) : words;

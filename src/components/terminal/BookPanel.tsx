@@ -65,7 +65,7 @@ export function BookPanel({ frame }: { frame: Frame }) {
         <span>PRICE</span>
       </div>
       <div className={styles.bookAsks}>
-        {frame.asks.length === 0 && height > 0 && <div className={`${styles.bookRow} ${styles.bookEmpty}`}>NO ASKS</div>}
+        {frame.asks.length === 0 && height > 0 && <div className={`${styles.bookRow} ${styles.bookEmpty}`}>NO ASKS · liquidity vacuum</div>}
         {asks.map((l) => (
           <Level key={`a${l.price}`} level={l} side="ASK" maxQty={maxQty} />
         ))}
@@ -77,7 +77,7 @@ export function BookPanel({ frame }: { frame: Frame }) {
         <span>{frame.bid === null || frame.ask === null ? "" : `MID ${formatMid(frame.bid, frame.ask)}`}</span>
       </div>
       <div className={styles.bookBids}>
-        {frame.bids.length === 0 && height > 0 && <div className={`${styles.bookRow} ${styles.bookEmpty}`}>NO BIDS</div>}
+        {frame.bids.length === 0 && height > 0 && <div className={`${styles.bookRow} ${styles.bookEmpty}`}>NO BIDS · liquidity vacuum</div>}
         {bids.map((l) => (
           <Level key={`b${l.price}`} level={l} side="BID" maxQty={maxQty} />
         ))}

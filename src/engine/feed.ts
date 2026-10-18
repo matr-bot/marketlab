@@ -35,17 +35,26 @@ export interface Candle {
   readonly volume: number;
 }
 
-/** A headline the market has received: when, what, how big, and (after 60 s) who made money. */
+/** A headline the market has received: when, what and how big. Sent once, in the frame after it lands. */
 export interface FrameHeadline {
+  /** The headline's sequence number (matches its later `FrameImpact`). */
+  readonly seq: number;
   /** Sim ms the shock was applied. */
   readonly time: number;
   readonly code: string;
   readonly headline: string;
   /** The (clamped) fair-value jump, as a fraction: −0.03 = −3%. */
   readonly fairValuePct: number;
-  /** First-minute P&L by agent type in cents, or null until 60 s have passed (D-047). */
-  readonly pnlByType: Readonly<Partial<Record<AgentType, number>>> | null;
 }
+
+/** A headline's first-minute P&L by agent type in cents (D-047). Sent once, when the minute is over. */
+export interface FrameImpact {
+  readonly seq: number;
+  readonly pnlByType: Readonly<Partial<Record<AgentType, number>>>;
+}
+
+/** What `applyPreset` did: queued the headline, or refused it (unknown code, or too soon after the last). */
+export type PresetResult = { readonly ok: true; readonly code: string; readonly headline: string } | { readonly ok: false; readonly message: string };
 
 export interface Frame {
   readonly seed: number;
@@ -71,8 +80,10 @@ export interface Frame {
   readonly candleMs: number;
   /** Candles created or changed since the last frame, oldest first. */
   readonly candles: readonly Candle[];
-  /** Every headline so far, oldest first (a handful at most, so it is sent whole). */
+  /** Headlines applied since the last frame (each is sent exactly once; D-051). */
   readonly headlines: readonly FrameHeadline[];
+  /** First-minute P&L records finalized since the last frame (each sent exactly once). */
+  readonly impacts: readonly FrameImpact[];
 }
 
 export interface FeedOptions {
@@ -106,6 +117,9 @@ export class MarketFeed {
   /** Index into `candles` of the oldest candle changed since the last frame, or null. */
   private dirtyFrom: number | null = null;
   private pending: FrameTrade[] = [];
+  /** Next headline / impact seq to send. */
+  private nextHeadline = 0;
+  private nextImpact = 0;
   private dropped = 0;
 
   constructor(
@@ -126,13 +140,14 @@ export class MarketFeed {
 
   /**
    * Queue the offline preset `code` (FED, CEO, BEAT, DOWNGRADE) for the start of the next tick.
-   * Returns its headline, or null for an unknown code (nothing is applied).
+   * Refused, with nothing applied, for an unknown code or under 3 s of sim time after the last
+   * headline (D-051).
    */
-  applyPreset(code: string): string | null {
+  applyPreset(code: string): PresetResult {
     const preset = presetByCode(code);
-    if (preset === undefined) return null;
-    this.sim.applyShock(preset.shock, preset.code);
-    return preset.headline;
+    if (preset === undefined) return { ok: false, message: `Unknown headline code "${code.slice(0, 20)}".` };
+    const r = this.sim.applyShock(preset.shock, preset.code);
+    return r.ok ? { ok: true, code: preset.code, headline: preset.headline } : { ok: false, message: r.message };
   }
 
   /** Run `ticks` ticks of the simulation and take in their fills. */
@@ -160,18 +175,30 @@ export class MarketFeed {
       droppedTrades: this.dropped,
       candleMs: this.candleMs,
       candles: this.dirtyFrom === null ? [] : this.candles.slice(this.dirtyFrom).map((c) => ({ ...c })),
-      headlines: this.sim.shocks.map((s, i) => ({
-        time: s.time,
-        code: s.label,
-        headline: presetByCode(s.label)?.headline ?? s.label,
-        fairValuePct: s.shock.fairValuePct,
-        pnlByType: this.sim.shockImpacts[i].pnlByType,
-      })),
+      headlines: this.newHeadlines(),
+      impacts: this.newImpacts(),
     };
     this.pending = [];
     this.dropped = 0;
     this.dirtyFrom = null;
     return frame;
+  }
+
+  /** Headlines with seq ≥ the next one to send; at most one per frame in practice (D-051). */
+  private newHeadlines(): FrameHeadline[] {
+    const out = this.sim.shocks
+      .filter((s) => s.seq >= this.nextHeadline)
+      .map((s) => ({ seq: s.seq, time: s.time, code: s.label, headline: presetByCode(s.label)?.headline ?? s.label, fairValuePct: s.shock.fairValuePct }));
+    if (out.length > 0) this.nextHeadline = out[out.length - 1].seq + 1;
+    return out;
+  }
+
+  /** Finalized impacts not sent yet. They finalize in seq order, so a single cursor is enough. */
+  private newImpacts(): FrameImpact[] {
+    const out: FrameImpact[] = [];
+    for (const i of this.sim.shockImpacts) if (i.seq >= this.nextImpact && i.pnlByType !== null) out.push({ seq: i.seq, pnlByType: i.pnlByType });
+    if (out.length > 0) this.nextImpact = out[out.length - 1].seq + 1;
+    return out;
   }
 
   private ingest(): void {

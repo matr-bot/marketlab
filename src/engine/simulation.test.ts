@@ -456,7 +456,7 @@ describe("Simulation: the agent context", () => {
     const t = sim.shocks[0].time;
     sim.run(598); // last tick end 5,000 + 59,900
     expect(sim.clock.now).toBe(t + 59_900);
-    expect(sim.shockImpacts).toEqual([{ time: t, label: "TEST", pnlByType: null }]);
+    expect(sim.shockImpacts).toEqual([{ seq: 0, time: t, label: "TEST", pnlByType: null }]);
     sim.run(1); // tick end exactly 60 s after: now fixed
     // The trade before the headline is not counted. After it, the value trader paid 18,750 × 100 for
     // shares marked at the mid 18,700: −5,000¢; the maker the opposite.

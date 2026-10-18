@@ -233,19 +233,51 @@ describe("The real clock decides only HOW MANY ticks run, never what happens in 
   }, 30_000); // four 77-agent markets: a few seconds under coverage instrumentation
 });
 
-describe("MarketFeed: headlines (D-048)", () => {
-  it("applies a preset at the next tick and reports it in every frame, with its P&L after 60 s", () => {
+describe("MarketFeed: headlines (D-048, D-051)", () => {
+  it("applies a preset at the next tick, sends it once, then sends its P&L once after 60 s", () => {
     const feed = feedOf();
     feed.advance(600);
-    expect(feed.applyPreset("fed")).toBe("Fed surprise hike 75bps"); // codes are case-insensitive
+    expect(feed.applyPreset("fed")).toEqual({ ok: true, code: "FED", headline: "Fed surprise hike 75bps" }); // case-insensitive
     expect(feed.frame().headlines).toEqual([]); // queued, not applied until the next tick
     feed.advance(1);
-    const [h] = feed.frame().headlines;
-    expect(h).toEqual({ time: 60_000, code: "FED", headline: "Fed surprise hike 75bps", fairValuePct: -0.03, pnlByType: null });
+    expect(feed.frame().headlines).toEqual([{ seq: 0, time: 60_000, code: "FED", headline: "Fed surprise hike 75bps", fairValuePct: -0.03 }]);
+    expect(feed.frame().headlines).toEqual([]); // sent exactly once
+    feed.advance(598);
+    expect(feed.frame().impacts).toEqual([]); // 59.9 s: not final yet
+    feed.advance(1);
+    const [impact] = feed.frame().impacts;
+    expect(impact.seq).toBe(0);
+    expect(impact.pnlByType.marketMaker).toBeTypeOf("number");
+    feed.advance(100);
+    expect(feed.frame().impacts).toEqual([]); // sent exactly once
+  });
+
+  it("refuses a headline under 3 s of sim time after the last, with nothing queued; accepts it after", () => {
+    const feed = feedOf();
+    expect(feed.applyPreset("FED").ok).toBe(true);
+    expect(feed.applyPreset("CEO")).toEqual({ ok: false, message: "The market is still digesting the last headline. Try again in 3 s." }); // one already waiting
+    feed.advance(1); // FED lands at 0 ms
+    feed.advance(10); // 1.1 s
+    expect(feed.applyPreset("CEO")).toEqual({ ok: false, message: "The market is still digesting the last headline. Try again in 2 s." });
+    feed.advance(19); // 3.0 s: the next tick starts exactly 3 s after FED
+    expect(feed.applyPreset("CEO").ok).toBe(true);
+    feed.advance(1);
+    expect(feed.sim.shocks.map((s) => [s.label, s.time])).toEqual([["FED", 0], ["CEO", 3_000]]);
+  });
+
+  it("refuses as data with a reason code; a waiting headline blocks the next even late in the session", () => {
+    const feed = feedOf();
     feed.advance(600);
-    const later = feed.frame().headlines[0];
-    expect(later.pnlByType).not.toBeNull();
-    expect(later.pnlByType!.marketMaker).toBeTypeOf("number");
+    expect(feed.sim.applyShock(PRESETS[0].shock, "FED")).toEqual({ ok: true });
+    expect(feed.sim.applyShock(PRESETS[0].shock, "FED")).toEqual({
+      ok: false,
+      reason: "SHOCK_TOO_SOON",
+      message: "The market is still digesting the last headline. Try again in 3 s.",
+    });
+  });
+
+  it("echoes at most 20 characters of an unknown code", () => {
+    expect(feedOf().applyPreset("X".repeat(150))).toEqual({ ok: false, message: `Unknown headline code "${"X".repeat(20)}".` });
   });
 
   it("shows a shock applied with any other label (Tuesday's AI headlines) under that label", () => {
@@ -255,13 +287,51 @@ describe("MarketFeed: headlines (D-048)", () => {
     expect(feed.frame().headlines[0]).toMatchObject({ code: "Chip supplier fire", headline: "Chip supplier fire", fairValuePct: 0.01 });
   });
 
-  it("ignores an unknown code: nothing is applied", () => {
+  it("refuses an unknown code: nothing is applied", () => {
     const feed = feedOf();
-    expect(feed.applyPreset("MOON")).toBeNull();
+    expect(feed.applyPreset("MOON")).toEqual({ ok: false, message: 'Unknown headline code "MOON".' });
     feed.advance(10);
     expect(feed.frame().headlines).toEqual([]);
     expect(feed.sim.shocks).toEqual([]);
   });
+
+  it("1,000 rapid FED commands: bounded work per frame, bounded memory, never stuck", () => {
+    const feed = feedOf();
+    feed.advance(600);
+    let accepted = 0;
+    let maxHeadlines = 0;
+    let maxImpacts = 0;
+    const t0 = performance.now();
+    for (let i = 0; i < 1_000; i++) {
+      // Ten commands per tick, as if typed into a busy page: 100 ticks = 10 s of sim time.
+      if (feed.applyPreset("FED").ok) accepted++;
+      if (i % 10 === 9) feed.advance(1);
+      const f = feed.frame();
+      maxHeadlines = Math.max(maxHeadlines, f.headlines.length);
+      maxImpacts = Math.max(maxImpacts, f.impacts.length);
+    }
+    for (let i = 0; i < 100; i++) {
+      feed.advance(10);
+      maxImpacts = Math.max(maxImpacts, feed.frame().impacts.length);
+    }
+    expect(accepted).toBe(4); // at 0, 3, 6 and 9 s of the 10 s burst
+    expect([maxHeadlines, maxImpacts]).toEqual([1, 1]);
+    expect(feed.sim.shocks).toHaveLength(4);
+    expect(performance.now() - t0).toBeLessThan(5_000);
+  });
+
+  it("keeps at most 50 headlines and P&L records however long the session", () => {
+    const feed = feedOf();
+    for (let i = 0; i < 70; i++) {
+      expect(feed.applyPreset(i % 2 === 0 ? "BEAT" : "DOWNGRADE").ok).toBe(true);
+      feed.advance(30);
+    }
+    feed.advance(600);
+    expect(feed.sim.shocks).toHaveLength(50);
+    expect(feed.sim.shockImpacts).toHaveLength(50);
+    expect(feed.sim.shocks[0].seq).toBe(20);
+    expect(feed.sim.shockImpacts.every((i) => i.pnlByType !== null)).toBe(true);
+  }, 30_000);
 });
 
 describe("TickPacer: real ms → whole 100 ms ticks", () => {

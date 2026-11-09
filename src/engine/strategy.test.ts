@@ -355,3 +355,11 @@ describe("StrategyRunner: the record of what the rules read (the glass box's inp
     expect(runner.mids[0][0]).toBe(2_000);
   });
 });
+
+describe("StrategyRunner: STOP right after a fully filled exit", () => {
+  it("sends nothing: the shares are already gone, though the runner only notices at the next second", () => {
+    const { runner } = drive(spec({ stopLossPct: null, takeProfitPct: null, timeExitSec: 1 }), [20_000, 19_400, 19_400]); // entry at 1 s, exit at 2 s, both filled
+    expect([runner.position, runner.isClosing]).toEqual([0, true]);
+    expect(runner.stop(2_500, 19_400)).toBeNull();
+  });
+});

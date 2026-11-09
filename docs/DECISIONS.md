@@ -1604,3 +1604,148 @@ command:
 **Tested.** `command.test.ts`: every pre-existing test unchanged, plus fifteen real-looking headlines
 that start with command words, and number-after-command errors. A Playwright test sends "Buy now, pay
 later lender collapses" with the AI mocked and checks it reaches the AI preview, not the order ticket.
+
+---
+
+## D-062 · The student's strategy: a fixed rule menu, decided once a sim second, traded as the student
+
+**Date:** 2026-11-09 · **Status:** Accepted
+
+**Decision.** A `StrategySpec` (`engine/strategy.ts`) is data from a fixed menu, never code: one
+entry rule (buy or sell short after a drop or a rise of X% within N s, measured from the window's
+high or low), any of three exits (stop loss and take profit measured from the entry's arrival mid,
+and a time exit), a size and a cooldown. `clampStrategy` clamps every number (move 0.1–20%, window
+5–300 s, stop 0.1–20%, target 0.1–50%, time exit 5–3,600 s, 1–10,000 shares, cooldown 0–600 s)
+and adds a 300 s time exit if every exit is off. `StrategyRunner` is a pure state machine.
+
+- **Cadence (a deliberate exception to D-023).** The runner decides at the start of each tick that
+  begins on a whole sim second, from the mid MidHistory sampled at that second, not at Poisson
+  arrival times. A fixed one-second check is what a student expects and what the glass box's
+  Python can reproduce exactly (D-065). Step order: scheduled shocks, pending shock, user commands,
+  **strategy**, agent arrivals.
+- **Reference price.** Stops and targets are measured from the arrival mid of the entry (the price
+  the student intended, D-010), so the rules are a pure function of the price; what the fill cost is
+  EXR's job. Every decision records the numbers it compared, for the glass box.
+- **Orders.** Market orders sent as the student (`user`), through the same path as manual orders:
+  fills carry arrival quotes and appear in EXR (SRC = STRAT) and on the desk. Because the account is
+  shared, self-trade prevention (D-008) cancels a manual resting order that the strategy's order
+  would hit, as on a real desk where an algorithm and its trader share an account (tested).
+- **Own shares only.** The runner tracks its own position and cash from its own fills; an exit
+  closes only those, never the student's manual shares. One position at a time.
+- **Closing retries.** Right after FED the bid side is empty for a few seconds (docs/LATER.md), so a
+  closing order can be refused or only partly filled. Found by a test: STOP left 500 shares behind.
+  The runner now stays "closing" and retries a market order for what it still holds once a second
+  until flat, with no new entries meanwhile; retries are execution, not rule decisions, so they are
+  in EXR but not in the decision log. A replaced or stopped strategy keeps closing until flat.
+- **Commands.** `startStrategy` / `stopStrategy` go through the user command queue (D-056), so they
+  take effect at a tick start like any order. Starting a new strategy stops the old one first.
+  RERUN, SEED and SCN start a running strategy again at the open, so the same seed and spec give
+  the same run.
+
+**Tested.** `strategy.test.ts` (every rule at its exact threshold and half a cent away, exits for
+longs and shorts, cooldown, closing retries, caps), `userStrategy.test.ts` (the FED demo on seed 187,
+identical fill logs across tick batching, manual shares untouched, STOP and replacement, self-trade
+prevention, frames). Demo check: FED on seed 187 triggers a 3% drop within 60 s whether sent at +0,
++10, +30 or +60 s (deepest 60 s drop 3.71–4.25%); no retuning.
+
+**Mutation.** See D-065's numbers under Tested; survivors in docs/LATER.md.
+
+---
+
+## D-063 · Sharpe annualized with the sim's clock; max drawdown
+
+**Date:** 2026-11-09 · **Status:** Accepted (replaces D-032's "no annualizing" for Sharpe only)
+
+**Decision.** `engine/metrics.ts` is the one definition, used by the frame, the formulas on screen
+and the generated Python:
+- Equity E = the strategy's own cash + its shares × mid, once per evaluated sim second.
+  Returns r_t = (E_t − E_(t−1)) ÷ capital, where capital = size × the first mid the strategy saw.
+- Sharpe = (mean(r) − r_f) ÷ sd(r) × √(periods per year), with the sample standard deviation
+  (n − 1). One return per sim second, and a trading year of 252 sessions × 23,400 s (09:30–16:00),
+  so periods per year = 5,896,800 and the factor is √5,896,800 ≈ 2,428.33. The 252 is sessions per
+  year, never "each sample is a day": the sample interval comes from the sim clock. r_f = 4% a year
+  (a round figure near short T-bill yields) ÷ 5,896,800 per second. Null with fewer than 2 returns
+  or none varying.
+- Max drawdown: the largest fall of E from its running peak, in dollars and as a share of capital.
+- **Honesty about noise.** The panel and the glass box always show how many one-second returns are
+  behind the number, with a note that short runs are noisy and a Sharpe from minutes of data means
+  little: on the demo it reads above 100 after a minute, which is the mission 7 lesson, not skill.
+
+**Tested.** `metrics.test.ts` (hand-computed series), and exact equality with the Python (D-065).
+
+---
+
+## D-064 · Plain English → StrategySpec through /api/interpret; offline parser labelled offline
+
+**Date:** 2026-11-09 · **Status:** Accepted
+
+**Decision.** The same route, model, 6 s timeout, no retry, rate limits and failure handling as
+headlines (D-052). A body `{"kind": "strategy", "text": …}` (1–300 characters) is a strategy;
+every other body is a headline, exactly as before.
+- **Contract.** `StrategyModelOutput`: the entry rule is an enum of the engine's four; percents and
+  seconds are plain numbers; exits may be null. An idea the menu cannot express ("buy when the CEO
+  tweets", moving averages) answers `expressible: "no"` with a reason, and the page says what the
+  menu can do instead of forcing a rule. The server clamps with the engine's `clampStrategy`; the
+  reason is stripped of digits. The text sits in `<strategy>` tags as data; injection can at most
+  pick an in-range rule. Defaults when the text gives no number: 60 s window, stop 2%, target 2%,
+  time exit 300 s (only if no exit is named), 500 shares, 30 s cooldown.
+- **Offline.** `parseStrategyOffline` reads only plain menu phrasing (a side word, a drop or rise
+  word, a percent, optional window, exits and size) and returns null rather than guess; "sellers"
+  is not "sell". It runs on the server with no key or on any model failure, and in the page if the
+  route is unreachable. Its results are always labelled "UNDERSTOOD OFFLINE · NOT THE AI" and carry
+  no reason, so they are never mistaken for the AI's.
+- **Preview.** The spec is shown editable, with a plain-English line per rule (`glassbox/english.ts`),
+  before it trades; START (or Enter on an empty command bar) starts it.
+
+**Tested.** `strategyInterpret.test.ts` (schema, clamping, unsupported ideas, every failure path,
+rate limit, offline parser cases), route tests, and a hand-run live check
+(`LIVE=1 npx vitest run src/lib/interpret.live.test.ts`) with unsupported ideas and injections.
+
+---
+
+## D-065 · The glass box: Python generated from the spec, proved equal to the engine
+
+**Date:** 2026-11-09 · **Status:** Accepted
+
+**Decision.** "Show me what I built" opens a full-screen overlay: English (the student's sentence,
+the AI's reason or the offline label) → rules (the spec) → formulas with this run's numbers (from the
+decision log and the frame's metrics) → Python. The Python (`glassbox/python.ts`) is generated from
+the spec the engine is running by a template, never by the LLM. It mirrors `strategy.ts` and
+`metrics.ts` operation for operation (`ref * (1 - pct)`, plain left-to-right loops: Python 3.12+'s
+`sum()` uses compensated summation and would differ in the last bits). The runner records exactly
+what its rules read (the window before its first second, then every evaluated second), and the glass
+box can download that as `run.json`, so `python3 strategy.py run.json` gives a student the same
+decisions and Sharpe.
+
+**Known difference.** If the book cannot take a whole exit, the engine keeps closing and holds off
+new entries until flat (D-062); plain Python does not see the book, so only then can the two differ.
+The glass box says so.
+
+**Tested.** `strategyPython.test.ts` runs the generated program with `python3 -I` and requires the
+engine's decisions, Sharpe and max drawdown **exactly**: on live runs (the FED demo on seed 187, a
+short through the whipsaw, both other rules in a calm market and a crash), with the recorded input
+checked against mids the test samples itself (its warm-up on an identical twin market), and on
+scripted prices that land exactly on every level, on the window's edge and inside a cooldown. It
+**fails, never skips**, if python3 is missing (GitHub's ubuntu runners have it). Deliberate breaks
+of the Python (`<` for `<=`, no cooldown, an open window edge, both stop comparisons, the short
+target formula, the mean over n − 1, the time-exit boundary) each fail it; the one that does not
+("take profit checked even after a stop") is equivalent, since both cannot trigger at once.
+Mutation on the engine side: strategy.ts 85.0% → 98.0% and metrics.ts 95.1% after the edge tests;
+every remaining survivor is equivalent (listed in docs/LATER.md).
+
+---
+
+## D-066 · Function codes open in the active panel; STRAT takes slot 7 back from NEWS
+
+**Date:** 2026-11-09 · **Status:** Accepted (completes D-059's slot-7 note)
+
+**Decision.** Typing a function code alone (`GP`, `WHO`, `CHAT`, `TAPE`, `BOOK`, `TKT`, `STRAT`,
+`NEWS`, `EXR`, or after `MLAB`) opens it in the active panel; a code already on screen swaps places
+with it, so nothing is shown twice. The active panel is panel 7 until another panel is clicked (amber
+border). The default layout is now CLAUDE.md's: 7 is STRAT. NEWS opens by code; an assigned
+scenario (`?scn=…`) and `SCN <name>` open with NEWS in the active panel so the brief is read first.
+Following D-061, a code followed by words is a headline ("Tape shows heavy selling"), except
+`STRAT <idea>` (not an English word: a strategy) and `NEWS <headline>` (the headline, prefix
+dropped). `STOP` alone stops the strategy; "Stop-loss orders pile up" is a headline.
+
+**Tested.** `command.test.ts`; e2e opens NEWS by its code and runs the demo from STRAT in panel 7.

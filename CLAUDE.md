@@ -80,7 +80,7 @@ then grows day by day with the roadmap:
 | --- | --- |
 | Sun 10/18 | Theme (black / amber / white, flash rules), status bar, scrolling ticker, default-layout grid, `GP` (price chart), `TAPE`, `BOOK` basics (best bid/ask, top levels) |
 | Tue 10/20 | `NEWS` headline input (with the command bar, codes for panels that exist), `CHAT` (desk chat / narrator), `WHO` (click a candle in `GP`) |
-| Wed 10/21 | `STRAT` + the strategy agent + glass box reveal, `TKT` manual trading (✅ shipped early, D-056) |
+| Wed 10/21 | `STRAT` + the strategy agent + glass box reveal (✅ D-062 to D-066), `TKT` manual trading (✅ shipped early, D-056) |
 | Thu 10/22 | `EXR` (slippage split, P&L) (✅ shipped early, D-058) |
 | Cut unless ahead | `CROWD`, missions, full `BOOK` depth view, realism panel, Learn / Pro modes (with the per-panel "On a professional terminal…" notes), rewind with the `REPLAY` label, what-if reruns, `ASK`, shortcut strip, hover formulas, `HELP`, function codes beyond existing panels |
 
@@ -385,13 +385,18 @@ New priority: everything visible. The engine is strong; judges can only grade wh
   command queue, `EXR` execution report (slippage split into spread and impact, P&L on the desk),
   `NEWS` scenario panel (slot 7 until `STRAT` ships), six assignable scenarios with `?scn=&seed=`
   links, PAUSE / RUN / SPEED / SEED / RERUN / LINK, `HELP` overlay, a bottom control strip.
-- **Wed 10/21:** strategy agent (StrategySpec via the same route) + glass box (`STRAT` takes slot 7;
-  `NEWS` moves to on-demand). `TKT` ✅ done early.
-- **Thu 10/22:** tuning; `EXR` ✅ done early (Sharpe and drawdown still "if time").
+- **Wed 10/21 ✅ (D-062 to D-066):** strategy agent from a fixed rule menu (StrategySpec via the same
+  route, offline parser labelled offline), STRAT in slot 7, glass box (English → rules → formulas
+  with real numbers → template-generated Python, proved equal to the engine by running it), Sharpe
+  annualized with the sim clock and max drawdown, function codes in the active panel (NEWS by code).
+  `TKT` ✅ done early.
+- **Thu 10/22:** tuning; `EXR` ✅ done early. Open items in docs/LATER.md (GP trade markers, EXR
+  subtotals by source, the live strategy-prompt check).
 - **Fri 10/23:** feature freeze, bug bash, demo script, backup video.
 - **Cut unless ahead:** momentum, whale, missions, full depth view, realism panel, Learn/Pro,
   rewind, what-if, `ASK`, shortcut strip.
-- **If time:** Sharpe ratio and max drawdown in `EXR`; a Limit Up–Limit Down band (±5% around the
+- **If time:** Sharpe and max drawdown in `EXR` (they exist for the strategy, in STRAT and the glass
+  box); a Limit Up–Limit Down band (±5% around the
   5-minute average price, the real rule for large stocks: a 15 s limit state, then a short trading
   pause), with CEO as the halt demo (D-051). When it is built, check FED on the demo seed (187) so
   the main demo never halts unexpectedly.

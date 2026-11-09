@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { createDemoMarket, DEMO_SEED } from "@/engine/demoMarket";
 import { MarketFeed, type Frame } from "@/engine/feed";
-import { applyFrame, MAX_CANDLES, MAX_TAPE, type MarketState } from "./marketState";
+import { createScenarioMarket, scenarioById } from "@/engine/scenarios";
+import { applyFrame, MAX_CANDLES, MAX_TAPE, scenarioProgress, type MarketState } from "./marketState";
 
 /** Fold `n` frames taken every `ticks` ticks, as the page does. */
 function fold(n: number, ticks: number, feed = new MarketFeed(createDemoMarket(), DEMO_SEED)) {
@@ -79,5 +80,72 @@ describe("applyFrame: headlines", () => {
     }
     expect(state!.headlines).toHaveLength(50);
     expect(state!.headlines[0].seq).toBe(5);
+  });
+});
+
+describe("applyFrame: the student's desk, orders and execution report", () => {
+  const scenario = scenarioById("quiet-buy")!;
+  const fresh = () => new MarketFeed(createScenarioMarket(scenario), scenario.seed);
+
+  it("remembers when the scenario opened, and keeps the latest desk and report", () => {
+    const feed = fresh();
+    let state = applyFrame(null, feed.frame());
+    expect(state.startTime).toBe(feed.sim.clock.now);
+    expect(state.desk.position).toBe(0);
+    expect(state.exr).toBeNull();
+    feed.submitOrder({ type: "market", side: "buy", qty: 800 });
+    feed.advance(1);
+    state = applyFrame(state, feed.frame());
+    const withReport = state.exr;
+    expect(state.startTime).toBe(feed.sim.clock.now - 100); // unchanged by later frames
+    expect(state.desk.position).toBe(800);
+    expect(withReport?.totals.qty).toBe(800);
+    feed.advance(5);
+    state = applyFrame(state, feed.frame()); // nothing new: the report is kept, not cleared
+    expect(state.exr).toBe(withReport);
+  });
+
+  it("keeps the last 50 order outcomes, oldest first", () => {
+    const feed = fresh();
+    let state: MarketState | null = null;
+    for (let i = 0; i < 60; i++) {
+      feed.submitOrder({ type: "limit", side: "buy", qty: 100, price: 100 });
+      feed.advance(1);
+      state = applyFrame(state, feed.frame());
+    }
+    expect(state!.userEvents).toHaveLength(50);
+    expect(state!.userEvents[0].seq).toBe(10);
+    expect(state!.userEvents.at(-1)!.seq).toBe(59);
+  });
+
+  it("scenarioProgress: price since the open, and progress toward the target", () => {
+    const feed = fresh();
+    let state = applyFrame(null, feed.frame());
+    let p = scenarioProgress(state, scenario);
+    expect(p.elapsedSec).toBe(0);
+    expect(p.open).not.toBeNull();
+    expect(p.target).toEqual({ side: "buy", qty: 50_000, filled: 0, remaining: 50_000, slippageBps: null });
+    feed.submitOrder({ type: "market", side: "buy", qty: 5_000 });
+    feed.advance(300);
+    state = applyFrame(state, feed.frame());
+    p = scenarioProgress(state, scenario);
+    expect(p.elapsedSec).toBe(30);
+    expect(p.target).toMatchObject({ filled: 5_000, remaining: 45_000 });
+    expect(p.target!.slippageBps).toBeGreaterThan(0);
+    expect(p.low!).toBeLessThanOrEqual(p.last!);
+    expect(p.high!).toBeGreaterThanOrEqual(p.last!);
+    expect(p.changePct).toBeCloseTo((p.last! - p.open!) / p.open!, 12);
+    // A scenario without a target reports none.
+    expect(scenarioProgress(state, scenarioById("rate-shock")!).target).toBeNull();
+  });
+
+  it("a sell target counts shares held short, and never more than the target", () => {
+    const sellScenario = { ...scenario, target: { side: "sell" as const, qty: 1_000 } };
+    const feed = fresh();
+    let state = applyFrame(null, feed.frame());
+    feed.submitOrder({ type: "market", side: "sell", qty: 2_500 });
+    feed.advance(1);
+    state = applyFrame(state, feed.frame());
+    expect(scenarioProgress(state, sellScenario).target).toMatchObject({ filled: 1_000, remaining: 0 });
   });
 });

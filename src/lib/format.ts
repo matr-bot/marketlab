@@ -54,3 +54,51 @@ const TRADER_NAMES: Record<string, string> = {
 export function traderName(type: string): string {
   return TRADER_NAMES[type] ?? type;
 }
+
+const dollarsFormat = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** Cents as dollars: 1234 → "$12.34"; -310 → "-$3.10". With `signed`, a gain shows "+": 1234 → "+$12.34". Zero is "$0.00". */
+export function formatDollars(cents: number, signed = false): string {
+  const abs = Math.abs(cents);
+  const sign = cents < 0 ? "-" : signed && cents > 0 ? "+" : "";
+  return `${sign}$${dollarsFormat.format(abs / 100)}`;
+}
+
+/** A price that is an average and so may fall between cents, shown to the cent: 18701.3333 → "187.01". */
+export function formatAvgPrice(cents: number): string {
+  return dollarsFormat.format(cents / 100);
+}
+
+/** Cents per share with two decimals, signed: 1.3333 → "1.33", -0.5 → "-0.50"; null → "—". */
+export function formatCentsPerShare(cents: number | null): string {
+  if (cents === null) return "—";
+  const text = Math.abs(cents).toFixed(2);
+  return cents < 0 && text !== "0.00" ? `-${text}` : text;
+}
+
+/** Basis points with one decimal: 0.713 → "0.7"; null → "—". */
+export function formatBps(bps: number | null): string {
+  if (bps === null) return "—";
+  const text = Math.abs(bps).toFixed(1);
+  return bps < 0 && text !== "0.0" ? `-${text}` : text;
+}
+
+/** Whole seconds as m:ss — 65 → "1:05", 600 → "10:00". */
+export function formatElapsed(totalSeconds: number): string {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+/**
+ * Half-cents as dollars, exactly: 400 → "$2.00", 401 → "$2.005", -3 → "-$0.015". The execution report
+ * is kept in half-cents (a mid can fall on a half cent), so showing at most three decimals keeps
+ * spread + impact + resting fills adding up to the total on screen, with no rounding.
+ */
+export function formatDollarsX2(x2: number): string {
+  const sign = x2 < 0 ? "-" : "";
+  const abs = Math.abs(x2);
+  const dollars = Math.floor(abs / 200);
+  const half = abs % 200; // half-cents left over, 0..199
+  const cents = String(Math.floor(half / 2)).padStart(2, "0");
+  return `${sign}$${qtyFormat.format(dollars)}.${cents}${half % 2 === 1 ? "5" : ""}`;
+}

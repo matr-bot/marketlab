@@ -11,11 +11,11 @@ const warm = (): Simulation => {
   return sim;
 };
 
-/** Rest a sell limit of `qty` at the best ask (joining the queue there), and run until the book has taken it all. */
-function restAndWait(qty: number) {
+/** Rest a limit of `qty` at the best price on its side (joining the queue there), and run until the book has taken it all. */
+function restAndWait(qty: number, side: "buy" | "sell" = "sell") {
   const sim = warm();
-  const price = sim.engine.book.bestAsk()!;
-  sim.submitUserOrder({ type: "limit", side: "sell", price, qty });
+  const price = side === "sell" ? sim.engine.book.bestAsk()! : sim.engine.book.bestBid()!;
+  sim.submitUserOrder({ type: "limit", side, price, qty });
   sim.step();
   expect(sim.userEvents.at(-1)).toMatchObject({ kind: "order", status: "resting", restingQty: qty });
   for (let i = 0; i < 6_000 && sim.desk.openOrders.length > 0; i++) sim.step();
@@ -30,6 +30,12 @@ describe("fills of the student's resting orders are announced", () => {
     expect(fills.at(-1)).toMatchObject({ kind: "fill", source: "manual", side: "sell", orderType: "limit", requestedQty: 100, limitPrice: price, status: "filled", filledQty: 100, avgPrice: price, restingQty: 0 });
     expect(sim.desk.position).toBe(-100);
     expect(fills[0].ref).toBe(sim.userEvents[0].ref); // the same order the "resting" event announced
+  });
+
+  it("a resting buy is announced too, from the sell side's fills", () => {
+    const { sim, price } = restAndWait(100, "buy");
+    expect(sim.userEvents.filter((e) => e.kind === "fill").at(-1)).toMatchObject({ side: "buy", limitPrice: price, status: "filled", filledQty: 100, message: "" });
+    expect(sim.desk.position).toBe(100);
   });
 
   it("a big order fills in parts: 'partial' with what is filled and what still rests, then 'filled'", () => {

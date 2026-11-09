@@ -97,9 +97,9 @@ export function BookPanel({ frame }: { frame: Frame }) {
         ))}
       </div>
       {beyond.length > 0 && (
-        <div className={`${styles.bookRow} ${styles.bookBeyond}`} data-testid="book-beyond">
-          YOUR ORDER{beyond.length === 1 ? "" : "S"}: {beyond.slice(0, 2).map((o) => `${o.side === "buy" ? "BUY" : "SELL"} ${formatQty(o.qty)} @ ${formatPrice(o.price)}`).join(" · ")}
-          {beyond.length > 2 ? ` · +${beyond.length - 2} more` : ""} · beyond the levels shown
+        <div className={`${styles.bookRow} ${styles.bookBeyond}`} data-testid="book-beyond" title={beyond.map((o) => `Your ${o.side} order: ${formatQty(o.qty)} @ ${formatPrice(o.price)}, beyond the levels shown`).join("\n")}>
+          YOUR {beyond.slice(0, 1).map((o) => `${o.side === "buy" ? "BUY" : "SELL"} ${formatQty(o.qty)} @ ${formatPrice(o.price)}`)}
+          {beyond.length > 1 ? ` +${beyond.length - 1} more` : ""} · further out
         </div>
       )}
     </div>

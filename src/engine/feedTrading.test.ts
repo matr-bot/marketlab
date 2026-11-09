@@ -98,6 +98,12 @@ describe("custom headlines (applyCustomShock)", () => {
     expect(r).toEqual({ ok: true, code: "CUSTOM", headline: "Custom shock: fair value -20.0%, panic 3× for 10 s", note: "capped to the engine's limits: fair value -90.0% → -20.0%, panic 99× → 3×, 5 s → 10 s" });
   });
 
+  it("names a capped rise with its sign, and capped multipliers", () => {
+    const feed = feedFor();
+    const r = feed.applyCustomShock({ fairValuePct: 9.99, panicSensitivity: 1, durationSec: 300, volatilityMultiplier: 9, liquidityMultiplier: 0 });
+    expect(r).toMatchObject({ ok: true, note: "capped to the engine's limits: fair value +999.0% → +20.0%, volatility 9× → 3×, liquidity 0× → 0.25×" });
+  });
+
   it("says nothing was capped when nothing was", () => {
     const feed = feedFor();
     expect(feed.applyCustomShock({ fairValuePct: 0.05, panicSensitivity: 1, durationSec: 300, volatilityMultiplier: 1, liquidityMultiplier: 1 })).not.toHaveProperty("note");

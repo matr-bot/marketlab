@@ -404,7 +404,7 @@ export function Terminal() {
       case "BOOK":
         return { title: `${frame.ticker} DEPTH`, body: <BookPanel frame={frame} /> };
       case "TKT":
-        return { title: "ORDER TICKET", meta: "SIMULATED · NO REAL MONEY", body: <TicketPanel frame={frame} lastEvent={latestEvent} paused={paused} onCommand={onCommand} /> };
+        return { title: "ORDER TICKET", meta: "NO REAL MONEY", body: <TicketPanel frame={frame} lastEvent={latestEvent} paused={paused} onCommand={onCommand} /> };
       case "STRAT":
         return {
           title: "STRATEGY",

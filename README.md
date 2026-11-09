@@ -104,6 +104,16 @@ traders reprice, panic sellers cascade and market makers pull back. What exists 
 - [x] A desk-chat narrator that explains the move from engine numbers ("Value traders sold 20,749
       shares in the first 5 s", "Market makers lost $29,281 to informed traders"), and "who moved
       the price?" for the last minute or any clicked candle, with exact shares
+- [x] Trade against the crowd: `BUY 500`, `SELL 5K @ 187.25` or the order ticket (`TKT`) send
+      orders through a deterministic command queue, so your own orders move the price, and the
+      ticket estimates the cost from the book on screen before you send
+- [x] An execution report (`EXR`): each order's average price against the mid when it arrived,
+      split exactly into spread cost and impact cost (half-cent arithmetic, so the parts add up to
+      the total on screen), plus position and P&L marked to the mid
+- [x] Six assignable scenarios (rate shock, earnings miss then guidance cut, accounting fraud, a
+      reversal, "buy 50,000 shares quietly", free play): a link like `/?scn=rate-shock&seed=4101`
+      gives every student the same market and the same headlines at the same moments. PAUSE, RUN,
+      SPEED, SEED, RERUN, LINK and HELP from the command bar
 
 - [x] A terminal-style UI on [marketlab-nine.vercel.app](https://marketlab-nine.vercel.app): the
       market is already trading when the page loads. Status bar (last price, change, volume, sim
@@ -130,7 +140,8 @@ traders reprice, panic sellers cascade and market makers pull back. What exists 
       that widens with volatility, smaller sizes under stress, post-only quotes and inventory
       limits. Profitable against the noise crowd on 6 of 6 runs, including seeds never used to
       tune them
-- [x] 809 unit tests, five browser smoke tests in CI, shadow-model comparison, and 96% mutation score
+- [x] 896 unit tests, ten browser tests in CI, shadow-model comparison, and 96% mutation score on the
+      engine before the trading code (93% on the trading and scenario files; gaps listed in docs/LATER.md)
       (see [Testing](#testing))
 - [x] Engine boundary and determinism rules, enforced by ESLint and checked at runtime
 
@@ -143,8 +154,8 @@ not just "does it work on my example" but "can any small bug slip past the tests
 
 | Check | Result |
 | --- | --- |
-| Unit and property tests (Vitest) | **809 passing** across 34 files (plus a live AI check, run by hand) |
-| Browser smoke tests (Playwright, in CI) | Production build: the page loads and prices move; FED moves the market with no network call; FED typed 30 times never freezes the page; a custom headline goes through the AI preview to a market reaction, CHAT and WHO; with the AI route down, the offline fallback works |
+| Unit and property tests (Vitest) | **896 passing** across 39 files (plus a live AI check, run by hand) |
+| Browser smoke tests (Playwright, in CI) | Production build: the page loads and prices move; FED moves the market with no network call; FED typed 30 times never freezes the page; a custom headline goes through the AI preview to a market reaction, CHAT and WHO; with the AI route down, the offline fallback works; a scenario link opens the assigned run; a market order fills and the execution report splits its cost; PAUSE / RUN; HELP; a headline starting with "Buy" reaches the AI, not the order ticket |
 | Randomized shadow-model comparison | Order book and matching engine, 5 seeds × 3,000 operations each, full state compared after **every** step |
 | Mutation score (Stryker) on `src/engine` | **95.69%**: 2,019 of 2,110 mutants detected (D-050) |
 | Same seed → identical market | The whole fill log and final book of a 10-minute, 40-trader market are fingerprinted and pinned; seed 188 differs |
@@ -267,8 +278,9 @@ working build on the live site.
 | **Sun 10/18** ✅ | Web Worker + terminal UI (status bar, ticker, price chart, time & sales, order book basics) + market alive on load. **Milestone: prices moving on the live site** |
 | **Mon 10/19** ✅ | Value traders (fair value), panic sellers (threshold cascade), headline shock = a fair-value jump |
 | **Tue 10/20** ✅ | AI interpret route for headlines → clamped, editable parameters; headline input; desk-chat narrator (deterministic); "who moved the price?" attribution |
-| **Wed 10/21** | Strategy agent (plain-English strategy via the same route) + glass box + manual buy/sell |
-| **Thu 10/22** | Execution report (slippage split into spread and impact, P&L), tuning |
+| **Ahead of schedule** ✅ | Manual buy/sell (`TKT`), execution report (`EXR`), assignable scenarios with links, PAUSE / SPEED / RERUN / LINK, HELP |
+| **Wed 10/21** | Strategy agent (plain-English strategy via the same route) + glass box |
+| **Thu 10/22** | Tuning (the execution report shipped early) |
 | **Fri 10/23** | Feature freeze, bug bash, demo script, backup video |
 | **If time** | Sharpe ratio and max drawdown in the execution report; a Limit Up–Limit Down trading band (±5%, the real rule for large stocks), with the CEO headline as the halt demo |
 | **Cut unless ahead** | Momentum traders, whale, missions, full depth view, realism panel, Learn/Pro modes, rewind, what-if reruns, ask-the-AI, shortcut strip |

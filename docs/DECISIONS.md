@@ -1480,3 +1480,127 @@ while collecting the file even when the suite was skipped under mutation, and a 
 that setup crashed the file and counted as "survived". Fixed (setup in `beforeAll`), then measured
 with only the narrator's own fast tests: **87.3%** (405 killed, 8 timeouts, 60 survivors, listed in
 docs/LATER.md). attribution.ts 93.4%, feed.ts 97.1% (7 timeouts).
+
+---
+
+## D-056 · Student orders and headlines enter through a deterministic command queue
+
+**Date:** 2026-11-08 (ported from the trading-UI branch, where it was numbered D-052) · **Status:** Accepted
+
+**Problem.** The student must trade against the crowd (TKT) without breaking determinism: the same
+seed and the same inputs must give the same market, or reruns, scenario links and tests mean nothing.
+
+**Decision.**
+- Orders, cancels and headlines are *commands*. The UI posts them; the engine applies them at the
+  start of the next tick, before any agent acts. Step order: scheduled (scenario) shocks, the pending
+  shock (a preset, an AI headline from `/api/interpret` via `applyParams`, or `SHOCK <pct>` via
+  `applyCustomShock`), user commands, agent arrivals. All headlines share the one pending slot and
+  the 3 s spacing of D-051. The real clock only decides how many ticks run, so frame timing can never
+  change what a command does.
+- Limits live in the engine, returned as data (`UserRejectReason`), never thrown: 100,000 shares per
+  order, 500,000 position, 20 commands waiting, 100 user events kept.
+- The user is an owner (`"user"`) like any agent, so fills carry the same arrival-quote fields and
+  attribution stays exact: WHO and the narrator name the student's flow "you".
+- `SHOCK <pct>` and scenario shocks set the D-053 volatility and liquidity multipliers to a neutral
+  1, so they behave exactly as written before D-053 existed; only AI and edited headlines set them.
+
+**Tested.** `userTrading.test.ts` (14) and `feedTrading.test.ts` (10), including determinism across
+frame timings and a mutation check on the position limit.
+
+---
+
+## D-057 · Scenarios are data: scheduled shocks, a seed, a link
+
+**Date:** 2026-11-08 (ported; was D-053) · **Status:** Accepted
+
+**Problem.** A professor needs to assign "a rate hike is announced, design a strategy" and get
+comparable results from every student.
+
+**Decision.** A scenario (`engine/scenarios.ts`) is a seed, a brief, a task and a list of shocks at
+fixed sim times from the open (`scheduleShock`). `?scn=<id>&seed=<n>` reopens exactly that run, and
+`LINK` copies it. Same link, same market, same headlines at the same moments. Unknown scenario or a
+bad seed falls back to free play with a visible message, never a crash. Six scenarios ship: free play,
+rate shock, earnings miss then guidance cut, accounting fraud, bad news then a reversal, and
+"buy 50,000 shares quietly" (market impact and slippage).
+
+**Warm-up.** Every run, free play included, opens through `createScenarioMarket`, which warms the
+market up before the feed exists. So the desk-chat narrator (D-055) starts watching at the open
+(09:40:00) instead of posting ten minutes of warm-up commentary in the first frame. The market itself
+is identical either way: the narrator only reads.
+
+**Tested.** `scenarios.test.ts` (12): determinism, direction and size of each move, two-sided book.
+
+---
+
+## D-058 · Execution report in half-cents, split into spread and impact
+
+**Date:** 2026-11-08 (ported; was D-054) · **Status:** Accepted
+
+**Decision.** Implementation shortfall against the arrival mid (D-010). The mid can be a half cent, so
+every amount is kept as integer "X2" (twice the cents) and shown with `formatDollarsX2`, so spread
+cost + impact cost + resting-fill edge equals the total exactly on screen. Spread = aggressive
+quantity × (touch − mid); impact = the rest. The ticket's pre-trade estimate walks the book with the
+same rules as the engine and is checked against the engine's real fills for market orders on both
+sides (`estimate.test.ts`).
+
+---
+
+## D-059 · Panel numbers keep their slots; NEWS borrows slot 7; PAUSED is a label
+
+**Date:** 2026-11-08 (ported; was D-055, which put NEWS in the CHAT slot until the narrator existed) ·
+**Status:** Accepted
+
+**Decision.** Panel numbers follow the default layout: 1 GP, 2 WHO (the CROWD slot; CROWD is cut),
+3 CHAT, 4 TAPE on the left; 5 BOOK, 6 TKT, 7 NEWS, 8 EXR on the right. NEWS holds the scenario brief,
+task, stats, headlines and who gained or lost; it borrows STRAT's slot 7 until STRAT ships, when NEWS
+becomes an on-demand function as CLAUDE.md describes (docs/LATER.md). The editable AI preview of
+D-052 stays a strip directly under the command bar, so the headline you typed and its parameters sit
+together and Tab from the bar lands on the first field.
+
+**Grid.** Eight panels do not fit one right-hand column at 1440×900 (BOOK fell to 4 levels a side,
+failing the smoke test's "more than 5", the ticket's SEND button was cut off, and EXR's nine columns
+ran together). So the grid has four columns: GP across three, BOOK and TKT on the right, WHO / CHAT /
+NEWS under GP, and TAPE and a two-column EXR at the bottom. The rows are fixed in CSS, so the NEWS
+strip appearing or disappearing never moves the panels.
+
+Green and red stay price direction only, so BUY/SELL are amber and P&L is a signed number.
+**Deviation from "REPLAY only" status labels:** a PAUSED (and speed) tag appears while the market is
+paused or fast, because a frozen screen would otherwise look broken.
+
+---
+
+## D-060 · Pressing Enter on a command must not activate a button it opens
+
+**Date:** 2026-11-08 (ported; was D-056) · **Status:** Accepted
+
+**Problem found in the browser test.** HELP opened a dialog whose Close button was auto-focused; the
+same Enter that ran the command then pressed Close, so HELP flashed and vanished.
+**Fix.** The dialog itself takes focus, not a button. A Playwright test now covers it.
+
+---
+
+## D-061 · Command words vs headlines: a command needs its own shape
+
+**Date:** 2026-11-08 · **Status:** Accepted
+
+**Problem.** The command bar treats anything it does not know as a headline for `/api/interpret`
+(CLAUDE.md, Command bar; D-052). The trading commands added in D-056 are also ordinary English words
+that start real headlines: "Buy now, pay later lender collapses", "Run on regional banks", "Pause in
+Fed hikes expected", "Seed funding dries up". Treating them as commands would answer real news with
+"not a number of shares"; treating every miss as news would send a typo like `BUY 5OO` to the AI,
+which might move the market.
+
+**Decision.** A command word counts only with its own shape, and numbers after one always mean a
+command:
+- `BUY` / `SELL` followed by something that starts like a number is an order, parsed strictly; a
+  mistake is a friendly error. Followed by words, it is a headline.
+- `SHOCK` followed by a preset code or a number is a shock; followed by words, a headline (as before).
+- `PAUSE`, `RUN`, `CANCEL`, `RERUN`, `LINK`, `HELP` run alone (and `CANCEL ALL`); followed by a number
+  they are an "Unknown command" error; followed by words, a headline.
+- `SPEED` / `SEED` with a number are commands (errors if out of range); with words, headlines.
+  `SCN` is not an English word, so it is always a command; `SCENARIO …` with several words is news.
+- Anything else stays a headline, exactly as before.
+
+**Tested.** `command.test.ts`: every pre-existing test unchanged, plus fifteen real-looking headlines
+that start with command words, and number-after-command errors. A Playwright test sends "Buy now, pay
+later lender collapses" with the AI mocked and checks it reaches the AI preview, not the order ticket.

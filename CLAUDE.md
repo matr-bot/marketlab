@@ -80,8 +80,8 @@ then grows day by day with the roadmap:
 | --- | --- |
 | Sun 10/18 | Theme (black / amber / white, flash rules), status bar, scrolling ticker, default-layout grid, `GP` (price chart), `TAPE`, `BOOK` basics (best bid/ask, top levels) |
 | Tue 10/20 | `NEWS` headline input (with the command bar, codes for panels that exist), `CHAT` (desk chat / narrator), `WHO` (click a candle in `GP`) |
-| Wed 10/21 | `STRAT` + the strategy agent + glass box reveal, `TKT` manual trading |
-| Thu 10/22 | `EXR` (slippage split, P&L) |
+| Wed 10/21 | `STRAT` + the strategy agent + glass box reveal, `TKT` manual trading (✅ shipped early, D-056) |
+| Thu 10/22 | `EXR` (slippage split, P&L) (✅ shipped early, D-058) |
 | Cut unless ahead | `CROWD`, missions, full `BOOK` depth view, realism panel, Learn / Pro modes (with the per-panel "On a professional terminal…" notes), rewind with the `REPLAY` label, what-if reruns, `ASK`, shortcut strip, hover formulas, `HELP`, function codes beyond existing panels |
 
 Until a function ships, its slot in the default layout is simply not drawn (the grid closes up);
@@ -381,9 +381,13 @@ New priority: everything visible. The engine is strong; judges can only grade wh
 - **Tue 10/20 ✅ (done Sun 10/18, D-052 to D-055):** `/api/interpret` for headlines
   (claude-haiku-5-5) → clamped, editable parameters; `NEWS` input; `CHAT` narrator
   (deterministic); `WHO` attribution.
-- **Wed 10/21:** strategy agent (StrategySpec via the same route) + glass box + `TKT` manual
-  buy/sell.
-- **Thu 10/22:** `EXR` execution report (slippage split, P&L), tuning.
+- **Added ahead of schedule (D-056 to D-061):** `TKT` manual trading through a deterministic
+  command queue, `EXR` execution report (slippage split into spread and impact, P&L on the desk),
+  `NEWS` scenario panel (slot 7 until `STRAT` ships), six assignable scenarios with `?scn=&seed=`
+  links, PAUSE / RUN / SPEED / SEED / RERUN / LINK, `HELP` overlay, a bottom control strip.
+- **Wed 10/21:** strategy agent (StrategySpec via the same route) + glass box (`STRAT` takes slot 7;
+  `NEWS` moves to on-demand). `TKT` ✅ done early.
+- **Thu 10/22:** tuning; `EXR` ✅ done early (Sharpe and drawdown still "if time").
 - **Fri 10/23:** feature freeze, bug bash, demo script, backup video.
 - **Cut unless ahead:** momentum, whale, missions, full depth view, realism panel, Learn/Pro,
   rewind, what-if, `ASK`, shortcut strip.

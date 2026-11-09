@@ -36,3 +36,32 @@ describe("POST /api/interpret: HTTP checks (D-052)", () => {
     expect(none).toMatchObject({ ok: true, source: "offline", preset: null, scenario: null, message: "AI unavailable · try FED, CEO, BEAT or DOWNGRADE." });
   });
 });
+
+describe("POST /api/interpret: strategies (D-064)", () => {
+  let saved: string | undefined;
+  beforeEach(() => {
+    saved = process.env.ANTHROPIC_API_KEY;
+    delete process.env.ANTHROPIC_API_KEY; // no network in tests
+  });
+  afterEach(() => {
+    if (saved !== undefined) process.env.ANTHROPIC_API_KEY = saved;
+  });
+
+  it("refuses a strategy body outside 1 to 300 characters, or with a headline instead of text", async () => {
+    expect((await post(JSON.stringify({ kind: "strategy", text: " " }))).status).toBe(400);
+    expect((await post(JSON.stringify({ kind: "strategy", text: "x".repeat(301) }))).status).toBe(400);
+    const res = await post(JSON.stringify({ kind: "strategy", headline: "Buy after a 3% drop" }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ ok: false, message: "A strategy is 1 to 300 characters." });
+  });
+
+  it("with no API key, understands simple phrasing offline and says so", async () => {
+    const res = await post(JSON.stringify({ kind: "strategy", text: "Buy after a quick 3% drop because panic sellers overshoot" }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true, source: "offline", strategy: { spec: { entry: { rule: "buyAfterDrop", pct: 0.03, windowSec: 60 } }, reason: "" } });
+  });
+
+  it("a headline body is still a headline", async () => {
+    expect(await (await post(JSON.stringify({ kind: "headline", headline: "Fed unexpectedly hikes rates 75 basis points" }))).json()).toMatchObject({ source: "offline", preset: "FED" });
+  });
+});

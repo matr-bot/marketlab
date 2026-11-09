@@ -39,6 +39,11 @@ export interface MarketState {
   readonly chat: readonly ChatMessage[];
   /** Sim ms of the first frame: when the scenario opened (the market is warmed up and trading by then). */
   readonly startTime: number;
+  /**
+   * The scenario open: the last trade price when the run opened (its first frame), in cents. The one
+   * baseline for every "change" on screen, the status bar and NEWS alike. Null if nothing had traded.
+   */
+  readonly openPrice: number | null;
   /** The student's position, cash, P&L and open orders as of the latest frame. */
   readonly desk: Desk;
   /** The latest execution report (kept until a newer one arrives); null before the student has traded. */
@@ -60,6 +65,7 @@ export function applyFrame(prev: MarketState | null, frame: Frame): MarketState 
     headlines: mergeHeadlines(prev?.headlines ?? [], frame),
     chat: frame.chat.length === 0 && prev ? prev.chat : [...(prev?.chat ?? []), ...frame.chat].slice(-MAX_CHAT),
     startTime: prev?.startTime ?? frame.time,
+    openPrice: prev === null ? frame.last : prev.openPrice,
     desk: frame.desk,
     exr: frame.exr ?? prev?.exr ?? null,
     userEvents: mergeUserEvents(prev?.userEvents ?? [], frame.userEvents),
@@ -103,9 +109,8 @@ export interface ScenarioProgress {
 
 export function scenarioProgress(state: MarketState, scenario: Scenario): ScenarioProgress {
   const { frame, candles, startTime } = state;
-  const before = candles.filter((c) => c.start < startTime);
   const since = candles.filter((c) => c.start >= startTime);
-  const open = before.length > 0 ? before[before.length - 1].close : null;
+  const open = state.openPrice;
   const last = frame.last;
   const target = scenario.target;
   // A buy target counts shares held long; a sell target counts shares held short.

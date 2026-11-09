@@ -95,7 +95,12 @@ describe("custom headlines (applyCustomShock)", () => {
   it("clamps to the engine's limits and says what was really applied", () => {
     const feed = feedFor();
     const r = feed.applyCustomShock({ fairValuePct: -0.9, panicSensitivity: 99, durationSec: 5, volatilityMultiplier: 1, liquidityMultiplier: 1 });
-    expect(r).toEqual({ ok: true, code: "CUSTOM", headline: "Custom shock: fair value -20.0%, panic 3× for 10 s" });
+    expect(r).toEqual({ ok: true, code: "CUSTOM", headline: "Custom shock: fair value -20.0%, panic 3× for 10 s", note: "capped to the engine's limits: fair value -90.0% → -20.0%, panic 99× → 3×, 5 s → 10 s" });
+  });
+
+  it("says nothing was capped when nothing was", () => {
+    const feed = feedFor();
+    expect(feed.applyCustomShock({ fairValuePct: 0.05, panicSensitivity: 1, durationSec: 300, volatilityMultiplier: 1, liquidityMultiplier: 1 })).not.toHaveProperty("note");
   });
 
   it("refuses non-numbers with a friendly message and applies nothing", () => {

@@ -1749,3 +1749,35 @@ Following D-061, a code followed by words is a headline ("Tape shows heavy selli
 dropped). `STOP` alone stops the strategy; "Stop-loss orders pile up" is a headline.
 
 **Tested.** `command.test.ts`; e2e opens NEWS by its code and runs the demo from STRAT in panel 7.
+
+---
+
+## D-067 · QA fixes: one change baseline, side hues, announced fills, honest fallbacks
+
+**Date:** 2026-11-09 · **Status:** Accepted (replaces D-042's side coloring)
+
+From a QA pass on the deployed build. Each item's cause and fix:
+- **One change baseline.** The status bar measured change from the 09:30 start price (187.00), NEWS
+  from the price when the run opened. Both now use the **scenario open**: the last trade price in the
+  run's first frame (`MarketState.openPrice`).
+- **Green and red are price direction only.** TAPE colored its price, arrow and AGGRESSOR label by
+  aggressor side, and BOOK tinted bid bars green and ask bars red. The TAPE price and arrow now follow
+  the tick (up or down from the previous trade); AGGRESSOR and BOOK bars use two neutral side hues
+  (`--bid` steel blue, `--ask` mauve). Every other green/red use was checked and is price direction:
+  candles, status-bar change, flashes, ticker items.
+- **Resting orders that fill are announced.** A fill of the student's resting order by someone else
+  logged nothing, so the last message stayed "resting". The engine now logs a `fill` user event per
+  agent order that hits it ("SELL 100 @ 186.96 filled", or "…: 40 filled, 60 still resting").
+- **No numbers from no data.** The narrator's quiet clock started at 09:30, so at 09:40 it posted
+  "Quiet market: … 0.0 trades a second" from one tick of observation. It now starts when the narrator
+  starts watching, so the first quiet note comes after a full minute of trading.
+- **Offline fallback says why.** It matches events, not names ("CEO tweets" is not fraud), and the
+  reply now quotes the words that matched ("“record earnings” matched the offline preset BEAT") or
+  says what offline mode can do. HELP says the same. Server and page share `offlineFallback`.
+- **One way to show a mid** (`formatMidX2`): a half cent shows as a third decimal in BOOK, TKT and EXR.
+- **SHOCK** on a rise adds no panic unless asked; values past the limits are capped and the reply says
+  which ("capped to the engine's limits: fair value +999.0% → +20.0%").
+- **Layout.** Scroll areas fade a cut line instead of showing half of it (`useOverflowFade`); NEWS pins
+  its title, progress and target tracker; TKT's SEND sticks to the bottom; panel titles never
+  truncate (the header note gives way); BOOK marks the student's resting orders (`·YOU`) and lists
+  any beyond the levels shown.

@@ -10,6 +10,10 @@
   --up: #1fd660;
   --down: #ff4040;
   --highlight: #4a3410;
+  /* Buy side and sell side (BOOK bars, TAPE aggressor). Deliberately neither green nor red: those mean
+     price direction only (QA #5). */
+  --bid: #6fa8dc;
+  --ask: #c39bd3;
   /* Secondary labels, table headers and hover rows (not market direction, so neither green nor red). */
   --amber-dim: #b07218;
   --hover: #151515;
@@ -61,4 +65,18 @@ input {
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
+}
+
+/* A scroll area whose content continues fades the cut edge instead of showing half a line (QA #6;
+   useOverflowFade sets the attributes). */
+[data-below] {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 1.6em), transparent);
+}
+
+[data-above] {
+  mask-image: linear-gradient(to top, #000 calc(100% - 1.6em), transparent);
+}
+
+[data-above][data-below] {
+  mask-image: linear-gradient(to bottom, transparent, #000 1.6em, #000 calc(100% - 1.6em), transparent);
 }

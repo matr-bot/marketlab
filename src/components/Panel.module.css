@@ -33,14 +33,15 @@
   color: var(--dim);
 }
 
+/* The title never shrinks; the header note gives way first (QA #6). */
 .title {
   font-size: inherit;
   font-weight: 400;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex-shrink: 0;
 }
 
 .meta {
+  min-width: 0;
   margin-left: auto;
   padding-left: 12px;
   color: var(--dim);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatAvgPrice, formatBps, formatCentsPerShare, formatChange, formatDollars, formatDollarsX2, formatElapsed, formatInterval, formatMid, formatPercent, formatPrice, formatQty } from "./format";
+import { formatAvgPrice, formatBps, formatCentsPerShare, formatChange, formatDollars, formatDollarsX2, formatElapsed, formatInterval, formatMid, formatMidX2, formatPercent, formatPrice, formatQty } from "./format";
 
 describe("display formatting: exact cents, never rounded", () => {
   it.each([
@@ -88,5 +88,12 @@ describe("formatDollarsX2: exact dollars from half-cents", () => {
     for (const [spread, impact] of [[300, 101], [1, 1], [199, 3], [7, 0]]) {
       expect(parse(formatDollarsX2(spread)) + parse(formatDollarsX2(impact))).toBe(parse(formatDollarsX2(spread + impact)));
     }
+  });
+});
+
+describe("formatMidX2: one way to show a mid (QA #7)", () => {
+  it("a whole cent with two decimals, a half cent with three", () => {
+    expect([formatMidX2(37_410), formatMidX2(37_409), formatMidX2(36_311)]).toEqual(["187.05", "187.045", "181.555"]);
+    expect(formatMid(18_704, 18_705)).toBe(formatMidX2(37_409));
   });
 });

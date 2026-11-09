@@ -6,6 +6,7 @@ import type { AgentType } from "@/engine/types";
 import { formatDollars, formatElapsed, formatPercent, formatPrice, formatQty, formatBps } from "@/lib/format";
 import { scenarioProgress, type HeadlineState, type MarketState } from "@/lib/marketState";
 import styles from "./terminal.module.css";
+import { useOverflowFade } from "./useOverflowFade";
 
 const TYPE_LABELS: Partial<Record<AgentType, string>> = {
   marketMaker: "MARKET MAKERS",
@@ -29,6 +30,7 @@ function latestImpact(headlines: readonly HeadlineState[]): HeadlineState | null
  * in the minute after each headline) come from the engine, so they are the debrief.
  */
 export function NewsPanel({ scenario, market, onCommand }: { scenario: Scenario; market: MarketState; onCommand: (text: string) => void }) {
+  const { ref: fade } = useOverflowFade<HTMLDivElement>();
   const p = scenarioProgress(market, scenario);
   const headlines = [...market.headlines].reverse().slice(0, 4);
   const impact = latestImpact(market.headlines);
@@ -38,7 +40,8 @@ export function NewsPanel({ scenario, market, onCommand }: { scenario: Scenario;
   const informed = pnl?.value;
   return (
     <div className={styles.newsWrap} data-testid="news-panel">
-      <div className={styles.newsScroll}>
+      {/* Pinned: what the scenario is, how far along, and the target if it has one, always visible (QA #6). */}
+      <div className={styles.newsPinned}>
         <div className={styles.scnHead}>
           <span className={styles.scnTitle} data-testid="scenario-title">
             {scenario.title}
@@ -51,11 +54,29 @@ export function NewsPanel({ scenario, market, onCommand }: { scenario: Scenario;
         <div className={styles.progress} aria-hidden>
           <div className={styles.progressBar} style={{ width: `${Math.min(100, (100 * p.elapsedSec) / scenario.durationSec)}%` }} />
         </div>
-        <p className={styles.para}>{scenario.brief}</p>
+        {p.target !== null && (
+          <div className={styles.statRow} data-testid="scenario-target">
+            <span>
+              <span className={styles.label}>TARGET</span> {p.target.side.toUpperCase()} {formatQty(p.target.qty)}
+            </span>
+            <span>
+              <span className={styles.label}>DONE</span> {formatQty(p.target.filled)}
+            </span>
+            <span>
+              <span className={styles.label}>LEFT</span> {formatQty(p.target.remaining)}
+            </span>
+            <span title="Your slippage across all your orders, in basis points of their value.">
+              <span className={styles.label}>SLIPPAGE</span> {formatBps(p.target.slippageBps)} bp
+            </span>
+          </div>
+        )}
+      </div>
+      <div ref={fade} className={styles.newsScroll}>
         <p className={styles.para}>
           <span className={styles.label}>TASK </span>
           {scenario.task}
         </p>
+        <p className={styles.para}>{scenario.brief}</p>
         <p className={styles.dim}>
           <span className={styles.label}>TEACHES </span>
           {scenario.teaches}
@@ -79,22 +100,6 @@ export function NewsPanel({ scenario, market, onCommand }: { scenario: Scenario;
           </span>
         </div>
 
-        {p.target !== null && (
-          <div className={styles.statRow} data-testid="scenario-target">
-            <span>
-              <span className={styles.label}>TARGET</span> {p.target.side.toUpperCase()} {formatQty(p.target.qty)}
-            </span>
-            <span>
-              <span className={styles.label}>DONE</span> {formatQty(p.target.filled)}
-            </span>
-            <span>
-              <span className={styles.label}>LEFT</span> {formatQty(p.target.remaining)}
-            </span>
-            <span title="Your slippage across all your orders, in basis points of their value.">
-              <span className={styles.label}>SLIPPAGE</span> {formatBps(p.target.slippageBps)} bp
-            </span>
-          </div>
-        )}
 
         <div className={styles.sectionHead}>HEADLINES</div>
         {headlines.length === 0 ? (

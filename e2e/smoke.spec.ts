@@ -20,17 +20,26 @@ test("the market is alive on load: prices change within 5 seconds, with no conso
   await expect(page.getByTestId("sim-clock")).toHaveText(/^09:4\d:\d\d\.\d00$/); // warmed up 10 minutes from 09:30
   await expect(page.locator("[data-panel=GP] canvas")).toBeVisible();
   await expect(page.getByTestId("tape").locator("tbody tr").first()).toBeVisible();
-  // Every TAPE print's color agrees with its AGGRESSOR label.
-  const sides = await page.getByTestId("tape").locator("tbody tr").evaluateAll((rows) =>
-    (rows as HTMLTableRowElement[]).map((r) => [r.getAttribute("data-aggressor"), getComputedStyle(r.cells[1]).color, getComputedStyle(r.cells[3]).color, r.cells[3].textContent]),
+  // Green and red mean price direction only (QA #5): a TAPE price is green when it ticked up and red
+  // when it ticked down; the AGGRESSOR label is in a side hue that is neither.
+  const GREEN = "rgb(31, 214, 96)";
+  const RED = "rgb(255, 64, 64)";
+  const rows = await page.getByTestId("tape").locator("tbody tr").evaluateAll((trs) =>
+    (trs as HTMLTableRowElement[]).map((r) => ({ aggressor: r.getAttribute("data-aggressor"), tick: r.getAttribute("data-tick"), price: getComputedStyle(r.cells[1]).color, labelColor: getComputedStyle(r.cells[3]).color, label: r.cells[3].textContent })),
   );
-  for (const [aggressor, priceColor, labelColor, label] of sides) {
-    expect(label).toBe(aggressor === "buy" ? "BUYER" : "SELLER");
-    expect(priceColor).toBe(labelColor);
+  for (const r of rows) {
+    expect(r.label).toBe(r.aggressor === "buy" ? "BUYER" : "SELLER");
+    expect(r.price).toBe(r.tick === "up" ? GREEN : RED);
+    expect([GREEN, RED]).not.toContain(r.labelColor);
   }
-  expect(new Set(sides.map((s) => s[1])).size).toBe(2); // both sides appear, in two colors
+  const labelColors = new Map(rows.map((r) => [r.aggressor, r.labelColor]));
+  expect(new Set(labelColors.values()).size).toBe(labelColors.size); // buyers and sellers in two different hues
   await expect(page.getByTestId("book").getByText("SPREAD")).toBeVisible();
   await expect(page.getByTestId("book").getByText(/^(BID|ASK)$/).first()).toBeVisible();
+  // BOOK's depth bars are in the side hues, never green or red (QA #5).
+  const barColors = await page.getByTestId("book").locator("[data-side] [aria-hidden]").evaluateAll((els) => els.map((e) => getComputedStyle(e).backgroundColor));
+  expect(barColors.length).toBeGreaterThan(0);
+  for (const c of barColors) expect(c).not.toMatch(/^rgba?\((31, 214, 96|255, 64, 64)/);
   // The same number of levels on each side, centered on the spread.
   const book = page.getByTestId("book");
   const levels = Number(await book.getAttribute("data-levels"));
@@ -44,7 +53,7 @@ test("the market is alive on load: prices change within 5 seconds, with no conso
   await expect(page.getByTestId("ticker").locator("span").first()).toBeVisible();
   await expect(page.getByTestId("status-bar")).toContainText("MLAB");
   await expect(page.getByTestId("status-bar").getByText("SIMULATED", { exact: true })).toBeVisible();
-  await expect(page.getByTestId("status-bar")).toContainText("Simulated market · every trade from 77 agents");
+  await expect(page.getByTestId("status-bar")).toContainText("every trade from 77 agents");
   await expect(page.locator("[data-panel=GP]")).toContainText("MLAB PRICE · 10S CANDLES");
   await expect(page.getByText(/not running/i)).toHaveCount(0);
 
@@ -167,9 +176,9 @@ test("with the AI route down, a clear headline falls back to its offline preset 
   await expect(page.getByTestId("last-price")).toBeVisible({ timeout: 5_000 });
   await page.keyboard.type("Aliens land in Ohio");
   await page.keyboard.press("Enter");
-  await expect(page.getByTestId("command-reply")).toHaveText("AI unavailable · try FED, CEO, BEAT or DOWNGRADE.");
+  await expect(page.getByTestId("command-reply")).toHaveText("AI unavailable · offline, only clear events work (a rate hike, fraud, a beat, a miss, a downgrade), or type FED, CEO, BEAT or DOWNGRADE on its own.");
   await page.keyboard.type("MLAB earnings miss, cuts guidance");
   await page.keyboard.press("Enter");
-  await expect(page.getByTestId("command-reply")).toHaveText("AI unavailable · used offline preset DOWNGRADE (closest match).");
+  await expect(page.getByTestId("command-reply")).toHaveText("AI unavailable · “miss” matched the offline preset DOWNGRADE.");
   await expect(page.getByTestId("news")).toHaveAttribute("data-phase", "preview");
 });

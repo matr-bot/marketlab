@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import type { AgentContext, AgentSpec } from "./agents/agent";
-import { createDemoMarket } from "./demoMarket";
+import { createDemoMarket, WARMUP_TICKS } from "./demoMarket";
 import { dollars, Narrator, price, shares, type ChatMessage } from "./narrator";
 import { presetByCode } from "./presets";
 import { Simulation } from "./simulation";
@@ -535,5 +535,29 @@ describe("Narrator rule boundaries (fake simulation)", () => {
     h.tick(7_000);
     const watches = (h.n as unknown as { watches: unknown[] }).watches;
     expect(watches).toHaveLength(0);
+  });
+});
+
+describe("the first quiet note after the open (QA #3)", () => {
+  it("waits for a full minute of observed trading, so its numbers are never computed from nothing", () => {
+    const sim = createDemoMarket(187);
+    sim.run(WARMUP_TICKS); // the page's market: warmed up before the narrator starts watching
+    const narrator = new Narrator(sim);
+    const posted: ChatMessage[] = [];
+    for (let i = 0; i < 590; i++) {
+      sim.step();
+      narrator.onTick();
+      posted.push(...narrator.take());
+    }
+    expect(posted.filter((m) => m.kind === "quiet")).toEqual([]); // 59 s: not yet
+    for (let i = 0; i < 20; i++) {
+      sim.step();
+      narrator.onTick();
+      posted.push(...narrator.take());
+    }
+    const quiet = posted.filter((m) => m.kind === "quiet");
+    expect(quiet).toHaveLength(1);
+    const perSec = Number(/, ([\d.]+) trades a second/.exec(quiet[0].text)![1]);
+    expect(perSec).toBeGreaterThan(0);
   });
 });

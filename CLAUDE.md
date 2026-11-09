@@ -96,10 +96,12 @@ company's name, logo or exact screens.
 - Pure black background.
 - AMBER (orange-gold) for labels, panel headers and UI text.
 - WHITE for numbers and data.
-- GREEN and RED ONLY for market direction: price up / down, and in `TAPE` the trade's side
-  (buyer-initiated green, seller-initiated red, matching its AGGRESSOR label, D-042), plus dim
-  green bid and dim red ask depth bars in `BOOK`. Nothing else is green or red, with one named
-  exception: the bottom shortcut strip's key colors (see Layout), as on real terminal keyboards.
+- GREEN and RED ONLY for price direction: a price up or down (candles, the status bar change,
+  flashes, ticker items, and each `TAPE` price and arrow by its tick versus the previous trade).
+  The buy and sell SIDES (`TAPE` AGGRESSOR, `BOOK` depth bars) use two neutral hues, steel blue
+  and mauve, never green or red (D-067, replacing D-042's side coloring). Nothing else is green or
+  red, with one named exception: the bottom shortcut strip's key colors (see Layout), as on real
+  terminal keyboards.
 - Monospace font, small and dense; numbers right-aligned so digits line up.
 - Thin, solid borders with sharp corners. No dashed lines, rounded corners, shadows or gradients.
 - Dense rows and tight spacing; no big empty boxes.

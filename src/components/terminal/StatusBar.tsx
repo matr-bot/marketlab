@@ -11,9 +11,11 @@ import { useFlash } from "./useFlash";
  * running. A PAUSED or speed tag appears only when the market is not running at normal speed, so a
  * frozen or fast screen is never mistaken for a fault.
  */
-export function StatusBar({ frame, scenarioTitle, paused, speed }: { frame: Frame; scenarioTitle: string; paused: boolean; speed: number }) {
-  const last = frame.last ?? frame.open;
-  const change = last - frame.open;
+export function StatusBar({ frame, openPrice, scenarioTitle, paused, speed }: { frame: Frame; openPrice: number | null; scenarioTitle: string; paused: boolean; speed: number }) {
+  // Change is measured from the scenario open (the price when this run opened), the same baseline as NEWS.
+  const base = openPrice ?? frame.open;
+  const last = frame.last ?? base;
+  const change = last - base;
   const lastRef = useFlash<HTMLSpanElement>(frame.last, "price");
   const volRef = useFlash<HTMLSpanElement>(frame.volume, "neutral");
   const direction = change > 0 ? styles.up : change < 0 ? styles.down : styles.num;
@@ -37,8 +39,8 @@ export function StatusBar({ frame, scenarioTitle, paused, speed }: { frame: Fram
       <span ref={lastRef} className={styles.last} data-testid="last-price">
         {formatPrice(last)}
       </span>
-      <span className={direction}>
-        {formatChange(change)} {formatPercent(change, frame.open)}
+      <span className={direction} data-testid="status-change" title={`Change since this run opened, at ${formatPrice(base)}: the same baseline as NEWS.`}>
+        {formatChange(change)} {formatPercent(change, base)}
       </span>
       <span className={styles.field}>
         <span className={styles.label}>VOL</span>
@@ -52,7 +54,7 @@ export function StatusBar({ frame, scenarioTitle, paused, speed }: { frame: Fram
         <span className={styles.label}>ASK</span>
         <span className={styles.num}>{frame.ask === null ? "—" : formatPrice(frame.ask)}</span>
       </span>
-      <span className={styles.subtitle}>Simulated market · every trade from {formatQty(frame.agents)} agents</span>
+      <span className={styles.subtitle}>every trade from {formatQty(frame.agents)} agents</span>
       <span className={styles.spacer} />
       <span className={styles.num} data-testid="sim-clock">
         {formatSimTime(frame.time)}

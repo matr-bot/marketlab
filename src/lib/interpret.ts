@@ -1,5 +1,5 @@
 import { presetByCode } from "@/engine/presets";
-import { offlineMatch, OFFLINE_HELP } from "./offlineMatch";
+import { offlineFallback } from "./offlineMatch";
 import { OFFLINE_STRATEGY_HELP, parseStrategyOffline } from "./offlineStrategy";
 import { normalizeHeadline, type RateLimiter, type TtlCache } from "./rateLimit";
 import { toScenario, toStrategy, type InterpretResponse, type ModelOutput, type ScenarioParams, type StrategyModelOutput, type StrategyParams, type StrategyResponse } from "./schemas";
@@ -45,11 +45,10 @@ Fields:
 - reason: one short plain sentence explaining the economic logic, under 15 words, with no numbers.`;
 
 const fallback = (headline: string, why: "unavailable" | "busy"): InterpretResponse => {
-  const code = offlineMatch(headline);
-  const prefix = why === "busy" ? "AI busy (too many headlines from this network)" : "AI unavailable";
-  if (code === null) return { ok: true, source: "offline", headline, preset: null, scenario: null, message: why === "busy" ? `${prefix} · try FED, CEO, BEAT or DOWNGRADE.` : OFFLINE_HELP };
+  const { code, message } = offlineFallback(headline, why === "busy" ? "AI busy (too many headlines from this network)" : "AI unavailable");
+  if (code === null) return { ok: true, source: "offline", headline, preset: null, scenario: null, message };
   const p = presetByCode(code)!;
-  return { ok: true, source: "offline", headline, preset: code, scenario: { shock: p.shock, reason: p.headline }, message: `${prefix} · used offline preset ${code} (closest match).` };
+  return { ok: true, source: "offline", headline, preset: code, scenario: { shock: p.shock, reason: p.headline }, message };
 };
 
 /** Interpret one headline from visitor `ip`. Never throws. */

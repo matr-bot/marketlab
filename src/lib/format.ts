@@ -26,8 +26,12 @@ export function formatPercent(change: number, base: number): string {
 
 /** The mid of two cent prices, exactly: (18699, 18701) → "187.00"; (18699, 18700) → "186.995". */
 export function formatMid(bid: number, ask: number): string {
-  const sum = bid + ask;
-  return sum % 2 === 0 ? formatPrice(sum / 2) : `${formatPrice((sum - 1) / 2)}5`;
+  return formatMidX2(bid + ask);
+}
+
+/** A mid from twice its value in cents, the one way mids are shown everywhere (QA #7): 37409 → "187.045", 37410 → "187.05". */
+export function formatMidX2(x2: number): string {
+  return x2 % 2 === 0 ? formatPrice(x2 / 2) : `${formatPrice((x2 - 1) / 2)}5`;
 }
 
 /** A candle interval for labels: 10_000 → "10S", 60_000 → "1M", 90_000 → "90S". */

@@ -4,6 +4,7 @@ import { topType, type Attribution, type SideAttribution } from "@/engine/attrib
 import { formatSimTime } from "@/engine/simClock";
 import { formatQty, traderName } from "@/lib/format";
 import styles from "./terminal.module.css";
+import { useOverflowFade } from "./useOverflowFade";
 
 function Side({ label, side }: { label: string; side: SideAttribution }) {
   const rows = (Object.entries(side.byType) as Array<[string, number]>).sort((a, b) => b[1] - a[1]);
@@ -30,11 +31,12 @@ function Side({ label, side }: { label: string; side: SideAttribution }) {
  * that add up to 100. The last 60 s by default; a clicked GP candle shows that candle's window.
  */
 export function WhoPanel({ who, selected }: { who: Attribution; selected: boolean }) {
+  const { ref: fade } = useOverflowFade<HTMLDivElement>();
   const main = who.selling.shares >= who.buying.shares ? { word: "selling", side: who.selling } : { word: "buying", side: who.buying };
   const top = topType(main.side);
   const window = selected ? `${formatSimTime(who.from).slice(0, 8)}–${formatSimTime(who.to).slice(0, 8)} (clicked candle · Esc for live)` : "last 60 s · click a candle for its window";
   return (
-    <div className={styles.who} data-testid="who">
+    <div ref={fade} className={styles.who} data-testid="who">
       <div className={styles.whoWindow}>{window}</div>
       {who.trades === 0 || top === null ? (
         <div className={styles.chatEmpty}>No trades in this window.</div>

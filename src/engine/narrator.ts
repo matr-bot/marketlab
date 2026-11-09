@@ -88,6 +88,9 @@ export class Narrator {
 
   constructor(private readonly sim: Simulation) {
     this.seenFill = sim.engine.fillCount;
+    // Quiet time counts from when the narrator starts watching (the open, after the warm-up), so its
+    // first quiet note comes after a full minute of observed trading, never from no data (QA #3).
+    this.lastAny = sim.clock.now;
   }
 
   /** Messages posted since the last call, oldest first. */

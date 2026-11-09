@@ -88,7 +88,7 @@
   align-self: center;
   color: var(--amber);
   border: 1px solid var(--amber);
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1;
   padding: 2px 3px 1px;
   letter-spacing: 0.08em;
@@ -123,10 +123,15 @@
   color: var(--down);
 }
 
+/* Context, not data: hidden outright when the bar is too narrow, never cut mid-word (QA #6). */
 .subtitle {
   color: var(--dim);
-  overflow: hidden;
-  text-overflow: ellipsis;
+}
+
+@media (max-width: 1400px) {
+  .subtitle {
+    display: none;
+  }
 }
 
 .spacer {
@@ -372,11 +377,20 @@
 }
 
 .depthBid {
-  background: rgba(31, 214, 96, 0.16);
+  background: rgba(111, 168, 220, 0.18);
 }
 
 .depthAsk {
-  background: rgba(255, 64, 64, 0.16);
+  background: rgba(195, 155, 211, 0.18);
+}
+
+/* TAPE aggressor: the side that crossed, in the side hues (not price direction). */
+.sideBuy {
+  color: var(--bid);
+}
+
+.sideSell {
+  color: var(--ask);
 }
 
 .bookRow > span:first-child {
@@ -641,6 +655,11 @@
 }
 
 .sendBtn {
+  /* Always reachable: on a short screen the ticket scrolls under it (QA #6). */
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  flex-shrink: 0;
   width: 100%;
   padding: 4px 0;
   background: var(--amber);
@@ -975,4 +994,39 @@
   color: var(--fg);
   white-space: pre;
   overflow: auto;
+}
+
+/* ---------- QA #6: scroll areas ---------- */
+.tapeWrap {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.newsPinned {
+  flex-shrink: 0;
+  padding: 6px 8px 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.newsPinned .statRow {
+  margin-top: 4px;
+}
+
+/* BOOK: the student's own resting orders (QA #8). Amber is UI, not price direction. */
+.bookMine .bookSide {
+  color: var(--amber);
+}
+
+.bookMine {
+  outline: 1px solid var(--amber-dim);
+  outline-offset: -1px;
+}
+
+.bookBeyond {
+  display: block;
+  flex-shrink: 0;
+  color: var(--amber);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

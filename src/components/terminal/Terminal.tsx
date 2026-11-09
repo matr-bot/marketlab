@@ -12,7 +12,7 @@ import { clampStrategy, type StrategySpec } from "@/engine/strategy";
 import { parseCommand, type FunctionCode } from "@/lib/command";
 import { formatInterval } from "@/lib/format";
 import type { RunData } from "@/lib/glassbox/python";
-import { offlineMatch, OFFLINE_HELP } from "@/lib/offlineMatch";
+import { offlineFallback, OFFLINE_HELP } from "@/lib/offlineMatch";
 import { OFFLINE_STRATEGY_HELP, parseStrategyOffline } from "@/lib/offlineStrategy";
 import type { InterpretResponse, StrategyResponse } from "@/lib/schemas";
 import { formatUserEvent } from "@/lib/userMessages";
@@ -67,9 +67,9 @@ async function interpret(headline: string): Promise<InterpretResponse> {
     });
     return (await res.json()) as InterpretResponse;
   } catch {
-    const code = offlineMatch(headline);
-    if (code === null) return { ok: true, source: "offline", headline, preset: null, scenario: null, message: OFFLINE_HELP };
-    return { ok: true, source: "offline", headline, preset: code, scenario: { shock: presetByCode(code)!.shock, reason: "" }, message: `AI unavailable · used offline preset ${code} (closest match).` };
+    const { code, message } = offlineFallback(headline);
+    if (code === null) return { ok: true, source: "offline", headline, preset: null, scenario: null, message };
+    return { ok: true, source: "offline", headline, preset: code, scenario: { shock: presetByCode(code)!.shock, reason: "" }, message };
   }
 }
 
@@ -134,7 +134,7 @@ export function Terminal() {
   // The worker decides whether a headline is accepted (at most one per 3 s of sim time, D-051).
   const onShockResult = useCallback(
     (r: PresetResult) => {
-      say(r.ok ? `${r.code} · ${r.headline}` : r.message);
+      say(r.ok ? `${r.code} · ${r.headline}${r.note ? ` · ${r.note}` : ""}` : r.message);
       if (pendingApply.current) {
         pendingApply.current = false;
         if (r.ok) setNews((n) => (n.phase === "preview" || n.phase === "applied" ? { ...n, phase: "applied", edited: false } : n));
@@ -183,20 +183,21 @@ export function Terminal() {
     return true;
   }, [news, sendParams]);
 
-  /** Start the previewed strategy: clamped by the engine's own rules, through the command queue (D-062). */
-  const startStrategy = () => {
-    if (strat.phase !== "preview") return;
+  /** Start the previewed strategy: clamped by the engine's own rules, through the command queue (D-062). False if there is none. */
+  const startStrategy = (): boolean => {
+    if (strat.phase !== "preview") return false;
     let clamped: StrategySpec;
     try {
       clamped = clampStrategy(strat.draft);
     } catch {
       say("That strategy has a number the engine cannot use. Check the fields.");
-      return;
+      return true;
     }
     sendStrategy(clamped);
     setBuilt({ text: strat.text, source: strat.source, reason: strat.reason });
     setStrat({ phase: "live" });
     say(paused ? "Strategy queued. The market is paused: it starts when you RUN." : "Strategy starts at the next tick. Watch STRAT, EXR and the tape.");
+    return true;
   };
 
   const submitStrategy = async (text: string) => {
@@ -235,8 +236,9 @@ export function Terminal() {
 
   const onCommand = async (text: string) => {
     if (text.trim() === "") {
-      // Enter on an empty bar applies the headline preview, or else starts the previewed strategy.
-      if (!apply()) startStrategy();
+      // Enter on an empty bar applies the headline preview, or else starts the previewed strategy;
+      // with neither, it clears the last message (QA #10).
+      if (!apply() && !startStrategy()) say("");
       return;
     }
     const cmd = parseCommand(text);
@@ -302,7 +304,9 @@ export function Terminal() {
           return;
         }
         const scenario = scenarioById(cmd.id) ?? FREE_PLAY;
-        restart({ scenario, seed: scenario.seed, runId: (run?.runId ?? 0) + 1 }, `Opening "${scenario.title}". Its brief and task are in NEWS.`);
+        // A scenario runs on its own seed, so a whole class sees the same market; say so if it replaces yours (QA #10).
+        const seedNote = run !== null && run.seed !== scenario.seed ? ` It runs on its own seed, ${scenario.seed} (yours was ${run.seed}; SEED ${run.seed} reruns it on yours).` : "";
+        restart({ scenario, seed: scenario.seed, runId: (run?.runId ?? 0) + 1 }, `Opening "${scenario.title}". Its brief and task are in NEWS.${seedNote}`);
         open("NEWS");
         return;
       }
@@ -432,7 +436,7 @@ export function Terminal() {
 
   return (
     <div className={styles.shell}>
-      <StatusBar frame={frame} scenarioTitle={scenario.title} paused={paused} speed={speed} />
+      <StatusBar frame={frame} openPrice={m.openPrice} scenarioTitle={scenario.title} paused={paused} speed={speed} />
       <TickerTape ticker={frame.ticker} trades={frame.trades} headlines={frame.headlines} frameCount={frameCount} />
       <CommandBar onCommand={onCommand} reply={shown} />
       <NewsPreview news={news} onEdit={onEdit} onApply={apply} onCancel={onCancel} />

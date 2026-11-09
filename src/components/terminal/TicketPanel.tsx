@@ -5,7 +5,7 @@ import type { Frame } from "@/engine/feed";
 import type { UserEvent } from "@/engine/simulation";
 import { parseCommand } from "@/lib/command";
 import { estimateMarketFill } from "@/lib/estimate";
-import { formatAvgPrice, formatCentsPerShare, formatDollars, formatMid, formatPrice, formatQty } from "@/lib/format";
+import { formatAvgPrice, formatCentsPerShare, formatDollars, formatMid, formatMidX2, formatPrice, formatQty } from "@/lib/format";
 import { formatUserEvent } from "@/lib/userMessages";
 import styles from "./terminal.module.css";
 
@@ -32,6 +32,18 @@ export function TicketPanel({ frame, lastEvent, paused, onCommand }: { frame: Fr
   const text = `${side.toUpperCase()} ${qty.trim()}${type === "limit" ? ` @ ${price.trim()}` : ""}`;
   const cmd = qty.trim() === "" || (type === "limit" && price.trim() === "") ? null : parseCommand(text);
   const order = cmd !== null && cmd.kind === "order" ? cmd.order : null;
+  // Why SEND is disabled, in words (QA #10). Text that is not a number parses as a headline (D-061), so
+  // the ticket says what it needs itself.
+  const blocked: string | null =
+    order !== null
+      ? null
+      : qty.trim() === ""
+        ? "Enter a number of shares."
+        : cmd === null
+          ? "Enter a limit price."
+          : cmd.kind === "error"
+            ? cmd.message
+            : `"${qty.trim().slice(0, 12)}" is not a number of shares: use a whole number, like 500 or 5K.`;
   const mid = frame.bid !== null && frame.ask !== null ? (frame.bid + frame.ask) / 2 : null;
 
   const send = () => {
@@ -49,7 +61,7 @@ export function TicketPanel({ frame, lastEvent, paused, onCommand }: { frame: Fr
   // What the order would do, from the book on screen.
   let preview: string;
   if (order === null) {
-    preview = cmd !== null && cmd.kind === "error" ? cmd.message : "Enter a number of shares" + (type === "limit" ? " and a price." : ".");
+    preview = blocked!;
   } else if (order.type === "market") {
     const e = estimateMarketFill(side === "buy" ? frame.asks : frame.bids, order.qty, side, mid);
     if (e.avgPrice === null) preview = "Nothing to trade against: this order would be cancelled.";
@@ -94,7 +106,7 @@ export function TicketPanel({ frame, lastEvent, paused, onCommand }: { frame: Fr
         </div>
         <div title="The price your shares are valued at: the mid of the best bid and ask.">
           <dt>MARK</dt>
-          <dd>{formatAvgPrice(desk.mark)}</dd>
+          <dd>{Number.isInteger(desk.mark * 2) ? formatMidX2(desk.mark * 2) : formatAvgPrice(desk.mark)}</dd>
         </div>
       </dl>
 
@@ -184,8 +196,8 @@ export function TicketPanel({ frame, lastEvent, paused, onCommand }: { frame: Fr
         {preview}
       </div>
 
-      <button type="button" className={styles.sendBtn} disabled={order === null} data-testid="ticket-send" onClick={send}>
-        SEND {side.toUpperCase()} {order === null ? "" : formatQty(order.qty)} {type === "market" ? "MKT" : order !== null && order.type === "limit" ? `@ ${formatPrice(order.price)}` : "LMT"}
+      <button type="button" className={styles.sendBtn} disabled={order === null} data-testid="ticket-send" title={blocked ?? undefined} onClick={send}>
+        {order === null ? "CAN'T SEND · SEE THE NOTE ABOVE" : `SEND ${side.toUpperCase()} ${formatQty(order.qty)} ${order.type === "market" ? "MKT" : `@ ${formatPrice(order.price)}`}`}
       </button>
       {paused && <div className={styles.note}>PAUSED: orders wait and execute when the market resumes (RUN).</div>}
 

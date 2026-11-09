@@ -49,3 +49,13 @@ describe("formatUserEvent: the strategy's orders", () => {
     expect(formatUserEvent({ ...base, source: "strategy" })).toBe("STRAT · BUY 500 filled @ 187.01");
   });
 });
+
+describe("formatUserEvent: a resting order filled later (QA #2)", () => {
+  const rest = { ...base, kind: "fill" as const, side: "sell" as const, orderType: "limit" as const, requestedQty: 100, limitPrice: 18_696, avgPrice: 18_696 };
+  it("says it filled, at its price", () => {
+    expect(formatUserEvent({ ...rest, status: "filled", filledQty: 100, restingQty: 0 })).toBe("SELL 100 @ 186.96 filled");
+  });
+  it("in part: how much filled and how much still rests", () => {
+    expect(formatUserEvent({ ...rest, status: "partial", filledQty: 40, restingQty: 60 })).toBe("SELL 100 @ 186.96: 40 filled, 60 still resting");
+  });
+});

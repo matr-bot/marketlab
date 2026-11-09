@@ -60,7 +60,20 @@ export interface FrameImpact {
 }
 
 /** What `applyPreset` did: queued the headline, or refused it (unknown code, or too soon after the last). */
-export type PresetResult = { readonly ok: true; readonly code: string; readonly headline: string } | { readonly ok: false; readonly message: string };
+/** `note`: what the engine changed from what was asked (a custom shock clamped to its limits; QA #9). */
+export type PresetResult = { readonly ok: true; readonly code: string; readonly headline: string; readonly note?: string } | { readonly ok: false; readonly message: string };
+
+/** What clamping changed, in words: "fair value +999.0% → +20.0%" (QA #9). */
+function cappedFields(raw: ShockParams, applied: ShockParams): string[] {
+  const pct = (x: number) => `${x > 0 ? "+" : ""}${(x * 100).toFixed(1)}%`;
+  const out: string[] = [];
+  if (raw.fairValuePct !== applied.fairValuePct) out.push(`fair value ${pct(raw.fairValuePct)} → ${pct(applied.fairValuePct)}`);
+  if (raw.panicSensitivity !== applied.panicSensitivity) out.push(`panic ${raw.panicSensitivity}× → ${applied.panicSensitivity}×`);
+  if (raw.durationSec !== applied.durationSec) out.push(`${raw.durationSec} s → ${applied.durationSec} s`);
+  if (raw.volatilityMultiplier !== applied.volatilityMultiplier) out.push(`volatility ${raw.volatilityMultiplier}× → ${applied.volatilityMultiplier}×`);
+  if (raw.liquidityMultiplier !== applied.liquidityMultiplier) out.push(`liquidity ${raw.liquidityMultiplier}× → ${applied.liquidityMultiplier}×`);
+  return out;
+}
 
 /** The student's execution report: the most recent orders and the totals over all of them. Sent only when it changed. */
 /** An EXR row: the order's report, and whether the student sent it by hand or their strategy did (D-062). */
@@ -254,7 +267,9 @@ export class MarketFeed {
     const extra = `${shock.volatilityMultiplier !== 1 ? `, volatility ${shock.volatilityMultiplier}×` : ""}${shock.liquidityMultiplier !== 1 ? `, liquidity ${shock.liquidityMultiplier}×` : ""}`;
     const headline = `Custom shock: fair value ${shock.fairValuePct > 0 ? "+" : ""}${pct}%, panic ${shock.panicSensitivity}×${extra} for ${shock.durationSec} s`;
     const r = this.sim.applyShock(shock, "CUSTOM", headline);
-    return r.ok ? { ok: true, code: "CUSTOM", headline } : { ok: false, message: r.message };
+    if (!r.ok) return { ok: false, message: r.message };
+    const capped = cappedFields(raw, shock);
+    return capped.length === 0 ? { ok: true, code: "CUSTOM", headline } : { ok: true, code: "CUSTOM", headline, note: `capped to the engine's limits: ${capped.join(", ")}` };
   }
 
   /** Queue the student's order for the start of the next tick; its outcome arrives in a later frame's `userEvents`. */

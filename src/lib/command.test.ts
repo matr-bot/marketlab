@@ -202,3 +202,11 @@ describe("parseCommand: function codes, STRAT and STOP (D-064, D-066)", () => {
     for (const h of ["Tape shows heavy selling", "Book value jumps", "Strategy shift at MLAB", "Chat logs leaked"]) expect(parseCommand(h)).toEqual({ kind: "news", headline: h });
   });
 });
+
+describe("parseCommand: SHOCK on a rise adds no panic unless asked (QA #9)", () => {
+  it("a positive shock defaults to panic 1×; a negative one to 1.5×; either can be set", () => {
+    expect(parseCommand("SHOCK 999")).toEqual({ kind: "customShock", fairValuePct: 9.99, panicSensitivity: 1, durationSec: DEFAULT_SHOCK_SECONDS });
+    expect(parseCommand("SHOCK -3")).toMatchObject({ panicSensitivity: DEFAULT_PANIC_SENSITIVITY });
+    expect(parseCommand("SHOCK 2 2")).toMatchObject({ fairValuePct: 0.02, panicSensitivity: 2 });
+  });
+});

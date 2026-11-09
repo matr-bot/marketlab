@@ -22,11 +22,19 @@ export function levelsPerSide(height: number, asks: number, bids: number): { ask
   return { asks: n, bids: n };
 }
 
-/** One level, with a depth bar behind it: width = this level's size ÷ the largest size shown. */
-function Level({ level, side, maxQty }: { level: DepthLevel; side: "BID" | "ASK"; maxQty: number }) {
+type OpenOrder = Frame["desk"]["openOrders"][number];
+
+/** The student's resting orders not at any of the levels shown (QA #8). */
+export function ordersBeyond(orders: readonly OpenOrder[], asks: readonly DepthLevel[], bids: readonly DepthLevel[]): OpenOrder[] {
+  const shown = new Set([...asks.map((l) => `sell ${l.price}`), ...bids.map((l) => `buy ${l.price}`)]);
+  return orders.filter((o) => !shown.has(`${o.side} ${o.price}`));
+}
+
+/** One level, with a depth bar behind it: width = this level's size ÷ the largest size shown. `mine`: the student's shares resting here. */
+function Level({ level, side, maxQty, mine }: { level: DepthLevel; side: "BID" | "ASK"; maxQty: number; mine: number }) {
   return (
-    <div className={styles.bookRow} data-side={side}>
-      <span className={styles.bookSide}>{side}</span>
+    <div className={`${styles.bookRow} ${mine > 0 ? styles.bookMine : ""}`} data-side={side} data-mine={mine > 0 || undefined} title={mine > 0 ? `Your order: ${formatQty(mine)} of these ${formatQty(level.qty)} shares` : undefined}>
+      <span className={styles.bookSide}>{mine > 0 ? `${side}·YOU` : side}</span>
       <span>{level.orderCount}</span>
       <span>{formatQty(level.qty)}</span>
       <span>{formatPrice(level.price)}</span>
@@ -36,7 +44,7 @@ function Level({ level, side, maxQty }: { level: DepthLevel; side: "BID" | "ASK"
 }
 
 /**
- * Best bid/ask and the levels behind them, each with a depth bar (dim green bids, dim red asks)
+ * Best bid/ask and the levels behind them, each with a depth bar in the side hues (QA #5)
  * so thinning liquidity is visible at a glance. No change highlights here: price flashes belong
  * to the status bar and TAPE. Asks sit above the spread (best at the bottom), bids below it (best
  * at the top), the same number on each side, so the spread is always centered and the panel full.
@@ -51,9 +59,15 @@ export function BookPanel({ frame }: { frame: Frame }) {
     observer.observe(box);
     return () => observer.disconnect();
   }, []);
-  const n = height === 0 ? { asks: 0, bids: 0 } : levelsPerSide(height, frame.asks.length, frame.bids.length);
+  const open = frame.desk.openOrders;
+  const fitAll = height === 0 ? { asks: 0, bids: 0 } : levelsPerSide(height, frame.asks.length, frame.bids.length);
+  // If any of the student's orders would be off screen, give up one row to say where they are (QA #8).
+  const reserve = open.length > 0 && ordersBeyond(open, frame.asks.slice(0, fitAll.asks), frame.bids.slice(0, fitAll.bids)).length > 0;
+  const n = reserve ? levelsPerSide(height - ROW_H, frame.asks.length, frame.bids.length) : fitAll;
   const asks = frame.asks.slice(0, n.asks).reverse();
   const bids = frame.bids.slice(0, n.bids);
+  const beyond = reserve ? ordersBeyond(open, asks, bids) : [];
+  const mineAt = (side: "buy" | "sell", price: number) => open.reduce((t, o) => (o.side === side && o.price === price ? t + o.qty : t), 0);
   const spread = frame.bid !== null && frame.ask !== null ? frame.ask - frame.bid : null;
   const maxQty = Math.max(1, ...asks.map((l) => l.qty), ...bids.map((l) => l.qty));
   return (
@@ -67,7 +81,7 @@ export function BookPanel({ frame }: { frame: Frame }) {
       <div className={styles.bookAsks}>
         {frame.asks.length === 0 && height > 0 && <div className={`${styles.bookRow} ${styles.bookEmpty}`}>NO ASKS · liquidity vacuum</div>}
         {asks.map((l) => (
-          <Level key={`a${l.price}`} level={l} side="ASK" maxQty={maxQty} />
+          <Level key={`a${l.price}`} level={l} side="ASK" maxQty={maxQty} mine={mineAt("sell", l.price)} />
         ))}
       </div>
       <div className={`${styles.bookRow} ${styles.bookSpread}`}>
@@ -79,9 +93,15 @@ export function BookPanel({ frame }: { frame: Frame }) {
       <div className={styles.bookBids}>
         {frame.bids.length === 0 && height > 0 && <div className={`${styles.bookRow} ${styles.bookEmpty}`}>NO BIDS · liquidity vacuum</div>}
         {bids.map((l) => (
-          <Level key={`b${l.price}`} level={l} side="BID" maxQty={maxQty} />
+          <Level key={`b${l.price}`} level={l} side="BID" maxQty={maxQty} mine={mineAt("buy", l.price)} />
         ))}
       </div>
+      {beyond.length > 0 && (
+        <div className={`${styles.bookRow} ${styles.bookBeyond}`} data-testid="book-beyond">
+          YOUR ORDER{beyond.length === 1 ? "" : "S"}: {beyond.slice(0, 2).map((o) => `${o.side === "buy" ? "BUY" : "SELL"} ${formatQty(o.qty)} @ ${formatPrice(o.price)}`).join(" · ")}
+          {beyond.length > 2 ? ` · +${beyond.length - 2} more` : ""} · beyond the levels shown
+        </div>
+      )}
     </div>
   );
 }

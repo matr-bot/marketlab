@@ -14,6 +14,8 @@ function describe(e: UserEvent): string {
   if (e.kind === "cancel") return e.message;
   const side = e.side === "buy" ? "BUY" : "SELL";
   const what = `${side} ${formatQty(e.requestedQty)}${e.limitPrice !== null ? ` @ ${formatPrice(e.limitPrice)}` : ""}`;
+  // A resting order traded later, against someone else's order.
+  if (e.kind === "fill") return e.status === "filled" ? `${what} filled` : `${what}: ${formatQty(e.filledQty)} filled, ${formatQty(e.restingQty)} still resting`;
   switch (e.status) {
     case "rejected":
       return `${what} rejected: ${e.message}`;

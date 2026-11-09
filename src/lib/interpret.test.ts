@@ -63,8 +63,8 @@ describe("interpretHeadline: every failure falls back, the demo never dies", () 
 
   it("with no API key: offline preset on a clear match, no effect otherwise", async () => {
     const { d } = deps(null);
-    expect(await interpretHeadline("Regulators open fraud probe into MLAB's CEO", "ip", d)).toMatchObject({ source: "offline", preset: "CEO", message: "AI unavailable · used offline preset CEO (closest match)." });
-    expect(await interpretHeadline("Aliens land in Ohio", "ip", d)).toEqual({ ok: true, source: "offline", headline: "Aliens land in Ohio", preset: null, scenario: null, message: "AI unavailable · try FED, CEO, BEAT or DOWNGRADE." });
+    expect(await interpretHeadline("Regulators open fraud probe into MLAB's CEO", "ip", d)).toMatchObject({ source: "offline", preset: "CEO", message: "AI unavailable · “fraud” matched the offline preset CEO." });
+    expect(await interpretHeadline("Aliens land in Ohio", "ip", d)).toEqual({ ok: true, source: "offline", headline: "Aliens land in Ohio", preset: null, scenario: null, message: "AI unavailable · offline, only clear events work (a rate hike, fraud, a beat, a miss, a downgrade), or type FED, CEO, BEAT or DOWNGRADE on its own." });
   });
 
   it.each([
@@ -97,7 +97,7 @@ describe("interpretHeadline: every failure falls back, the demo never dies", () 
     const { d, calls, now } = deps(always({ kind: "ok", output: OUT }));
     for (let i = 0; i < 25; i++) await interpretHeadline(`Fed hikes ${"!".repeat(i)}`, "wifi", d);
     expect(calls()).toBe(20);
-    expect(await interpretHeadline("Fed hikes again", "wifi", d)).toMatchObject({ source: "offline", message: "AI busy (too many headlines from this network) · used offline preset FED (closest match)." });
+    expect(await interpretHeadline("Fed hikes again", "wifi", d)).toMatchObject({ source: "offline", message: "AI busy (too many headlines from this network) · “Fed hikes” matched the offline preset FED." });
     expect(await interpretHeadline("Fed hikes, other network", "other", d)).toMatchObject({ source: "ai" }); // other visitors unaffected
     for (let m = 1; m <= 5; m++) {
       now.t = m * 61_000;
@@ -151,5 +151,13 @@ describe("cache and limits", () => {
     expect(c.size).toBe(500);
     expect(c.get("k0", 10)).toBeUndefined();
     expect(c.get("k599", 10)).toBe(599);
+  });
+});
+
+describe("the offline fallback says why (QA #4)", () => {
+  it("matches events, never names, and quotes the words that matched", async () => {
+    const { d } = deps(null);
+    expect(await interpretHeadline("buy when the CEO tweets", "ip", d)).toMatchObject({ preset: null, message: "AI unavailable · offline, only clear events work (a rate hike, fraud, a beat, a miss, a downgrade), or type FED, CEO, BEAT or DOWNGRADE on its own." });
+    expect(await interpretHeadline("Apple announces record earnings", "ip", d)).toMatchObject({ preset: "BEAT", message: "AI unavailable · “record earnings” matched the offline preset BEAT." });
   });
 });

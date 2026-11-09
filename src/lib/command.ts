@@ -43,7 +43,7 @@ export type FunctionCode = (typeof FUNCTION_CODES)[number];
 export const MAX_COMMAND_LENGTH = 200;
 /** Speeds the SPEED command accepts, as multiples of real time. */
 export const SPEEDS = [1, 2, 4, 8] as const;
-/** Defaults for SHOCK <pct>: how jumpy panic sellers get, and for how long. */
+/** Defaults for SHOCK <pct> on a fall: how jumpy panic sellers get, and for how long (a rise defaults to no extra panic). */
 export const DEFAULT_PANIC_SENSITIVITY = 1.5;
 export const DEFAULT_SHOCK_SECONDS = 300;
 
@@ -56,8 +56,8 @@ export const HELP_LINES: readonly (readonly [string, string])[] = [
   ["GP · BOOK · TAPE · TKT · EXR · STRAT · NEWS · WHO · CHAT", "Open that function in the active panel (click a panel's header to make it active; panel 7 by default)."],
   ["STRAT buy after a 3% drop", "Describe a strategy in plain English. Check its rules, then Enter starts it trading. STOP stops it."],
   ["FED · CEO · BEAT · DOWNGRADE", "Send a ready-made headline. The crowd reacts; fair value jumps and panic sellers may cascade."],
-  ["Any other text", "A headline in your own words. The AI turns it into parameters you can check and edit in NEWS before they apply."],
-  ["SHOCK -3", "Your own shock: fair value falls 3%. Add panic sensitivity and seconds: SHOCK -3 2 120."],
+  ["Any other text", "A headline in your own words. The AI turns it into parameters you check and edit before they apply. If the AI is unavailable, only a clear event (a rate hike, fraud, a beat, a miss, a downgrade) maps to an offline preset, and the reply says which words matched; anything else has no effect."],
+  ["SHOCK -3", "Your own shock: fair value falls 3%, with panic sellers 1.5× as jumpy for 300 s (a rise adds no panic). Set both: SHOCK -3 2 120. Values past the limits (±20%) are capped, and the reply says so."],
   ["BUY 500 · SELL 500", "A market order: trades at once against the book at the best prices, then the next, until filled."],
   ["BUY 500 @ 187.25", "A limit order: trades only at that price or better; otherwise it rests in the book and waits."],
   ["CANCEL", "Cancel all your resting limit orders."],
@@ -115,7 +115,8 @@ function parseShock(args: readonly string[]): Command {
   }
   const pct = args.length >= 1 && args.length <= 3 ? parsePercent(args[0]) : null;
   if (pct === null) return { kind: "error", message: SHOCK_USAGE };
-  const panic = args.length >= 2 ? (PLAIN_NUMBER.test(args[1]) ? Number(args[1]) : null) : DEFAULT_PANIC_SENSITIVITY;
+  // Panic is a reaction to bad news: a positive shock adds none unless asked for (QA #9).
+  const panic = args.length >= 2 ? (PLAIN_NUMBER.test(args[1]) ? Number(args[1]) : null) : pct > 0 ? 1 : DEFAULT_PANIC_SENSITIVITY;
   const seconds = args.length >= 3 ? (PLAIN_NUMBER.test(args[2]) ? Number(args[2]) : null) : DEFAULT_SHOCK_SECONDS;
   if (panic === null || seconds === null) return { kind: "error", message: SHOCK_USAGE };
   return { kind: "customShock", fairValuePct: pct, panicSensitivity: panic, durationSec: seconds };

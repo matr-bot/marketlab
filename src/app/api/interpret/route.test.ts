@@ -33,7 +33,7 @@ describe("POST /api/interpret: HTTP checks (D-052)", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ ok: true, source: "offline", preset: "FED" });
     const none = await (await post(JSON.stringify({ headline: "Aliens land in Ohio" }))).json();
-    expect(none).toMatchObject({ ok: true, source: "offline", preset: null, scenario: null, message: "AI unavailable · try FED, CEO, BEAT or DOWNGRADE." });
+    expect(none).toMatchObject({ ok: true, source: "offline", preset: null, scenario: null, message: "AI unavailable · offline, only clear events work (a rate hike, fraud, a beat, a miss, a downgrade), or type FED, CEO, BEAT or DOWNGRADE on its own." });
   });
 });
 

@@ -3,8 +3,9 @@
 import type { FrameExecution } from "@/engine/feed";
 import { orderSlippageBps, perShareCents } from "@/engine/executionReport";
 import { formatSimTime } from "@/engine/simClock";
-import { formatAvgPrice, formatBps, formatCentsPerShare, formatDollarsX2, formatQty } from "@/lib/format";
+import { formatAvgPrice, formatBps, formatCentsPerShare, formatDollarsX2, formatMidX2, formatQty } from "@/lib/format";
 import styles from "./terminal.module.css";
+import { useOverflowFade } from "./useOverflowFade";
 
 const per = (x2: number | null, qty: number) => (x2 === null ? null : perShareCents(x2, qty));
 
@@ -15,6 +16,7 @@ const per = (x2: number | null, qty: number) => (x2 === null ? null : perShareCe
  * share. A positive cost is money lost to the market; negative is price improvement.
  */
 export function ExecPanel({ exr }: { exr: FrameExecution | null }) {
+  const { ref: fade } = useOverflowFade<HTMLDivElement>();
   if (exr === null || exr.orders.length === 0) {
     return (
       <div className={styles.emptyState} data-testid="exr-empty">
@@ -27,7 +29,7 @@ export function ExecPanel({ exr }: { exr: FrameExecution | null }) {
   const rows = [...exr.orders].reverse();
   return (
     <div className={styles.exrWrap} data-testid="exr">
-      <div className={styles.exrScroll}>
+      <div ref={fade} className={styles.exrScroll}>
         <table className={styles.table}>
           <thead>
             <tr>
@@ -51,7 +53,7 @@ export function ExecPanel({ exr }: { exr: FrameExecution | null }) {
                 <td data-testid="exr-src">{r.source === "strategy" ? "STRAT" : "YOU"}</td>
                 <td>{formatQty(r.qty)}</td>
                 <td>{formatAvgPrice(r.avgPrice)}</td>
-                <td>{r.arrivalMidX2 === null ? "—" : formatAvgPrice(r.arrivalMidX2 / 2)}</td>
+                <td>{r.arrivalMidX2 === null ? "—" : formatMidX2(r.arrivalMidX2)}</td>
                 <td>{formatCentsPerShare(per(r.slippageX2, r.qty))}</td>
                 <td>{r.aggressiveQty === 0 ? "—" : formatCentsPerShare(per(r.spreadX2, r.qty))}</td>
                 <td>{r.aggressiveQty === 0 ? "—" : formatCentsPerShare(per(r.impactX2, r.qty))}</td>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { levelsPerSide } from "./BookPanel";
+import { levelsPerSide, ordersBeyond } from "./BookPanel";
 
 describe("levelsPerSide: BOOK shows the same number of levels on both sides", () => {
   it("fills the height: header and spread take a row each, the rest splits evenly", () => {
@@ -21,5 +21,22 @@ describe("levelsPerSide: BOOK shows the same number of levels on both sides", ()
     expect(levelsPerSide(16 * 42, 0, 33)).toEqual({ asks: 0, bids: 20 });
     expect(levelsPerSide(16 * 42, 5, 0)).toEqual({ asks: 5, bids: 0 });
     expect(levelsPerSide(16 * 42, 0, 0)).toEqual({ asks: 0, bids: 0 });
+  });
+});
+
+describe("ordersBeyond: the student's orders not at a level shown (QA #8)", () => {
+  const lv = (price: number) => ({ price, qty: 100, orderCount: 1 });
+  const asks = [lv(18_705), lv(18_706)];
+  const bids = [lv(18_704), lv(18_703)];
+  it("an order at a shown level is marked there, not listed; one further out is listed", () => {
+    const orders = [
+      { id: "MLAB-1", side: "sell" as const, price: 18_706, qty: 100 },
+      { id: "MLAB-2", side: "sell" as const, price: 18_720, qty: 100 },
+      { id: "MLAB-3", side: "buy" as const, price: 18_690, qty: 50 },
+    ];
+    expect(ordersBeyond(orders, asks, bids).map((o) => o.id)).toEqual(["MLAB-2", "MLAB-3"]);
+  });
+  it("matches side and price: a buy at an ask's price is not 'shown'", () => {
+    expect(ordersBeyond([{ id: "MLAB-4", side: "buy", price: 18_705, qty: 1 }], asks, bids)).toHaveLength(1);
   });
 });

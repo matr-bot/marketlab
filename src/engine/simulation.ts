@@ -1,7 +1,7 @@
 import type { AgentContext, AgentOrder, AgentSpec } from "./agents/agent";
 import { ArrivalScheduler, type Arrival } from "./arrivals";
 import { MarketRegistry } from "./marketRegistry";
-import type { MatchingEngine, OrderInput, SubmitResult } from "./matchingEngine";
+import type { Fill, MatchingEngine, OrderInput, SubmitResult } from "./matchingEngine";
 import { Rng } from "./rng";
 import { SimClock, type TickWindow } from "./simClock";
 import type { AgentType, CancelResult, Cents, OrderId, RejectReason, Side } from "./types";
@@ -78,7 +78,8 @@ export interface UserEvent {
   readonly ref: number;
   /** Sim ms: the start of the tick it ran in. */
   readonly time: number;
-  readonly kind: "order" | "cancel";
+  /** order: what a command did when it ran; cancel: a cancel-all; fill: a resting order of the student's was filled later by someone else. */
+  readonly kind: "order" | "cancel" | "fill";
   /** Who sent it: the student by hand, or the student's strategy (D-062). */
   readonly source: "manual" | "strategy";
   readonly side: Side | null;
@@ -183,6 +184,8 @@ export class Simulation {
   private strategyRunner: StrategyRunner | null = null;
   /** Replaced strategies still closing leftover shares; dropped once flat. */
   private retiring: StrategyRunner[] = [];
+  /** The student's orders resting in the book, so a later fill by someone else can be announced. */
+  private readonly restingUser = new Map<OrderId, { ref: number; side: Side; price: Cents; qty: number; filled: number; source: "manual" | "strategy" }>();
   /** Ids of the orders the strategy sent, so EXR can tell them from manual ones. */
   private readonly strategyOrders = new Set<OrderId>();
   private userRef = 0;
@@ -447,6 +450,7 @@ export class Simulation {
       }
       if (c.kind === "cancel") {
         const cancelled = this.engine.cancelAll(USER_ID).length;
+        this.restingUser.clear();
         this.logUserEvent({
           ref: c.ref, time, kind: "cancel", source: "manual", side: null, orderType: null, requestedQty: cancelled, limitPrice: null, status: "cancelled",
           filledQty: 0, avgPrice: null, restingQty: 0, cancelledQty: cancelled, reason: null,
@@ -507,6 +511,7 @@ export class Simulation {
     const filledQty = result.fills.reduce((n, f) => n + f.qty, 0);
     const notional = result.fills.reduce((n, f) => n + f.price * f.qty, 0);
     const restingQty = result.resting?.qty ?? 0;
+    if (result.resting !== null) this.restingUser.set(result.resting.id, { ref, side: order.side, price: result.resting.price, qty: order.qty, filled: filledQty, source });
     const status = filledQty === order.qty ? "filled" : restingQty > 0 ? (filledQty > 0 ? "partial" : "resting") : filledQty > 0 ? "partial" : "cancelled";
     this.logUserEvent({
       ...base, status, filledQty, avgPrice: filledQty > 0 ? notional / filledQty : null, restingQty, cancelledQty: result.cancelledQty, reason: null,
@@ -520,6 +525,29 @@ export class Simulation {
     if (this.userEventLog.length > USER_EVENT_HISTORY) this.userEventLog.shift();
   }
 
+  /**
+   * Someone else's order traded with the student's resting orders: log one "fill" event per resting
+   * order it hit, so the page says "SELL 100 @ 186.96 filled" instead of still showing "resting".
+   */
+  private announcePassiveFills(fills: readonly Fill[], time: number): void {
+    const hit = new Map<OrderId, number>();
+    for (const f of fills) {
+      const maker = f.aggressor === "buy" ? f.sell : f.buy;
+      if (maker.ownerId === USER_ID) hit.set(maker.orderId, (hit.get(maker.orderId) ?? 0) + f.qty);
+    }
+    for (const [id, qty] of hit) {
+      const o = this.restingUser.get(id);
+      if (o === undefined) continue;
+      o.filled += qty;
+      const restingQty = this.engine.book.get(id)?.qty ?? 0;
+      if (restingQty === 0) this.restingUser.delete(id);
+      this.logUserEvent({
+        ref: o.ref, time, kind: "fill", source: o.source, side: o.side, orderType: "limit", requestedQty: o.qty, limitPrice: o.price,
+        status: restingQty === 0 ? "filled" : "partial", filledQty: o.filled, avgPrice: o.price, restingQty, cancelledQty: 0, reason: null, message: "",
+      });
+    }
+  }
+
   /** Send an order into the market as `ownerId`: execute it, book the fills for both sides, track the last trade. */
   private place(ownerId: string, agentType: AgentType, order: AgentOrder, time: number): SubmitResult {
     const input: OrderInput = { ...order, ownerId, agentType };
@@ -530,6 +558,8 @@ export class Simulation {
         this.book(f.sell.ownerId, -f.qty, f.price * f.qty);
       }
       if (result.fills.length > 0) this.last = result.fills[result.fills.length - 1].price;
+      for (const o of result.selfTradeCancelled) this.restingUser.delete(o.id);
+      if (ownerId !== USER_ID && this.restingUser.size > 0) this.announcePassiveFills(result.fills, time);
     }
     this.observer.onSubmit?.(ownerId, input, result, time);
     return result;

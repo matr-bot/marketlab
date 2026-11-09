@@ -12,4 +12,6 @@ export const COLORS = {
   down: "#ff4040",
   /** Brief neutral highlight for changing non-price numbers. */
   highlight: "#4a3410",
+  /** Secondary labels and table headers. */
+  amberDim: "#b07218",
 } as const;

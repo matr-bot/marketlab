@@ -10,6 +10,9 @@
   --up: #1fd660;
   --down: #ff4040;
   --highlight: #4a3410;
+  /* Secondary labels, table headers and hover rows (not market direction, so neither green nor red). */
+  --amber-dim: #b07218;
+  --hover: #151515;
   --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
   color-scheme: dark;
 }
@@ -43,4 +46,19 @@ body {
 :focus-visible {
   outline: 1px solid var(--amber);
   outline-offset: 1px;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+input {
+  font: inherit;
+}
+
+/* Thin dark scrollbars where a panel scrolls. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
 }

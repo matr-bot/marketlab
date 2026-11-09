@@ -7,12 +7,14 @@ type PanelProps = {
   /** Function code, e.g. "GP". */
   code: string;
   title: string;
+  /** Optional dim text at the right end of the header, e.g. a unit or a hint. */
+  meta?: string;
   className?: string;
   children: ReactNode;
 };
 
 /** A numbered terminal panel: header `1 GP · MLAB PRICE`, then its body. */
-export function Panel({ number, code, title, className, children }: PanelProps) {
+export function Panel({ number, code, title, meta, className, children }: PanelProps) {
   return (
     <section className={`${styles.panel} ${className ?? ""}`} aria-label={`${code} ${title}`} data-panel={code}>
       <header className={styles.head}>
@@ -20,6 +22,7 @@ export function Panel({ number, code, title, className, children }: PanelProps) 
         <span className={styles.code}>{code}</span>
         <span className={styles.sep}>·</span>
         <h2 className={styles.title}>{title}</h2>
+        {meta !== undefined && <span className={styles.meta}>{meta}</span>}
       </header>
       <div className={styles.body}>{children}</div>
     </section>

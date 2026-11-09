@@ -36,6 +36,17 @@
 .title {
   font-size: inherit;
   font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.meta {
+  margin-left: auto;
+  padding-left: 12px;
+  color: var(--dim);
+  text-transform: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .body {

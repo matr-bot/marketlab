@@ -1,9 +1,10 @@
 import { attribute, type Attribution } from "./attribution";
-import type { ShockParams } from "./fundamental";
+import { buildOrderReports, totalExecution, type ExecutionTotals, type OrderReport } from "./executionReport";
+import { clampShock, type ShockParams } from "./fundamental";
 import type { Fill } from "./matchingEngine";
 import { Narrator, type ChatMessage } from "./narrator";
 import { presetByCode } from "./presets";
-import type { Simulation } from "./simulation";
+import { USER_ID, type Desk, type Simulation, type UserEvent, type UserOrder, type UserQueueResult } from "./simulation";
 import type { AgentType, Cents, DepthLevel, Side } from "./types";
 
 // What the worker sends the page (D-037). The engine may produce many fills per frame; the feed
@@ -59,6 +60,20 @@ export interface FrameImpact {
 /** What `applyPreset` did: queued the headline, or refused it (unknown code, or too soon after the last). */
 export type PresetResult = { readonly ok: true; readonly code: string; readonly headline: string } | { readonly ok: false; readonly message: string };
 
+/** The student's execution report: the most recent orders and the totals over all of them. Sent only when it changed. */
+export interface FrameExecution {
+  /** Orders with fills, oldest first; at most `EXR_ORDERS`, the newest ones. */
+  readonly orders: readonly OrderReport[];
+  readonly totals: ExecutionTotals;
+}
+
+/** Orders kept in `FrameExecution.orders`. */
+export const EXR_ORDERS = 30;
+/** Book levels per side in each frame unless `FeedOptions.depthLevels` says otherwise. */
+export const DEFAULT_DEPTH_LEVELS = 40;
+/** Fills of the student's kept for the execution report (a student cannot trade this much). */
+const MAX_USER_FILLS = 20_000;
+
 export interface Frame {
   readonly seed: number;
   readonly ticker: string;
@@ -91,6 +106,12 @@ export interface Frame {
   readonly chat: readonly ChatMessage[];
   /** Who moved the price over the last 60 s of sim time (D-054). */
   readonly who: Attribution;
+  /** The student's position, cash, P&L and open orders right now. */
+  readonly desk: Desk;
+  /** What happened to the student's commands since the last frame (each sent exactly once). */
+  readonly userEvents: readonly UserEvent[];
+  /** The execution report, or null if no fill of the student's arrived since the last frame. */
+  readonly exr: FrameExecution | null;
 }
 
 /** WHO looks back this far by default; windows are answered from the last WHO_BUFFER_MS. */
@@ -134,7 +155,11 @@ export class MarketFeed {
   /** Next headline / impact seq to send. */
   private nextHeadline = 0;
   private nextImpact = 0;
+  private nextUserEvent = 0;
   private dropped = 0;
+  /** Every fill the student was in, for the execution report. */
+  private userFills: Fill[] = [];
+  private exrDirty = false;
 
   constructor(
     readonly sim: Simulation,
@@ -143,7 +168,7 @@ export class MarketFeed {
   ) {
     this.narrator = new Narrator(sim);
     this.candleMs = options.candleMs ?? 10_000;
-    this.depthLevels = options.depthLevels ?? 40;
+    this.depthLevels = options.depthLevels ?? DEFAULT_DEPTH_LEVELS;
     this.maxTrades = options.maxTradesPerFrame ?? 500;
     if (!Number.isSafeInteger(this.candleMs) || this.candleMs <= 0 || this.candleMs % 100 !== 0) {
       throw new RangeError(`candleMs must be a positive multiple of 100, got ${this.candleMs}`);
@@ -173,6 +198,36 @@ export class MarketFeed {
   applyParams(shock: ShockParams, label: string): PresetResult {
     const r = this.sim.applyShock(shock, label.slice(0, 120));
     return r.ok ? { ok: true, code: "NEWS", headline: label.slice(0, 120) } : { ok: false, message: r.message };
+  }
+
+  /**
+   * Queue a headline of the student's own for the start of the next tick: fair value moves by
+   * `fairValuePct` (−0.03 = −3%), panic sellers are `panicSensitivity`× as jumpy for `durationSec`.
+   * Every field is clamped to the engine's limits, and the reply says what was actually applied.
+   * Refused for the same reasons as a preset (too soon after the last headline) or a non-number.
+   */
+  applyCustomShock(raw: ShockParams): PresetResult {
+    let shock: ShockParams;
+    try {
+      shock = clampShock(raw);
+    } catch {
+      return { ok: false, message: "A shock needs real numbers: fair-value change, panic sensitivity, duration and the two multipliers." };
+    }
+    const pct = (shock.fairValuePct * 100).toFixed(1);
+    const extra = `${shock.volatilityMultiplier !== 1 ? `, volatility ${shock.volatilityMultiplier}×` : ""}${shock.liquidityMultiplier !== 1 ? `, liquidity ${shock.liquidityMultiplier}×` : ""}`;
+    const headline = `Custom shock: fair value ${shock.fairValuePct > 0 ? "+" : ""}${pct}%, panic ${shock.panicSensitivity}×${extra} for ${shock.durationSec} s`;
+    const r = this.sim.applyShock(shock, "CUSTOM", headline);
+    return r.ok ? { ok: true, code: "CUSTOM", headline } : { ok: false, message: r.message };
+  }
+
+  /** Queue the student's order for the start of the next tick; its outcome arrives in a later frame's `userEvents`. */
+  submitOrder(order: UserOrder): UserQueueResult {
+    return this.sim.submitUserOrder(order);
+  }
+
+  /** Queue "cancel all my open orders" for the start of the next tick. */
+  cancelOrders(): UserQueueResult {
+    return this.sim.cancelUserOrders();
   }
 
   /** Run `ticks` ticks of the simulation, with the narrator watching each, and take in their fills. */
@@ -225,6 +280,9 @@ export class MarketFeed {
       impacts: this.newImpacts(),
       chat: this.narrator.take(),
       who: this.attribute(this.sim.clock.now - WHO_WINDOW_MS, this.sim.clock.now + 1),
+      desk: this.sim.desk,
+      userEvents: this.newUserEvents(),
+      exr: this.newExecution(),
     };
     this.pending = [];
     this.dropped = 0;
@@ -236,7 +294,7 @@ export class MarketFeed {
   private newHeadlines(): FrameHeadline[] {
     const out = this.sim.shocks
       .filter((s) => s.seq >= this.nextHeadline)
-      .map((s) => ({ seq: s.seq, time: s.time, code: s.label, headline: presetByCode(s.label)?.headline ?? s.label, fairValuePct: s.shock.fairValuePct }));
+      .map((s) => ({ seq: s.seq, time: s.time, code: s.label, headline: s.headline ?? presetByCode(s.label)?.headline ?? s.label, fairValuePct: s.shock.fairValuePct }));
     if (out.length > 0) this.nextHeadline = out[out.length - 1].seq + 1;
     return out;
   }
@@ -247,6 +305,21 @@ export class MarketFeed {
     for (const i of this.sim.shockImpacts) if (i.seq >= this.nextImpact && i.pnlByType !== null) out.push({ seq: i.seq, pnlByType: i.pnlByType });
     if (out.length > 0) this.nextImpact = out[out.length - 1].seq + 1;
     return out;
+  }
+
+  /** The student's command outcomes not sent yet. They are logged in seq order, so a single cursor is enough. */
+  private newUserEvents(): UserEvent[] {
+    const out = this.sim.userEvents.filter((e) => e.seq >= this.nextUserEvent);
+    if (out.length > 0) this.nextUserEvent = out[out.length - 1].seq + 1;
+    return out;
+  }
+
+  /** The execution report if a fill of the student's arrived since the last frame, else null. */
+  private newExecution(): FrameExecution | null {
+    if (!this.exrDirty) return null;
+    this.exrDirty = false;
+    const reports = buildOrderReports(this.userFills, USER_ID);
+    return { orders: reports.slice(-EXR_ORDERS), totals: totalExecution(reports) };
   }
 
   private ingest(): void {
@@ -264,6 +337,11 @@ export class MarketFeed {
   }
 
   private take(f: Fill): void {
+    if (f.buy.ownerId === USER_ID || f.sell.ownerId === USER_ID) {
+      this.userFills.push(f);
+      if (this.userFills.length > MAX_USER_FILLS) this.userFills = this.userFills.slice(-MAX_USER_FILLS);
+      this.exrDirty = true;
+    }
     if (this.lastPrice !== null && f.price !== this.lastPrice) this.lastTick = f.price > this.lastPrice ? "up" : "down";
     this.lastPrice = f.price;
     this.volume += f.qty;

@@ -4,9 +4,9 @@ import { MarketRegistry } from "./marketRegistry";
 import type { MatchingEngine, OrderInput, SubmitResult } from "./matchingEngine";
 import { Rng } from "./rng";
 import { SimClock, type TickWindow } from "./simClock";
-import type { AgentType, CancelResult, Cents, OrderId } from "./types";
+import type { AgentType, CancelResult, Cents, OrderId, RejectReason, Side } from "./types";
 import { DEFAULT_VOLATILITY_PARAMS, VolatilityEstimator, type VolatilityParams } from "./volatility";
-import { DEFAULT_FUNDAMENTAL_PARAMS, Fundamental, MidHistory, type FundamentalParams, type ShockParams } from "./fundamental";
+import { clampShock, DEFAULT_FUNDAMENTAL_PARAMS, Fundamental, MidHistory, type FundamentalParams, type ShockParams } from "./fundamental";
 
 // The simulation loop (D-023). Each tick: advance the clock 100 ms, take every agent arrival in
 // that window in exact time order, and let each agent act at its arrival's timestamp. Orders
@@ -46,6 +46,70 @@ export const SHOCK_SPACING_MS = 3_000;
 /** Headlines (and their P&L records) kept; older ones are dropped. */
 export const SHOCK_HISTORY = 50;
 
+/** The student's trader: orders from the page enter the market as this owner (agent type "user"). */
+export const USER_ID = "user";
+/** Largest single order a student can send, in shares. */
+export const MAX_USER_ORDER_QTY = 100_000;
+/** Largest position, long or short, a student can build, in shares. */
+export const MAX_USER_POSITION = 500_000;
+/** Commands waiting for the next tick; more than this are refused so a burst can never pile up work (D-051). */
+export const MAX_PENDING_USER_COMMANDS = 20;
+/** Outcomes kept for the page; older ones are dropped. */
+export const USER_EVENT_HISTORY = 100;
+/** Scheduled (scenario) headlines allowed at once. */
+export const MAX_SCHEDULED_SHOCKS = 100;
+
+/** An order as the student sends it. Prices are integer cents; a market order has no price. */
+export type UserOrder =
+  | { readonly type: "market"; readonly side: Side; readonly qty: number }
+  | { readonly type: "limit"; readonly side: Side; readonly qty: number; readonly price: Cents };
+
+export type UserRejectReason = RejectReason | "QUEUE_FULL" | "POSITION_LIMIT" | "ORDER_TOO_LARGE";
+
+/** Queued for the start of the next tick (`ref` ties it to its later `UserEvent`), or refused with nothing queued. */
+export type UserQueueResult = { readonly ok: true; readonly ref: number } | { readonly ok: false; readonly reason: UserRejectReason; readonly message: string };
+
+/** What happened to one command once the tick ran it. Sent to the page exactly once. */
+export interface UserEvent {
+  /** 0, 1, 2, … in the order run; never reused. */
+  readonly seq: number;
+  /** The ref returned when the command was queued. */
+  readonly ref: number;
+  /** Sim ms: the start of the tick it ran in. */
+  readonly time: number;
+  readonly kind: "order" | "cancel";
+  readonly side: Side | null;
+  readonly orderType: "market" | "limit" | null;
+  /** Shares asked for (orders), or open orders cancelled (cancel). */
+  readonly requestedQty: number;
+  readonly limitPrice: Cents | null;
+  readonly status: "filled" | "partial" | "resting" | "cancelled" | "rejected";
+  readonly filledQty: number;
+  /** Average fill price in cents (an exact ratio), or null if nothing filled. */
+  readonly avgPrice: number | null;
+  /** Shares left resting in the book. */
+  readonly restingQty: number;
+  /** Shares cancelled instead of traded (a market order that ran out of liquidity). */
+  readonly cancelledQty: number;
+  readonly reason: UserRejectReason | null;
+  readonly message: string;
+}
+
+/** The student's desk: what they hold and what is open. */
+export interface Desk {
+  /** Shares: + long, − short. */
+  readonly position: number;
+  /** Cash change in cents from every fill (− for buying, + for selling). */
+  readonly cash: number;
+  /** The price positions are marked to: the mid (may be a half cent), else the last trade. */
+  readonly mark: number;
+  /** cash + position × mark, rounded once to whole cents. Gains and losses since the open of the run. */
+  readonly pnl: number;
+  readonly openOrders: readonly { readonly id: OrderId; readonly side: Side; readonly price: Cents; readonly qty: number }[];
+}
+
+type UserCommand = { readonly kind: "order"; readonly ref: number; readonly order: UserOrder } | { readonly kind: "cancel"; readonly ref: number };
+
 /** Accepted, or refused because the last headline was too recent (returned as data, never thrown). */
 export type ShockResult = { readonly ok: true } | { readonly ok: false; readonly reason: "SHOCK_TOO_SOON"; readonly message: string };
 
@@ -56,6 +120,8 @@ export interface ShockEvent {
   /** Sim ms: the start of the tick it was applied in. */
   readonly time: number;
   readonly label: string;
+  /** The headline text, when it differs from the label (a scenario or custom shock). */
+  readonly headline?: string;
   readonly shock: ShockParams;
   /** Fair value just before and just after the jump, in cents. */
   readonly fairValueBefore: number;
@@ -101,7 +167,14 @@ export class Simulation {
   readonly fundamental: Fundamental;
   /** The mid once per second, for drawdown windows. */
   readonly midHistory = new MidHistory();
-  private pendingShock: { shock: ShockParams; label: string } | null = null;
+  private pendingShock: { shock: ShockParams; label: string; headline?: string } | null = null;
+  /** Scenario headlines due at fixed sim times, soonest first (ties keep the order they were added). */
+  private readonly scheduled: { at: number; shock: ShockParams; label: string; headline?: string }[] = [];
+  /** The student's commands waiting for the next tick, in the order they were sent. */
+  private userQueue: UserCommand[] = [];
+  private userRef = 0;
+  private userEventSeq = 0;
+  private readonly userEventLog: UserEvent[] = [];
   private lastShockTime: number | null = null;
   private shockSeq = 0;
   /** The last SHOCK_HISTORY headlines and their P&L records (open or finalized). */
@@ -166,14 +239,30 @@ export class Simulation {
    * with nothing queued, if one is already waiting or the last was under SHOCK_SPACING_MS of sim
    * time ago (D-051), so a burst of commands can never pile up work.
    */
-  applyShock(shock: ShockParams, label: string): ShockResult {
+  applyShock(shock: ShockParams, label: string, headline?: string): ShockResult {
     const at = this.clock.now; // the next tick starts here
     if (this.pendingShock !== null || (this.lastShockTime !== null && at < this.lastShockTime + SHOCK_SPACING_MS)) {
       const waitMs = this.pendingShock !== null ? SHOCK_SPACING_MS : this.lastShockTime! + SHOCK_SPACING_MS - at;
       return { ok: false, reason: "SHOCK_TOO_SOON", message: `The market is still digesting the last headline. Try again in ${Math.ceil(waitMs / 1000)} s.` };
     }
-    this.pendingShock = { shock, label };
+    this.pendingShock = headline === undefined ? { shock, label } : { shock, label, headline };
     return { ok: true };
+  }
+
+  /**
+   * Put a headline on the calendar: it is applied at the start of the first tick at or after `atMs`
+   * (sim ms), before any agent acts, so a scenario replays identically for the same seed. Scenario
+   * headlines are not rate-limited: the author chose their spacing. Throws on misuse (a bug in our
+   * code), never on market flow.
+   */
+  scheduleShock(atMs: number, shock: ShockParams, label: string, headline?: string): void {
+    if (!Number.isSafeInteger(atMs) || atMs < 0) throw new RangeError(`atMs must be a non-negative integer, got ${atMs}`);
+    if (this.scheduled.length >= MAX_SCHEDULED_SHOCKS) throw new RangeError(`at most ${MAX_SCHEDULED_SHOCKS} scheduled headlines`);
+    clampShock(shock); // a non-finite number must fail now, not in the middle of a tick
+    const entry = headline === undefined ? { at: atMs, shock, label } : { at: atMs, shock, label, headline };
+    let i = this.scheduled.length;
+    while (i > 0 && this.scheduled[i - 1].at > atMs) i--;
+    this.scheduled.splice(i, 0, entry);
   }
 
   /** Every headline applied so far, oldest first. */
@@ -204,20 +293,16 @@ export class Simulation {
   /** Advance one tick (100 ms): every arrival in the window acts, in exact time order. */
   step(): TickWindow {
     const window = this.clock.advance();
-    if (this.pendingShock !== null) {
-      const { shock, label } = this.pendingShock;
-      this.pendingShock = null;
-      this.lastShockTime = window.start;
-      const seq = this.shockSeq++;
-      const before = this.fundamental.value;
-      const applied = this.fundamental.shock(shock, window.start);
-      this.shockLog.push(Object.freeze({ seq, time: window.start, label, shock: applied, fairValueBefore: before, fairValueAfter: this.fundamental.value }));
-      const record: ImpactRecord = { seq, time: window.start, label, start: this.valueByType(), pnlByType: null };
-      this.impacts.push(record);
-      this.openImpacts.push(record);
-      if (this.shockLog.length > SHOCK_HISTORY) this.shockLog.shift();
-      if (this.impacts.length > SHOCK_HISTORY) this.impacts.shift();
+    while (this.scheduled.length > 0 && this.scheduled[0].at <= window.start) {
+      const due = this.scheduled.shift()!;
+      this.commitShock(due.shock, due.label, due.headline, window.start);
     }
+    if (this.pendingShock !== null) {
+      const { shock, label, headline } = this.pendingShock;
+      this.pendingShock = null;
+      this.commitShock(shock, label, headline, window.start);
+    }
+    this.runUserCommands(window.start);
     for (const arrival of this.scheduler.drain(window.end)) {
       this.observer.onArrival?.(arrival);
       const agent = this.agents.get(arrival.sourceId)!;
@@ -241,6 +326,124 @@ export class Simulation {
     }
     this.observer.onTickEnd?.(window);
     return window;
+  }
+
+  /** Apply a headline now (the start of a tick): fair value jumps, the event is logged, its P&L window opens. */
+  private commitShock(shock: ShockParams, label: string, headline: string | undefined, time: number): void {
+    this.lastShockTime = time;
+    const seq = this.shockSeq++;
+    const before = this.fundamental.value;
+    const applied = this.fundamental.shock(shock, time);
+    const event: ShockEvent = { seq, time, label, ...(headline === undefined ? {} : { headline }), shock: applied, fairValueBefore: before, fairValueAfter: this.fundamental.value };
+    this.shockLog.push(Object.freeze(event));
+    const record: ImpactRecord = { seq, time, label, start: this.valueByType(), pnlByType: null };
+    this.impacts.push(record);
+    this.openImpacts.push(record);
+    if (this.shockLog.length > SHOCK_HISTORY) this.shockLog.shift();
+    if (this.impacts.length > SHOCK_HISTORY) this.impacts.shift();
+  }
+
+  /**
+   * Queue the student's order for the start of the next tick, before any agent acts. Like headlines,
+   * this keeps the market deterministic: the same seed + the same commands at the same ticks always
+   * give the same market, so a "what if?" rerun differs only by what the student changed. The
+   * outcome (fills, resting, rejection) arrives later as a `UserEvent`.
+   */
+  submitUserOrder(order: UserOrder): UserQueueResult {
+    if (!Number.isSafeInteger(order.qty) || order.qty <= 0) return { ok: false, reason: "INVALID_QTY", message: `Quantity must be a whole number of shares, at least 1 (got ${order.qty}).` };
+    if (order.qty > MAX_USER_ORDER_QTY) return { ok: false, reason: "ORDER_TOO_LARGE", message: `One order can be at most ${MAX_USER_ORDER_QTY.toLocaleString("en-US")} shares.` };
+    if (this.userQueue.length >= MAX_PENDING_USER_COMMANDS) return { ok: false, reason: "QUEUE_FULL", message: "Too many orders waiting for the next tick. Try again in a moment." };
+    const ref = this.userRef++;
+    this.userQueue.push({ kind: "order", ref, order });
+    return { ok: true, ref };
+  }
+
+  /** Queue "cancel all my open orders" for the start of the next tick. */
+  cancelUserOrders(): UserQueueResult {
+    if (this.userQueue.length >= MAX_PENDING_USER_COMMANDS) return { ok: false, reason: "QUEUE_FULL", message: "Too many orders waiting for the next tick. Try again in a moment." };
+    const ref = this.userRef++;
+    this.userQueue.push({ kind: "cancel", ref });
+    return { ok: true, ref };
+  }
+
+  /** Outcomes of the student's commands so far (the last USER_EVENT_HISTORY), oldest first. */
+  get userEvents(): readonly UserEvent[] {
+    return this.userEventLog;
+  }
+
+  /** The student's position, cash, P&L marked to the mid, and open orders. */
+  get desk(): Desk {
+    const mark = this.markPrice();
+    const position = this.positionOf(USER_ID);
+    const cash = this.cashOf(USER_ID);
+    return {
+      position,
+      cash,
+      mark,
+      pnl: Math.round(cash + position * mark),
+      openOrders: this.engine.book.ordersOf(USER_ID).map((o) => ({ id: o.id, side: o.side, price: o.price, qty: o.qty })),
+    };
+  }
+
+  private runUserCommands(time: number): void {
+    if (this.userQueue.length === 0) return;
+    const commands = this.userQueue;
+    this.userQueue = [];
+    for (const c of commands) {
+      if (c.kind === "cancel") {
+        const cancelled = this.engine.cancelAll(USER_ID).length;
+        this.logUserEvent({
+          ref: c.ref, time, kind: "cancel", side: null, orderType: null, requestedQty: cancelled, limitPrice: null, status: "cancelled",
+          filledQty: 0, avgPrice: null, restingQty: 0, cancelledQty: cancelled, reason: null,
+          message: cancelled === 0 ? "No open orders to cancel." : `Cancelled ${cancelled} open order${cancelled === 1 ? "" : "s"}.`,
+        });
+        continue;
+      }
+      this.runUserOrder(c.ref, c.order, time);
+    }
+  }
+
+  private runUserOrder(ref: number, order: UserOrder, time: number): void {
+    const base = { ref, time, kind: "order" as const, side: order.side, orderType: order.type, requestedQty: order.qty, limitPrice: order.type === "limit" ? order.price : null };
+    const position = this.positionOf(USER_ID);
+    const after = position + (order.side === "buy" ? order.qty : -order.qty);
+    if (Math.abs(after) > MAX_USER_POSITION && Math.abs(after) > Math.abs(position)) {
+      this.logUserEvent({ ...base, status: "rejected", filledQty: 0, avgPrice: null, restingQty: 0, cancelledQty: 0, reason: "POSITION_LIMIT", message: `That would take your position past ${MAX_USER_POSITION.toLocaleString("en-US")} shares.` });
+      return;
+    }
+    const result = this.place(USER_ID, "user", order, time);
+    if (!result.ok) {
+      this.logUserEvent({ ...base, status: "rejected", filledQty: 0, avgPrice: null, restingQty: 0, cancelledQty: 0, reason: result.reason, message: result.message });
+      return;
+    }
+    const filledQty = result.fills.reduce((n, f) => n + f.qty, 0);
+    const notional = result.fills.reduce((n, f) => n + f.price * f.qty, 0);
+    const restingQty = result.resting?.qty ?? 0;
+    const status = filledQty === order.qty ? "filled" : restingQty > 0 ? (filledQty > 0 ? "partial" : "resting") : filledQty > 0 ? "partial" : "cancelled";
+    this.logUserEvent({
+      ...base, status, filledQty, avgPrice: filledQty > 0 ? notional / filledQty : null, restingQty, cancelledQty: result.cancelledQty, reason: null,
+      message: status === "cancelled" ? "Nothing to trade against: the order was cancelled." : "",
+    });
+  }
+
+  private logUserEvent(e: Omit<UserEvent, "seq">): void {
+    this.userEventLog.push(Object.freeze({ seq: this.userEventSeq++, ...e }));
+    if (this.userEventLog.length > USER_EVENT_HISTORY) this.userEventLog.shift();
+  }
+
+  /** Send an order into the market as `ownerId`: execute it, book the fills for both sides, track the last trade. */
+  private place(ownerId: string, agentType: AgentType, order: AgentOrder, time: number): SubmitResult {
+    const input: OrderInput = { ...order, ownerId, agentType };
+    const result = this.engine.submit(input, time);
+    if (result.ok) {
+      for (const f of result.fills) {
+        this.book(f.buy.ownerId, f.qty, -f.price * f.qty);
+        this.book(f.sell.ownerId, -f.qty, f.price * f.qty);
+      }
+      if (result.fills.length > 0) this.last = result.fills[result.fills.length - 1].price;
+    }
+    this.observer.onSubmit?.(ownerId, input, result, time);
+    return result;
   }
 
   /** Advance `ticks` ticks. */
@@ -278,19 +481,7 @@ export class Simulation {
         return position();
       },
       myOrders: () => engine.book.ordersOf(spec.id),
-      submit: (order: AgentOrder) => {
-        const input: OrderInput = { ...order, ownerId: spec.id, agentType: spec.agentType };
-        const result = engine.submit(input, time);
-        if (result.ok) {
-          for (const f of result.fills) {
-            this.book(f.buy.ownerId, f.qty, -f.price * f.qty);
-            this.book(f.sell.ownerId, -f.qty, f.price * f.qty);
-          }
-          if (result.fills.length > 0) this.last = result.fills[result.fills.length - 1].price;
-        }
-        this.observer.onSubmit?.(spec.id, input, result, time);
-        return result;
-      },
+      submit: (order: AgentOrder) => this.place(spec.id, spec.agentType, order, time),
       cancel: (orderId: OrderId) => {
         const owned = engine.book.get(orderId)?.ownerId === spec.id;
         const result: CancelResult = owned

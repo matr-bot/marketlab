@@ -1,9 +1,11 @@
 import { attribute, type Attribution } from "./attribution";
 import { buildOrderReports, totalExecution, type ExecutionTotals, type OrderReport } from "./executionReport";
 import { clampShock, type ShockParams } from "./fundamental";
+import { maxDrawdownOf, returnsOf, sharpeOf, type DrawdownResult, type SharpeResult } from "./metrics";
 import type { Fill } from "./matchingEngine";
 import { Narrator, type ChatMessage } from "./narrator";
 import { presetByCode } from "./presets";
+import type { StrategyDecision, StrategySpec } from "./strategy";
 import { USER_ID, type Desk, type Simulation, type UserEvent, type UserOrder, type UserQueueResult } from "./simulation";
 import type { AgentType, Cents, DepthLevel, Side } from "./types";
 
@@ -61,10 +63,38 @@ export interface FrameImpact {
 export type PresetResult = { readonly ok: true; readonly code: string; readonly headline: string } | { readonly ok: false; readonly message: string };
 
 /** The student's execution report: the most recent orders and the totals over all of them. Sent only when it changed. */
+/** An EXR row: the order's report, and whether the student sent it by hand or their strategy did (D-062). */
+export type FrameOrderReport = OrderReport & { readonly source: "manual" | "strategy" };
+
 export interface FrameExecution {
   /** Orders with fills, oldest first; at most `EXR_ORDERS`, the newest ones. */
-  readonly orders: readonly OrderReport[];
+  readonly orders: readonly FrameOrderReport[];
   readonly totals: ExecutionTotals;
+}
+
+/** The student's strategy in a frame (D-062, D-063). */
+export interface FrameStrategy {
+  /** Sim ms it started: identifies the run (a new strategy starts a new list of decisions). */
+  readonly startedAt: number;
+  readonly spec: StrategySpec;
+  /** running: deciding; closing: stopped but still selling (or buying back) leftover shares; stopped: done. */
+  readonly status: "running" | "closing" | "stopped";
+  /** Whether a position is open by the rules (an entry decided, no exit yet). */
+  readonly inPosition: boolean;
+  /** The strategy's own shares and cash (cents), and P&L marked to the mid (whole cents). */
+  readonly position: number;
+  readonly cash: number;
+  readonly pnl: number;
+  readonly trades: number;
+  /** Decisions made since the last frame (each sent exactly once per run). */
+  readonly newDecisions: readonly StrategyDecision[];
+  /** Size × the first mid seen, in cents; null before the first second. */
+  readonly capital: number | null;
+  /** Annualized Sharpe of one-second returns, with its parts; null with < 2 returns or no variation. */
+  readonly sharpe: SharpeResult | null;
+  readonly drawdown: DrawdownResult | null;
+  /** Equity points behind the metrics (returns = points − 1). */
+  readonly points: number;
 }
 
 /** Orders kept in `FrameExecution.orders`. */
@@ -112,6 +142,8 @@ export interface Frame {
   readonly userEvents: readonly UserEvent[];
   /** The execution report, or null if no fill of the student's arrived since the last frame. */
   readonly exr: FrameExecution | null;
+  /** The student's strategy, or null if none was ever started. */
+  readonly strategy: FrameStrategy | null;
 }
 
 /** WHO looks back this far by default; windows are answered from the last WHO_BUFFER_MS. */
@@ -160,6 +192,11 @@ export class MarketFeed {
   /** Every fill the student was in, for the execution report. */
   private userFills: Fill[] = [];
   private exrDirty = false;
+  /** Which strategy run the decision cursor and cached metrics belong to (its start time). */
+  private strategyRun = -1;
+  private nextDecision = 0;
+  private metricsAt = -1;
+  private metrics: { sharpe: SharpeResult | null; drawdown: DrawdownResult | null } = { sharpe: null, drawdown: null };
 
   constructor(
     readonly sim: Simulation,
@@ -230,6 +267,16 @@ export class MarketFeed {
     return this.sim.cancelUserOrders();
   }
 
+  /** Queue the student's strategy to start at the next tick (D-062). */
+  startStrategy(spec: StrategySpec): UserQueueResult {
+    return this.sim.startStrategy(spec);
+  }
+
+  /** Queue "stop my strategy" (closing its shares) for the next tick. */
+  stopStrategy(): UserQueueResult {
+    return this.sim.stopStrategy();
+  }
+
   /** Run `ticks` ticks of the simulation, with the narrator watching each, and take in their fills. */
   advance(ticks: number): void {
     if (!Number.isSafeInteger(ticks) || ticks < 0) throw new RangeError(`ticks must be a non-negative integer, got ${ticks}`);
@@ -283,6 +330,7 @@ export class MarketFeed {
       desk: this.sim.desk,
       userEvents: this.newUserEvents(),
       exr: this.newExecution(),
+      strategy: this.strategyFrame(),
     };
     this.pending = [];
     this.dropped = 0;
@@ -319,7 +367,42 @@ export class MarketFeed {
     if (!this.exrDirty) return null;
     this.exrDirty = false;
     const reports = buildOrderReports(this.userFills, USER_ID);
-    return { orders: reports.slice(-EXR_ORDERS), totals: totalExecution(reports) };
+    const recent = reports.slice(-EXR_ORDERS).map((r) => ({ ...r, source: this.sim.isStrategyOrder(r.orderId) ? ("strategy" as const) : ("manual" as const) }));
+    return { orders: recent, totals: totalExecution(reports) };
+  }
+
+  /** The strategy's state, its decisions not sent yet, and metrics (recomputed only when equity grew). */
+  private strategyFrame(): FrameStrategy | null {
+    const runner = this.sim.strategy;
+    if (runner === null) return null;
+    if (runner.startedAt !== this.strategyRun) {
+      this.strategyRun = runner.startedAt;
+      this.nextDecision = 0;
+      this.metricsAt = -1;
+    }
+    const newDecisions = runner.decisions.filter((d) => d.seq >= this.nextDecision);
+    if (newDecisions.length > 0) this.nextDecision = newDecisions[newDecisions.length - 1].seq + 1;
+    const { values } = runner.equity;
+    if (values.length !== this.metricsAt) {
+      this.metricsAt = values.length;
+      const capital = runner.capital;
+      this.metrics = capital === null ? { sharpe: null, drawdown: null } : { sharpe: sharpeOf(returnsOf(values, capital)), drawdown: maxDrawdownOf(values, capital) };
+    }
+    return {
+      startedAt: runner.startedAt,
+      spec: runner.spec,
+      status: runner.running ? "running" : runner.isClosing ? "closing" : "stopped",
+      inPosition: runner.inPosition,
+      position: runner.position,
+      cash: runner.cash,
+      pnl: Math.round(runner.cash + runner.position * this.sim.markPrice()),
+      trades: runner.trades,
+      newDecisions,
+      capital: runner.capital,
+      sharpe: this.metrics.sharpe,
+      drawdown: this.metrics.drawdown,
+      points: values.length,
+    };
   }
 
   private ingest(): void {

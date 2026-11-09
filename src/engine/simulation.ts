@@ -6,6 +6,7 @@ import { Rng } from "./rng";
 import { SimClock, type TickWindow } from "./simClock";
 import type { AgentType, CancelResult, Cents, OrderId, RejectReason, Side } from "./types";
 import { DEFAULT_VOLATILITY_PARAMS, VolatilityEstimator, type VolatilityParams } from "./volatility";
+import { clampStrategy, StrategyRunner, type StrategyIntent, type StrategySpec } from "./strategy";
 import { clampShock, DEFAULT_FUNDAMENTAL_PARAMS, Fundamental, MidHistory, type FundamentalParams, type ShockParams } from "./fundamental";
 
 // The simulation loop (D-023). Each tick: advance the clock 100 ms, take every agent arrival in
@@ -64,7 +65,7 @@ export type UserOrder =
   | { readonly type: "market"; readonly side: Side; readonly qty: number }
   | { readonly type: "limit"; readonly side: Side; readonly qty: number; readonly price: Cents };
 
-export type UserRejectReason = RejectReason | "QUEUE_FULL" | "POSITION_LIMIT" | "ORDER_TOO_LARGE";
+export type UserRejectReason = RejectReason | "QUEUE_FULL" | "POSITION_LIMIT" | "ORDER_TOO_LARGE" | "INVALID_STRATEGY";
 
 /** Queued for the start of the next tick (`ref` ties it to its later `UserEvent`), or refused with nothing queued. */
 export type UserQueueResult = { readonly ok: true; readonly ref: number } | { readonly ok: false; readonly reason: UserRejectReason; readonly message: string };
@@ -78,6 +79,8 @@ export interface UserEvent {
   /** Sim ms: the start of the tick it ran in. */
   readonly time: number;
   readonly kind: "order" | "cancel";
+  /** Who sent it: the student by hand, or the student's strategy (D-062). */
+  readonly source: "manual" | "strategy";
   readonly side: Side | null;
   readonly orderType: "market" | "limit" | null;
   /** Shares asked for (orders), or open orders cancelled (cancel). */
@@ -108,7 +111,11 @@ export interface Desk {
   readonly openOrders: readonly { readonly id: OrderId; readonly side: Side; readonly price: Cents; readonly qty: number }[];
 }
 
-type UserCommand = { readonly kind: "order"; readonly ref: number; readonly order: UserOrder } | { readonly kind: "cancel"; readonly ref: number };
+type UserCommand =
+  | { readonly kind: "order"; readonly ref: number; readonly order: UserOrder }
+  | { readonly kind: "cancel"; readonly ref: number }
+  | { readonly kind: "startStrategy"; readonly ref: number; readonly spec: StrategySpec }
+  | { readonly kind: "stopStrategy"; readonly ref: number };
 
 /** Accepted, or refused because the last headline was too recent (returned as data, never thrown). */
 export type ShockResult = { readonly ok: true } | { readonly ok: false; readonly reason: "SHOCK_TOO_SOON"; readonly message: string };
@@ -172,6 +179,12 @@ export class Simulation {
   private readonly scheduled: { at: number; shock: ShockParams; label: string; headline?: string }[] = [];
   /** The student's commands waiting for the next tick, in the order they were sent. */
   private userQueue: UserCommand[] = [];
+  /** The student's strategy, running or stopped, or null before the first one (D-062). */
+  private strategyRunner: StrategyRunner | null = null;
+  /** Replaced strategies still closing leftover shares; dropped once flat. */
+  private retiring: StrategyRunner[] = [];
+  /** Ids of the orders the strategy sent, so EXR can tell them from manual ones. */
+  private readonly strategyOrders = new Set<OrderId>();
   private userRef = 0;
   private userEventSeq = 0;
   private readonly userEventLog: UserEvent[] = [];
@@ -303,6 +316,7 @@ export class Simulation {
       this.commitShock(shock, label, headline, window.start);
     }
     this.runUserCommands(window.start);
+    this.runStrategy(window.start);
     for (const arrival of this.scheduler.drain(window.end)) {
       this.observer.onArrival?.(arrival);
       const agent = this.agents.get(arrival.sourceId)!;
@@ -352,17 +366,48 @@ export class Simulation {
   submitUserOrder(order: UserOrder): UserQueueResult {
     if (!Number.isSafeInteger(order.qty) || order.qty <= 0) return { ok: false, reason: "INVALID_QTY", message: `Quantity must be a whole number of shares, at least 1 (got ${order.qty}).` };
     if (order.qty > MAX_USER_ORDER_QTY) return { ok: false, reason: "ORDER_TOO_LARGE", message: `One order can be at most ${MAX_USER_ORDER_QTY.toLocaleString("en-US")} shares.` };
-    if (this.userQueue.length >= MAX_PENDING_USER_COMMANDS) return { ok: false, reason: "QUEUE_FULL", message: "Too many orders waiting for the next tick. Try again in a moment." };
-    const ref = this.userRef++;
-    this.userQueue.push({ kind: "order", ref, order });
-    return { ok: true, ref };
+    return this.queue((ref) => ({ kind: "order", ref, order }));
   }
 
   /** Queue "cancel all my open orders" for the start of the next tick. */
   cancelUserOrders(): UserQueueResult {
+    return this.queue((ref) => ({ kind: "cancel", ref }));
+  }
+
+  /**
+   * Queue the student's strategy to start at the start of the next tick (D-062). It replaces any
+   * strategy already running, which first closes its own shares. The spec is clamped here; one that
+   * cannot be (an unknown rule, a non-number) is refused with nothing queued.
+   */
+  startStrategy(spec: StrategySpec): UserQueueResult {
+    let clamped: StrategySpec;
+    try {
+      clamped = clampStrategy(spec);
+    } catch {
+      return { ok: false, reason: "INVALID_STRATEGY", message: "That strategy has a rule or a number the engine cannot use." };
+    }
+    return this.queue((ref) => ({ kind: "startStrategy", ref, spec: clamped }));
+  }
+
+  /** Queue "stop my strategy" (closing its shares) for the start of the next tick. */
+  stopStrategy(): UserQueueResult {
+    return this.queue((ref) => ({ kind: "stopStrategy", ref }));
+  }
+
+  /** The student's strategy (running or stopped), or null if none was ever started. */
+  get strategy(): StrategyRunner | null {
+    return this.strategyRunner;
+  }
+
+  /** Whether this order id was sent by the student's strategy. */
+  isStrategyOrder(id: OrderId): boolean {
+    return this.strategyOrders.has(id);
+  }
+
+  private queue(make: (ref: number) => UserCommand): UserQueueResult {
     if (this.userQueue.length >= MAX_PENDING_USER_COMMANDS) return { ok: false, reason: "QUEUE_FULL", message: "Too many orders waiting for the next tick. Try again in a moment." };
     const ref = this.userRef++;
-    this.userQueue.push({ kind: "cancel", ref });
+    this.userQueue.push(make(ref));
     return { ok: true, ref };
   }
 
@@ -390,31 +435,74 @@ export class Simulation {
     const commands = this.userQueue;
     this.userQueue = [];
     for (const c of commands) {
+      if (c.kind === "startStrategy") {
+        this.endStrategy(time);
+        if (this.strategyRunner !== null && !this.strategyRunner.done) this.retiring.push(this.strategyRunner);
+        this.strategyRunner = new StrategyRunner(c.spec, time);
+        continue;
+      }
+      if (c.kind === "stopStrategy") {
+        this.endStrategy(time);
+        continue;
+      }
       if (c.kind === "cancel") {
         const cancelled = this.engine.cancelAll(USER_ID).length;
         this.logUserEvent({
-          ref: c.ref, time, kind: "cancel", side: null, orderType: null, requestedQty: cancelled, limitPrice: null, status: "cancelled",
+          ref: c.ref, time, kind: "cancel", source: "manual", side: null, orderType: null, requestedQty: cancelled, limitPrice: null, status: "cancelled",
           filledQty: 0, avgPrice: null, restingQty: 0, cancelledQty: cancelled, reason: null,
           message: cancelled === 0 ? "No open orders to cancel." : `Cancelled ${cancelled} open order${cancelled === 1 ? "" : "s"}.`,
         });
         continue;
       }
-      this.runUserOrder(c.ref, c.order, time);
+      this.runUserOrder(c.ref, c.order, time, "manual");
     }
   }
 
-  private runUserOrder(ref: number, order: UserOrder, time: number): void {
-    const base = { ref, time, kind: "order" as const, side: order.side, orderType: order.type, requestedQty: order.qty, limitPrice: order.type === "limit" ? order.price : null };
+  /** Once a second, let the strategy decide; send what it asks for as the student's market order. */
+  private runStrategy(time: number): void {
+    if (this.retiring.length > 0) {
+      for (const old of this.retiring) {
+        const intent = old.onTick(time, this.midHistory);
+        if (intent !== null) this.sendStrategyOrder(old, intent, time);
+      }
+      this.retiring = this.retiring.filter((r) => !r.done);
+    }
+    const runner = this.strategyRunner;
+    if (runner === null) return;
+    const intent = runner.onTick(time, this.midHistory);
+    if (intent !== null) this.sendStrategyOrder(runner, intent, time);
+  }
+
+  /** Stop the running strategy, if any, closing its own shares at the market. */
+  private endStrategy(time: number): void {
+    const runner = this.strategyRunner;
+    if (runner === null || !runner.running) return;
+    const bid = this.engine.book.bestBid();
+    const ask = this.engine.book.bestAsk();
+    const intent = runner.stop(time, bid !== null && ask !== null ? (bid + ask) / 2 : null);
+    if (intent !== null) this.sendStrategyOrder(runner, intent, time);
+  }
+
+  private sendStrategyOrder(runner: StrategyRunner, intent: StrategyIntent, time: number): void {
+    const result = this.runUserOrder(this.userRef++, { type: "market", side: intent.side, qty: intent.qty }, time, "strategy");
+    if (result === null) return;
+    this.strategyOrders.add(result.orderId);
+    for (const f of result.fills) runner.onFill(intent.side, f.qty, f.price);
+  }
+
+  /** Run one of the student's orders now and log its outcome. Returns the engine's result if it reached the book. */
+  private runUserOrder(ref: number, order: UserOrder, time: number, source: "manual" | "strategy"): Extract<SubmitResult, { ok: true }> | null {
+    const base = { ref, time, kind: "order" as const, source, side: order.side, orderType: order.type, requestedQty: order.qty, limitPrice: order.type === "limit" ? order.price : null };
     const position = this.positionOf(USER_ID);
     const after = position + (order.side === "buy" ? order.qty : -order.qty);
     if (Math.abs(after) > MAX_USER_POSITION && Math.abs(after) > Math.abs(position)) {
       this.logUserEvent({ ...base, status: "rejected", filledQty: 0, avgPrice: null, restingQty: 0, cancelledQty: 0, reason: "POSITION_LIMIT", message: `That would take your position past ${MAX_USER_POSITION.toLocaleString("en-US")} shares.` });
-      return;
+      return null;
     }
     const result = this.place(USER_ID, "user", order, time);
     if (!result.ok) {
       this.logUserEvent({ ...base, status: "rejected", filledQty: 0, avgPrice: null, restingQty: 0, cancelledQty: 0, reason: result.reason, message: result.message });
-      return;
+      return null;
     }
     const filledQty = result.fills.reduce((n, f) => n + f.qty, 0);
     const notional = result.fills.reduce((n, f) => n + f.price * f.qty, 0);
@@ -424,6 +512,7 @@ export class Simulation {
       ...base, status, filledQty, avgPrice: filledQty > 0 ? notional / filledQty : null, restingQty, cancelledQty: result.cancelledQty, reason: null,
       message: status === "cancelled" ? "Nothing to trade against: the order was cancelled." : "",
     });
+    return result;
   }
 
   private logUserEvent(e: Omit<UserEvent, "seq">): void {

@@ -169,4 +169,19 @@ export class MidHistory {
     }
     return best;
   }
+
+  /** Lowest sampled mid at or after `sinceMs`, or null if there is none. */
+  minSince(sinceMs: number): number | null {
+    let best: number | null = null;
+    for (let i = this.times.length - 1; i >= 0 && this.times[i] >= sinceMs; i--) {
+      if (best === null || this.mids[i] < best) best = this.mids[i];
+    }
+    return best;
+  }
+
+  /** The newest sample if it was taken at exactly `timeMs`, else null (none yet, or one side of the book was empty then). */
+  latestAt(timeMs: number): number | null {
+    const i = this.times.length - 1;
+    return i >= 0 && this.times[i] === timeMs ? this.mids[i] : null;
+  }
 }

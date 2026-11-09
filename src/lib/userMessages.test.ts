@@ -3,7 +3,7 @@ import type { UserEvent } from "@/engine/simulation";
 import { formatUserEvent } from "./userMessages";
 
 const base: UserEvent = {
-  seq: 0, ref: 0, time: 0, kind: "order", side: "buy", orderType: "market", requestedQty: 500, limitPrice: null,
+  seq: 0, ref: 0, time: 0, kind: "order", source: "manual", side: "buy", orderType: "market", requestedQty: 500, limitPrice: null,
   status: "filled", filledQty: 500, avgPrice: 18_701.3333, restingQty: 0, cancelledQty: 0, reason: null, message: "",
 };
 

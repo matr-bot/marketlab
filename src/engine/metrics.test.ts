@@ -49,3 +49,9 @@ describe("max drawdown", () => {
     expect(maxDrawdownOf([], 10_000)).toBeNull();
   });
 });
+
+describe("edges (from the mutation run)", () => {
+  it("two returns are enough for a Sharpe", () => {
+    expect(sharpeOf([0.01, 0.02])).not.toBeNull();
+  });
+});

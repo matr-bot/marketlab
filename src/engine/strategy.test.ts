@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MidHistory } from "./fundamental";
-import { clampStrategy, DEFAULT_TIME_EXIT_SEC, StrategyRunner, type StrategySpec } from "./strategy";
+import { clampStrategy, DEFAULT_TIME_EXIT_SEC, MAX_DECISIONS, MAX_EQUITY_POINTS, StrategyRunner, type StrategySpec } from "./strategy";
 
 const spec = (over: Partial<StrategySpec> = {}): StrategySpec => ({
   entry: { rule: "buyAfterDrop", pct: 0.03, windowSec: 60 },
@@ -32,7 +32,7 @@ function drive(s: StrategySpec, mids: readonly (number | null)[], startSec = 0) 
 describe("clampStrategy", () => {
   it("clamps every number into its range and rounds seconds and shares", () => {
     const c = clampStrategy(spec({ entry: { rule: "sellAfterRise", pct: 5, windowSec: 9_999.4 }, stopLossPct: 0, takeProfitPct: 9, timeExitSec: 1.2, qty: 1e9, cooldownSec: -3 }));
-    expect(c).toEqual({ entry: { rule: "sellAfterRise", pct: 0.2, windowSec: 600 }, stopLossPct: 0.001, takeProfitPct: 0.5, timeExitSec: 5, qty: 10_000, cooldownSec: 0 });
+    expect(c).toEqual({ entry: { rule: "sellAfterRise", pct: 0.2, windowSec: 300 }, stopLossPct: 0.001, takeProfitPct: 0.5, timeExitSec: 5, qty: 10_000, cooldownSec: 0 });
     expect(clampStrategy(spec({ qty: 499.6, entry: { rule: "buyAfterDrop", pct: 0.03, windowSec: 59.5 } }))).toMatchObject({ qty: 500, entry: { windowSec: 60 } });
   });
 
@@ -225,5 +225,96 @@ describe("StrategyRunner: stop, P&L and equity", () => {
     expect([runner.position, runner.cash]).toEqual([500, -500 * 19_400]);
     expect(runner.equity.values).toEqual([0, 0, -500 * 19_400 + 500 * 19_600]);
     expect(runner.equity.times).toEqual([0, 1_000, 2_000]);
+  });
+});
+
+describe("StrategyRunner: edges (from the mutation run)", () => {
+  it("names the field in every error", () => {
+    expect(() => clampStrategy(spec({ entry: { rule: "nope" as never, pct: 0.03, windowSec: 60 } }))).toThrow("unknown entry rule nope");
+    const fields: [string, Partial<StrategySpec>][] = [
+      ["entry.pct", { entry: { rule: "buyAfterDrop", pct: Number.NaN, windowSec: 60 } }],
+      ["entry.windowSec", { entry: { rule: "buyAfterDrop", pct: 0.03, windowSec: Number.NaN } }],
+      ["stopLossPct", { stopLossPct: Number.NaN }],
+      ["takeProfitPct", { takeProfitPct: Number.NaN }],
+      ["timeExitSec", { timeExitSec: Number.NaN }],
+      ["qty", { qty: Number.NaN }],
+      ["cooldownSec", { cooldownSec: Number.NaN }],
+    ];
+    for (const [name, over] of fields) expect(() => clampStrategy(spec(over)), name).toThrow(`strategy ${name} must be a finite number, got NaN`);
+  });
+
+  it("adds the default time exit only when every exit is off", () => {
+    expect(clampStrategy(spec({ stopLossPct: 0.01, takeProfitPct: null, timeExitSec: null })).timeExitSec).toBeNull();
+    expect(clampStrategy(spec({ stopLossPct: null, takeProfitPct: 0.01, timeExitSec: null })).timeExitSec).toBeNull();
+    expect(clampStrategy(spec({ stopLossPct: null, takeProfitPct: null, timeExitSec: 40 })).timeExitSec).toBe(40);
+  });
+
+  it("a short holds while the mid is between its take-profit and stop levels, and exits exactly at each", () => {
+    const s = spec({ entry: { rule: "sellAfterRise", pct: 0.01, windowSec: 60 }, stopLossPct: 0.02, takeProfitPct: 0.02, timeExitSec: null });
+    const up = 20_000 * (1 + 0.01);
+    // Half a cent inside each level: no exit.
+    expect(drive(s, [20_000, up, up * (1 + 0.02) - 0.5, up * (1 - 0.02) + 0.5]).decisions.map((d) => d.reason)).toEqual(["entry"]);
+    const stop = drive(s, [20_000, up, up * (1 + 0.02)]).decisions[1];
+    expect(stop).toMatchObject({ reason: "stopLoss", level: up * (1 + 0.02) });
+    const take = drive(s, [20_000, up, up * (1 - 0.02)]).decisions[1];
+    expect(take).toMatchObject({ reason: "takeProfit", level: up * (1 - 0.02) });
+  });
+
+  it("a long holds between its levels too", () => {
+    const enter = 19_400;
+    expect(drive(spec({ timeExitSec: null }), [20_000, enter, enter * (1 - 0.02) + 0.5, enter * (1 + 0.02) - 0.5]).decisions.map((d) => d.reason)).toEqual(["entry"]);
+  });
+
+  it("capital is fixed at the first second's mid", () => {
+    const { runner } = drive(spec(), [20_000, 19_900, 19_800]);
+    expect(runner.capital).toBe(500 * 20_000);
+  });
+
+  it("once done, records nothing more", () => {
+    const { runner } = drive(spec(), [20_000, 19_900]);
+    runner.stop(1_500, 19_900);
+    const h = new MidHistory();
+    h.onTickEnd(2_000, 40_000);
+    runner.onTick(2_000, h);
+    expect(runner.equity.values).toHaveLength(2);
+    expect(runner.mids.at(-1)![0]).toBe(1_000);
+  });
+
+  it("STOP while flat by the rules but still closing leftovers keeps closing them", () => {
+    const s = spec({ stopLossPct: null, takeProfitPct: null, timeExitSec: 1, cooldownSec: 0 });
+    const history = new MidHistory();
+    const runner = new StrategyRunner(s, 0);
+    const tick = (sec: number, mid: number) => {
+      history.onTickEnd(sec * 1_000, mid * 2);
+      return runner.onTick(sec * 1_000, history);
+    };
+    tick(0, 20_000);
+    tick(1, 19_000);
+    runner.onFill("buy", 500, 19_000);
+    expect(tick(2, 19_000)).toEqual({ side: "sell", qty: 500 }); // time exit, nothing filled
+    runner.onFill("sell", 200, 19_000);
+    expect(runner.stop(2_500, 19_000)).toEqual({ side: "sell", qty: 300 });
+    runner.onFill("sell", 300, 19_000);
+    expect(runner.stop(2_600, 19_000)).toBeNull();
+    // Stopped while flat and not closing: nothing to send.
+    const flat = new StrategyRunner(s, 0);
+    expect(flat.stop(0, 19_000)).toBeNull();
+  });
+
+  it("keeps the last MAX_DECISIONS decisions and the last MAX_EQUITY_POINTS equity points", () => {
+    // Enter and time-exit every second: a decision each second.
+    const s = spec({ entry: { rule: "buyAfterDrop", pct: 0.001, windowSec: 5 }, stopLossPct: null, takeProfitPct: null, timeExitSec: 5, cooldownSec: 0 });
+    const history = new MidHistory();
+    const runner = new StrategyRunner(s, 0);
+    const n = MAX_EQUITY_POINTS + 10;
+    for (let sec = 0; sec < n; sec++) {
+      // A saw-tooth: high, then low, so the drop rule keeps firing.
+      history.onTickEnd(sec * 1_000, (sec % 2 === 0 ? 20_000 : 19_000) * 2);
+      runner.onTick(sec * 1_000, history);
+    }
+    expect(runner.decisions).toHaveLength(MAX_DECISIONS);
+    expect(runner.decisions[0].seq).toBeGreaterThan(0);
+    expect(runner.equity.values).toHaveLength(MAX_EQUITY_POINTS);
+    expect(runner.equity.times[0]).toBe(10_000);
   });
 });

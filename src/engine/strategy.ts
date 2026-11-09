@@ -28,10 +28,13 @@ export interface StrategySpec {
   readonly cooldownSec: number;
 }
 
-/** Inclusive ranges every spec is clamped to. Windows stop at 600 s because MidHistory keeps 600 samples. */
+/**
+ * Inclusive ranges every spec is clamped to. Windows stop at 300 s: MidHistory keeps the last 600
+ * one-second samples, so every window is always complete, in the engine and in the generated Python.
+ */
 export const STRATEGY_LIMITS = {
   pct: [0.001, 0.2],
-  windowSec: [5, 600],
+  windowSec: [5, 300],
   stopLossPct: [0.001, 0.2],
   takeProfitPct: [0.001, 0.5],
   timeExitSec: [5, 3_600],
@@ -123,6 +126,7 @@ export interface MidView {
   latestAt(timeMs: number): number | null;
   maxSince(sinceMs: number): number | null;
   minSince(sinceMs: number): number | null;
+  samplesSince(sinceMs: number): [number, number][];
 }
 
 export class StrategyRunner {
@@ -135,6 +139,8 @@ export class StrategyRunner {
   private readonly log: StrategyDecision[] = [];
   private readonly eqTimes: number[] = [];
   private readonly eq: number[] = [];
+  /** Every mid the rules saw, [time ms, mid], starting with the window before the first evaluated second. */
+  private readonly seen: [number, number][] = [];
   /** The strategy's own shares (+ long, − short) and cash in cents, from its fills only. */
   position = 0;
   cash = 0;
@@ -173,6 +179,11 @@ export class StrategyRunner {
     return this.log;
   }
 
+  /** Every mid the rules saw, oldest first: the input the glass box's Python replays (D-065). */
+  get mids(): readonly (readonly [number, number])[] {
+    return this.seen;
+  }
+
   /** Equity (cash + shares × mid, cents) once per evaluated second, with its sim times. */
   get equity(): { readonly times: readonly number[]; readonly values: readonly number[] } {
     return { times: this.eqTimes, values: this.eq };
@@ -186,8 +197,17 @@ export class StrategyRunner {
     if (this.done || time % 1_000 !== 0) return null;
     const mid = mids.latestAt(time);
     if (mid !== null) {
-      if (this.capital === null) this.capital = this.spec.qty * mid;
+      if (this.capital === null) {
+        this.capital = this.spec.qty * mid;
+        // The window behind the first second: the rules read it, so the record (and the Python) needs it.
+        this.seen.push(...mids.samplesSince(time - this.spec.entry.windowSec * 1_000).filter(([t]) => t < time));
+      }
       this.recordEquity(time, mid);
+      if (!this.stopped) {
+        // The rules' input: only seconds the rules ran on (after a stop, only closing happens).
+        this.seen.push([time, mid]);
+        if (this.seen.length > MAX_EQUITY_POINTS + STRATEGY_LIMITS.windowSec[1]) this.seen.shift();
+      }
     }
     // Execution, not a rule: an exit the book could not fully take is retried, and no entry happens
     // meanwhile. Not a decision, so it is not in the log (the glass box says so).

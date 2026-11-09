@@ -228,8 +228,8 @@ describe("in the frame", () => {
     expect(s.sharpe!.n).toBe(values.length - 1);
 
     // A new strategy is a new run: its decisions start again from the first.
-    // (A 0.1% drop over 600 s is certain after FED, so it enters in its first second.)
-    sim.startStrategy({ ...DEMO, entry: { rule: "sellAfterDrop", pct: 0.001, windowSec: 600 } });
+    // (A 0.1% drop over 300 s is certain after FED, so it enters in its first second.)
+    sim.startStrategy({ ...DEMO, entry: { rule: "sellAfterDrop", pct: 0.001, windowSec: 300 } });
     feed.advance(20);
     const b = feed.frame().strategy!;
     expect(b.startedAt).not.toBe(s.startedAt);

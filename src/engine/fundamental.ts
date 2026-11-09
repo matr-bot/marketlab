@@ -179,6 +179,13 @@ export class MidHistory {
     return best;
   }
 
+  /** The samples taken at or after `sinceMs`, oldest first, as [time ms, mid cents]. */
+  samplesSince(sinceMs: number): [number, number][] {
+    const out: [number, number][] = [];
+    for (let i = 0; i < this.times.length; i++) if (this.times[i] >= sinceMs) out.push([this.times[i], this.mids[i]]);
+    return out;
+  }
+
   /** The newest sample if it was taken at exactly `timeMs`, else null (none yet, or one side of the book was empty then). */
   latestAt(timeMs: number): number | null {
     const i = this.times.length - 1;

@@ -1,7 +1,8 @@
-import type { Candle, Frame, FrameExecution, FrameHeadline, FrameTrade } from "@/engine/feed";
+import type { Candle, Frame, FrameExecution, FrameHeadline, FrameStrategy, FrameTrade } from "@/engine/feed";
 import type { ChatMessage } from "@/engine/narrator";
 import type { Scenario, ScenarioTarget } from "@/engine/scenarios";
 import type { Desk, UserEvent } from "@/engine/simulation";
+import type { StrategyDecision } from "@/engine/strategy";
 import type { AgentType } from "@/engine/types";
 
 // What the panels show, folded from the worker's frames. Pure: (state, frame) → new state, so the
@@ -44,6 +45,10 @@ export interface MarketState {
   readonly exr: FrameExecution | null;
   /** The last MAX_USER_EVENTS outcomes of the student's commands, oldest first. */
   readonly userEvents: readonly UserEvent[];
+  /** The student's strategy as of the latest frame (its newest decisions are in `decisions`), or null. */
+  readonly strategy: Omit<FrameStrategy, "newDecisions"> | null;
+  /** The current strategy run's decisions, oldest first (the last MAX_DECISIONS_KEPT). */
+  readonly decisions: readonly StrategyDecision[];
 }
 
 export function applyFrame(prev: MarketState | null, frame: Frame): MarketState {
@@ -58,7 +63,20 @@ export function applyFrame(prev: MarketState | null, frame: Frame): MarketState 
     desk: frame.desk,
     exr: frame.exr ?? prev?.exr ?? null,
     userEvents: mergeUserEvents(prev?.userEvents ?? [], frame.userEvents),
+    ...mergeStrategy(prev, frame.strategy),
   };
+}
+
+/** Decisions the page keeps for the STRAT panel and the glass box. */
+export const MAX_DECISIONS_KEPT = 200;
+
+function mergeStrategy(prev: MarketState | null, s: FrameStrategy | null): Pick<MarketState, "strategy" | "decisions"> {
+  if (s === null) return { strategy: null, decisions: [] };
+  const { newDecisions, ...rest } = s;
+  // A different start time is a new run: its decisions start again from the first.
+  const have = prev?.strategy?.startedAt === s.startedAt ? prev.decisions : [];
+  const decisions = newDecisions.length === 0 ? have : [...have, ...newDecisions].slice(-MAX_DECISIONS_KEPT);
+  return { strategy: rest, decisions };
 }
 
 function mergeUserEvents(have: readonly UserEvent[], fresh: readonly UserEvent[]): readonly UserEvent[] {

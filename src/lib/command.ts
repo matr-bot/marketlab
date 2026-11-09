@@ -28,7 +28,16 @@ export type Command =
   | { readonly kind: "rerun" }
   | { readonly kind: "link" }
   | { readonly kind: "help" }
+  /** Open a function in the active panel (CLAUDE.md, Command bar; D-066). */
+  | { readonly kind: "open"; readonly code: FunctionCode }
+  /** A trading idea for the strategy agent: `STRAT buy after a 3% drop` (D-064). */
+  | { readonly kind: "strategy"; readonly text: string }
+  | { readonly kind: "stopStrategy" }
   | { readonly kind: "error"; readonly message: string };
+
+/** Function codes that open in a panel. HELP is a dialog and has its own command. */
+export const FUNCTION_CODES = ["GP", "WHO", "CHAT", "TAPE", "BOOK", "TKT", "STRAT", "NEWS", "EXR"] as const;
+export type FunctionCode = (typeof FUNCTION_CODES)[number];
 
 /** Longest accepted command (D-051). */
 export const MAX_COMMAND_LENGTH = 200;
@@ -44,6 +53,8 @@ const ORDER_USAGE = "Orders look like BUY 500, SELL 5K, or BUY 500 @ 187.25 for 
 
 /** Command reference for HELP: [what you type, what it does]. */
 export const HELP_LINES: readonly (readonly [string, string])[] = [
+  ["GP · BOOK · TAPE · TKT · EXR · STRAT · NEWS · WHO · CHAT", "Open that function in the active panel (click a panel's header to make it active; panel 7 by default)."],
+  ["STRAT buy after a 3% drop", "Describe a strategy in plain English. Check its rules, then Enter starts it trading. STOP stops it."],
   ["FED · CEO · BEAT · DOWNGRADE", "Send a ready-made headline. The crowd reacts; fair value jumps and panic sellers may cascade."],
   ["Any other text", "A headline in your own words. The AI turns it into parameters you can check and edit in NEWS before they apply."],
   ["SHOCK -3", "Your own shock: fair value falls 3%. Add panic sensitivity and seconds: SHOCK -3 2 120."],
@@ -127,6 +138,13 @@ export function parseCommand(input: string): Command {
 
   const preset = words.length === 1 ? presetByCode(verb) : undefined;
   if (preset) return { kind: "shock", code: preset.code, headline: preset.headline };
+  // A function code alone opens it; followed by words it is a headline (D-061), except STRAT and NEWS below.
+  if (args.length === 0 && (FUNCTION_CODES as readonly string[]).includes(verb)) return { kind: "open", code: verb as FunctionCode };
+  // STRAT is not an English word: whatever follows is the strategy. NEWS <headline> is a headline
+  // without the prefix. Both keep the text as typed (spacing tidied).
+  const after = (code: string) => input.trim().replace(new RegExp(`^(mlab\\s+)?${code}\\s+`, "i"), "").replace(/\s+/g, " ");
+  if (verb === "STRAT") return { kind: "strategy", text: after("strat") };
+  if (verb === "NEWS") return { kind: "news", headline: after("news") };
 
   switch (verb) {
     case "SHOCK":
@@ -171,6 +189,8 @@ export function parseCommand(input: string): Command {
     case "HELP":
     case "?":
       return bare({ kind: "help" });
+    case "STOP":
+      return bare({ kind: "stopStrategy" });
     default:
       return news;
   }

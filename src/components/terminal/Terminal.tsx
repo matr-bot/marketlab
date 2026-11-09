@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Panel } from "@/components/Panel";
 import type { Attribution } from "@/engine/attribution";
 import type { PresetResult } from "@/engine/feed";
@@ -8,21 +8,26 @@ import { clampShock, type ShockParams } from "@/engine/fundamental";
 import { presetByCode } from "@/engine/presets";
 import { FREE_PLAY, resolveRun, runLink, SCENARIOS, scenarioById, type Scenario } from "@/engine/scenarios";
 import type { UserQueueResult } from "@/engine/simulation";
-import { parseCommand } from "@/lib/command";
+import { clampStrategy, type StrategySpec } from "@/engine/strategy";
+import { parseCommand, type FunctionCode } from "@/lib/command";
 import { formatInterval } from "@/lib/format";
+import type { RunData } from "@/lib/glassbox/python";
 import { offlineMatch, OFFLINE_HELP } from "@/lib/offlineMatch";
-import type { InterpretResponse } from "@/lib/schemas";
+import { OFFLINE_STRATEGY_HELP, parseStrategyOffline } from "@/lib/offlineStrategy";
+import type { InterpretResponse, StrategyResponse } from "@/lib/schemas";
 import { formatUserEvent } from "@/lib/userMessages";
 import { BookPanel } from "./BookPanel";
 import { ChatPanel } from "./ChatPanel";
 import { CommandBar } from "./CommandBar";
 import { ControlStrip } from "./ControlStrip";
 import { ExecPanel } from "./ExecPanel";
+import { download, GlassBox } from "./GlassBox";
 import { HelpOverlay } from "./HelpOverlay";
 import { NewsPanel } from "./NewsPanel";
 import { NewsPreview, type NewsState } from "./NewsPreview";
 import { PriceChart } from "./PriceChart";
 import { StatusBar } from "./StatusBar";
+import { StrategyPanel, type StratSource, type StratState } from "./StrategyPanel";
 import { TapePanel } from "./TapePanel";
 import { TicketPanel } from "./TicketPanel";
 import { TickerTape } from "./TickerTape";
@@ -37,9 +42,19 @@ interface Run {
   readonly seed: number;
   /** Bumped by RERUN, SEED and SCN to start the market again from the open. */
   readonly runId: number;
+  /** The student's strategy, started again at the open of a rerun (D-062). */
+  readonly strategy: StrategySpec | null;
 }
 
-const WELCOME = "Type a headline, or FED, BUY 500 or HELP, and press Enter.";
+type Slot = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+const SLOTS: readonly Slot[] = [1, 2, 3, 4, 5, 6, 7, 8];
+
+/** The default layout (CLAUDE.md): 2 holds WHO (CROWD is cut) and 7 STRAT; NEWS opens by its code (D-066). */
+const DEFAULT_SLOTS: Readonly<Record<Slot, FunctionCode>> = { 1: "GP", 2: "WHO", 3: "CHAT", 4: "TAPE", 5: "BOOK", 6: "TKT", 7: "STRAT", 8: "EXR" };
+/** The panel a typed code opens in until another is clicked. */
+const DEFAULT_ACTIVE: Slot = 7;
+
+const WELCOME = "Type a headline, or FED, BUY 500, STRAT <your idea> or HELP, and press Enter.";
 
 /** Ask /api/interpret; if the route itself is unreachable (no Wi-Fi), fall back here the same way. */
 async function interpret(headline: string): Promise<InterpretResponse> {
@@ -58,12 +73,29 @@ async function interpret(headline: string): Promise<InterpretResponse> {
   }
 }
 
+/** Ask /api/interpret for a strategy (D-064); with the route unreachable, understand simple phrasing here. */
+async function interpretStrategyText(text: string): Promise<StrategyResponse> {
+  try {
+    const res = await fetch("/api/interpret", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kind: "strategy", text }),
+      signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS),
+    });
+    return (await res.json()) as StrategyResponse;
+  } catch {
+    const spec = parseStrategyOffline(text);
+    if (spec === null) return { ok: true, source: "offline", text, strategy: null, message: OFFLINE_STRATEGY_HELP };
+    return { ok: true, source: "offline", text, strategy: { spec, reason: "" }, message: "AI unavailable · understood offline from simple phrasing. Check every rule before you start it." };
+  }
+}
+
 /** The run a link asks for (`?scn=rate-shock&seed=42`); null on the server, where there is no link yet. */
 function runFromLink(): { run: Run; note: string | null } | null {
   if (typeof window === "undefined") return null;
   const q = new URLSearchParams(window.location.search);
   const r = resolveRun(q.get("scn"), q.get("seed"));
-  return { run: { scenario: r.scenario, seed: r.seed, runId: 0 }, note: r.unknownScenario ? `Unknown scenario "${(q.get("scn") ?? "").slice(0, 30)}": opened free play instead. Type SCN to see them.` : null };
+  return { run: { scenario: r.scenario, seed: r.seed, runId: 0, strategy: null }, note: r.unknownScenario ? `Unknown scenario "${(q.get("scn") ?? "").slice(0, 30)}": opened free play instead. Type SCN to see them.` : null };
 }
 
 /** Keep the address bar pointing at this exact run, so a refresh or a copy of the link reopens it. */
@@ -72,8 +104,8 @@ function showRunInAddressBar(scenario: Scenario, seed: number) {
 }
 
 /**
- * The terminal. Panels keep their default-layout numbers (CLAUDE.md); functions that have not
- * shipped yet are simply not drawn, and the grid closes up around the ones that have.
+ * The terminal. Panels keep their default-layout numbers (CLAUDE.md); a typed function code opens in
+ * the active panel (D-066), and functions that have not shipped are simply not drawn.
  */
 export function Terminal() {
   // Read once, on the client. The first render is the same "opening" screen as the server's either way.
@@ -87,7 +119,15 @@ export function Terminal() {
   const [news, setNews] = useState<NewsState>({ phase: "idle" });
   const [whoWindow, setWhoWindow] = useState<Attribution | null>(null);
   const [selectedCandle, setSelectedCandle] = useState<number | null>(null);
+  // An assigned scenario opens with its brief (NEWS) in panel 7; free play opens with STRAT.
+  const [slots, setSlots] = useState<Record<Slot, FunctionCode>>(() => (initial !== null && initial.run.scenario.id !== FREE_PLAY.id ? { ...DEFAULT_SLOTS, 7: "NEWS" } : { ...DEFAULT_SLOTS }));
+  const [active, setActive] = useState<Slot>(DEFAULT_ACTIVE);
+  const [strat, setStrat] = useState<StratState>({ phase: "compose", message: null });
+  /** The English behind the strategy that was started: what the glass box quotes. */
+  const [built, setBuilt] = useState<{ text: string; source: StratSource; reason: string } | null>(null);
+  const [glassOpen, setGlassOpen] = useState(false);
   const pendingApply = useRef(false);
+  const wantRunData = useRef(false);
   const latestSeqRef = useRef(-1);
   const say = useCallback((text: string, seen?: number) => setReply({ text, seen: seen ?? latestSeqRef.current }), []);
 
@@ -105,35 +145,98 @@ export function Terminal() {
   // An accepted order says nothing yet: what it did arrives with the next frame. A refusal is shown now.
   const onOrderResult = useCallback((r: UserQueueResult) => (r.ok ? undefined : say(r.message)), [say]);
   const onWho = useCallback((a: Attribution) => setWhoWindow(a), []);
-  const spec: RunSpec | null = run === null ? null : { seed: run.seed, scenarioId: run.scenario.id, runId: run.runId };
-  const { status, sendShock, sendParams, requestWho, sendCustomShock, sendOrder, sendCancel } = useMarket(spec, { speed, paused }, { onShockResult, onOrderResult, onWho });
+  const onRunData = useCallback(
+    (data: RunData | null) => {
+      if (!wantRunData.current) return;
+      wantRunData.current = false;
+      if (data === null) say("No run data yet: the strategy has not seen a price.");
+      else download("run.json", JSON.stringify(data), "application/json");
+    },
+    [say],
+  );
+  const spec: RunSpec | null = run === null ? null : { seed: run.seed, scenarioId: run.scenario.id, runId: run.runId, strategy: run.strategy };
+  const { status, sendShock, sendParams, requestWho, sendCustomShock, sendOrder, sendCancel, sendStrategy, sendStopStrategy, requestRunData } = useMarket(spec, { speed, paused }, { onShockResult, onOrderResult, onWho, onRunData });
 
-  const latestEvent = status.kind === "live" ? (status.market.userEvents.at(-1) ?? null) : null;
+  const market = status.kind === "live" ? status.market : null;
+  const latestEvent = market?.userEvents.at(-1) ?? null;
   useEffect(() => {
     latestSeqRef.current = latestEvent?.seq ?? -1;
   });
 
+  /** Open a function in the active panel; if it is already on screen, the two panels swap. */
+  const open = useCallback(
+    (code: FunctionCode) => {
+      setSlots((s) => {
+        if (s[active] === code) return s;
+        const at = SLOTS.find((n) => s[n] === code);
+        return at === undefined ? { ...s, [active]: code } : { ...s, [at]: s[active], [active]: code };
+      });
+    },
+    [active],
+  );
+  const visible = (code: FunctionCode) => SLOTS.some((n) => slots[n] === code);
+
   const apply = useCallback(() => {
-    if (news.phase !== "preview" && !(news.phase === "applied" && news.edited)) return;
+    if (news.phase !== "preview" && !(news.phase === "applied" && news.edited)) return false;
     pendingApply.current = true;
     sendParams(clampShock(news.draft), news.phase === "applied" ? `${news.headline} (edited)` : news.headline);
+    return true;
   }, [news, sendParams]);
 
-  const restart = (next: Run, text: string) => {
-    setRun(next);
+  /** Start the previewed strategy: clamped by the engine's own rules, through the command queue (D-062). */
+  const startStrategy = () => {
+    if (strat.phase !== "preview") return;
+    let clamped: StrategySpec;
+    try {
+      clamped = clampStrategy(strat.draft);
+    } catch {
+      say("That strategy has a number the engine cannot use. Check the fields.");
+      return;
+    }
+    sendStrategy(clamped);
+    setBuilt({ text: strat.text, source: strat.source, reason: strat.reason });
+    setStrat({ phase: "live" });
+    say(paused ? "Strategy queued. The market is paused: it starts when you RUN." : "Strategy starts at the next tick. Watch STRAT, EXR and the tape.");
+  };
+
+  const submitStrategy = async (text: string) => {
+    if (!visible("STRAT")) open("STRAT");
+    setStrat({ phase: "interpreting", text });
+    const answer = await interpretStrategyText(text);
+    if (!answer.ok) {
+      setStrat({ phase: "compose", message: answer.message });
+      say(answer.message);
+      return;
+    }
+    if (answer.strategy === null) {
+      const message = answer.source === "offline" || answer.source === "ai" ? (answer as { message: string }).message : OFFLINE_STRATEGY_HELP;
+      setStrat({ phase: "compose", message });
+      say(message);
+      return;
+    }
+    setStrat({ phase: "preview", text, source: answer.source, reason: answer.strategy.reason, draft: answer.strategy.spec });
+    say(answer.source === "offline" ? (answer as { message: string }).message : "Check the rules in STRAT. Enter starts the strategy; Tab edits a field first.");
+  };
+
+  const restart = (next: Omit<Run, "strategy">, text: string) => {
+    // The student's strategy, if one is running, starts again at the open: same seed + same spec = same run.
+    const keep = market?.strategy?.status === "running" ? market.strategy.spec : null;
+    setRun({ ...next, strategy: keep });
     setPaused(false);
     // A new market: the old headline preview and the old candle selection belong to the market that ended.
     setNews({ phase: "idle" });
     pendingApply.current = false;
     setSelectedCandle(null);
     setWhoWindow(null);
-    say(text, -1);
+    if (keep === null && strat.phase === "live") setStrat({ phase: "compose", message: null });
+    say(keep === null ? text : `${text} Your strategy starts again at the open.`, -1);
     showRunInAddressBar(next.scenario, next.seed);
   };
 
   const onCommand = async (text: string) => {
     if (text.trim() === "") {
-      apply(); // Enter on an empty bar applies the preview
+      // Enter on an empty bar applies the headline preview, or else starts the previewed strategy.
+      if (!apply()) startStrategy();
       return;
     }
     const cmd = parseCommand(text);
@@ -153,6 +256,25 @@ export function Terminal() {
         return;
       case "news":
         await interpretHeadline(cmd.headline);
+        return;
+      case "open":
+        open(cmd.code);
+        say(`${cmd.code} is in panel ${active}. Click a panel to choose where codes open.`);
+        return;
+      case "strategy":
+        if (cmd.text === "") {
+          open("STRAT");
+          return;
+        }
+        await submitStrategy(cmd.text);
+        return;
+      case "stopStrategy":
+        if (market?.strategy?.status !== "running") {
+          say("No strategy is running.");
+          return;
+        }
+        sendStopStrategy();
+        say("Stopping the strategy: its shares are closed at the market.");
         return;
       case "order":
         sendOrder(cmd.order);
@@ -180,7 +302,8 @@ export function Terminal() {
           return;
         }
         const scenario = scenarioById(cmd.id) ?? FREE_PLAY;
-        restart({ scenario, seed: scenario.seed, runId: (run?.runId ?? 0) + 1 }, `Opening "${scenario.title}". Read the brief and task in NEWS.`);
+        restart({ scenario, seed: scenario.seed, runId: (run?.runId ?? 0) + 1 }, `Opening "${scenario.title}". Its brief and task are in NEWS.`);
+        open("NEWS");
         return;
       }
       case "seed":
@@ -256,11 +379,57 @@ export function Terminal() {
     );
   }
 
-  const market = status.market;
-  const { frame, candles, tape, frameCount, headlines, chat } = market;
+  const m = status.market;
+  const { frame, candles, tape, frameCount, headlines, chat } = m;
   const who = selectedCandle !== null && whoWindow !== null ? whoWindow : frame.who;
   const scenario = run?.scenario ?? FREE_PLAY;
   const shown = latestEvent !== null && latestEvent.seq > reply.seen ? formatUserEvent(latestEvent) : reply.text;
+  const canReveal = m.strategy !== null && built !== null;
+
+  /** Title, header note and body of a function, wherever it is shown. */
+  const fn = (code: FunctionCode): { title: string; meta?: string; body: ReactNode } => {
+    switch (code) {
+      case "GP":
+        return { title: `${frame.ticker} PRICE · ${formatInterval(frame.candleMs)} CANDLES`, body: <PriceChart candles={candles} candleMs={frame.candleMs} last={frame.last} headlines={headlines} selected={selectedCandle} onSelect={(s) => onSelectCandle(s, frame.candleMs)} /> };
+      case "WHO":
+        return { title: "WHO MOVED THE PRICE", body: <WhoPanel who={who} selected={selectedCandle !== null && whoWindow !== null} /> };
+      case "CHAT":
+        return { title: "DESK CHAT", body: <ChatPanel chat={chat} /> };
+      case "TAPE":
+        return { title: "TIME & SALES", body: <TapePanel tape={tape} /> };
+      case "BOOK":
+        return { title: `${frame.ticker} DEPTH`, body: <BookPanel frame={frame} /> };
+      case "TKT":
+        return { title: "ORDER TICKET", meta: "SIMULATED · NO REAL MONEY", body: <TicketPanel frame={frame} lastEvent={latestEvent} paused={paused} onCommand={onCommand} /> };
+      case "STRAT":
+        return {
+          title: "STRATEGY",
+          meta: "RULES FROM A FIXED MENU",
+          body: (
+            <StrategyPanel
+              state={strat}
+              strategy={m.strategy}
+              decisions={m.decisions}
+              onSubmit={(t) => void submitStrategy(t)}
+              onEdit={(draft) => setStrat((s) => (s.phase === "preview" ? { ...s, draft } : s))}
+              onStart={startStrategy}
+              onCancel={() => setStrat({ phase: "compose", message: null })}
+              onStop={() => void onCommand("STOP")}
+              onReveal={() => canReveal && setGlassOpen(true)}
+              onNew={() => setStrat({ phase: "compose", message: null })}
+            />
+          ),
+        };
+      case "NEWS":
+        return { title: "SCENARIO & HEADLINES", body: <NewsPanel scenario={scenario} market={m} onCommand={onCommand} /> };
+      case "EXR":
+        return { title: "EXECUTION REPORT", meta: "COST VS THE MID WHEN YOUR ORDER ARRIVED", body: <ExecPanel exr={m.exr} /> };
+    }
+  };
+
+  // Grid areas belong to slots (positions), not functions: a function opened in panel 7 takes panel 7's place.
+  const AREA: Record<Slot, string> = { 1: styles.gp, 2: styles.whoArea, 3: styles.chatArea, 4: styles.tape, 5: styles.book, 6: styles.tkt, 7: styles.newsArea, 8: styles.exr };
+
   return (
     <div className={styles.shell}>
       <StatusBar frame={frame} scenarioTitle={scenario.title} paused={paused} speed={speed} />
@@ -268,33 +437,32 @@ export function Terminal() {
       <CommandBar onCommand={onCommand} reply={shown} />
       <NewsPreview news={news} onEdit={onEdit} onApply={apply} onCancel={onCancel} />
       <main className={styles.grid}>
-        <Panel number={1} code="GP" title={`${frame.ticker} PRICE · ${formatInterval(frame.candleMs)} CANDLES`} className={styles.gp}>
-          <PriceChart candles={candles} candleMs={frame.candleMs} last={frame.last} headlines={headlines} selected={selectedCandle} onSelect={(s) => onSelectCandle(s, frame.candleMs)} />
-        </Panel>
-        <Panel number={2} code="WHO" title="WHO MOVED THE PRICE" className={styles.whoArea}>
-          <WhoPanel who={who} selected={selectedCandle !== null && whoWindow !== null} />
-        </Panel>
-        <Panel number={3} code="CHAT" title="DESK CHAT" className={styles.chatArea}>
-          <ChatPanel chat={chat} />
-        </Panel>
-        <Panel number={4} code="TAPE" title="TIME & SALES" className={styles.tape}>
-          <TapePanel tape={tape} />
-        </Panel>
-        <Panel number={5} code="BOOK" title={`${frame.ticker} DEPTH`} className={styles.book}>
-          <BookPanel frame={frame} />
-        </Panel>
-        <Panel number={6} code="TKT" title="ORDER TICKET" meta="SIMULATED · NO REAL MONEY" className={styles.tkt}>
-          <TicketPanel frame={frame} lastEvent={latestEvent} paused={paused} onCommand={onCommand} />
-        </Panel>
-        <Panel number={7} code="NEWS" title="SCENARIO & HEADLINES" className={styles.newsArea}>
-          <NewsPanel scenario={scenario} market={market} onCommand={onCommand} />
-        </Panel>
-        <Panel number={8} code="EXR" title="EXECUTION REPORT" meta="COST VS THE MID WHEN YOUR ORDER ARRIVED" className={styles.exr}>
-          <ExecPanel exr={market.exr} />
-        </Panel>
+        {SLOTS.map((n) => {
+          const f = fn(slots[n]);
+          return (
+            <Panel key={n} number={n} code={slots[n]} title={f.title} meta={f.meta} className={AREA[n]} active={n === active} onActivate={() => setActive(n)}>
+              {f.body}
+            </Panel>
+          );
+        })}
       </main>
       <ControlStrip paused={paused} speed={speed} onCommand={onCommand} />
       {helpOpen && <HelpOverlay onClose={() => setHelpOpen(false)} />}
+      {glassOpen && m.strategy !== null && built !== null && (
+        <GlassBox
+          text={built.text}
+          source={built.source}
+          reason={built.reason}
+          spec={m.strategy.spec}
+          strategy={m.strategy}
+          decisions={m.decisions}
+          onClose={() => setGlassOpen(false)}
+          onDownloadRun={() => {
+            wantRunData.current = true;
+            requestRunData();
+          }}
+        />
+      )}
     </div>
   );
 }

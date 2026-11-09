@@ -83,6 +83,11 @@ test("a headline that starts with a command word goes to the AI preview, and NEW
 
   await page.keyboard.press("Enter"); // the empty bar applies the preview
   await expect(page.getByTestId("news")).toHaveAttribute("data-phase", "applied");
+  // In free play panel 7 holds STRAT; the NEWS code opens the headline list there (D-066).
+  await expect(page.getByTestId("news-panel")).toHaveCount(0);
+  await page.keyboard.type("NEWS");
+  await page.keyboard.press("Enter");
+  await expect(page.locator("[data-slot='7']")).toHaveAttribute("data-panel", "NEWS");
   await expect(page.getByTestId("news-panel").getByTestId("headline-row")).toContainText("Buy now, pay later lender collapses");
   await expect(page.getByTestId("news-panel").getByTestId("headline-row")).toContainText("FV -2.0%");
   expect(errors).toEqual([]);

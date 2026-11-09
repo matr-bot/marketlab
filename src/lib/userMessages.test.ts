@@ -43,3 +43,9 @@ describe("formatUserEvent", () => {
     );
   });
 });
+
+describe("formatUserEvent: the strategy's orders", () => {
+  it("say they are the strategy's", () => {
+    expect(formatUserEvent({ ...base, source: "strategy" })).toBe("STRAT · BUY 500 filled @ 187.01");
+  });
+});

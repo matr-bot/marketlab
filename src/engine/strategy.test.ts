@@ -318,3 +318,40 @@ describe("StrategyRunner: edges (from the mutation run)", () => {
     expect(runner.equity.times[0]).toBe(10_000);
   });
 });
+
+describe("StrategyRunner: the record of what the rules read (the glass box's input)", () => {
+  it("starts with exactly the window before the first second, then every second the rules ran", () => {
+    const history = new MidHistory();
+    for (let sec = 0; sec < 100; sec++) history.onTickEnd(sec * 1_000, (20_000 + sec) * 2);
+    const runner = new StrategyRunner(spec({ entry: { rule: "buyAfterDrop", pct: 0.2, windowSec: 10 } }), 99_000);
+    runner.onTick(99_000, history);
+    // [89 s, 99 s): the window behind the first second, then 99 s itself.
+    expect(runner.mids.map(([t]) => t / 1_000)).toEqual([89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99]);
+    expect(runner.mids[0][1]).toBe(20_089);
+    history.onTickEnd(100_000, 40_000);
+    runner.onTick(100_000, history);
+    expect(runner.mids.at(-1)).toEqual([100_000, 20_000]);
+  });
+
+  it("stops at a stop: closing after it is not the rules' input", () => {
+    const { runner } = drive(spec(), [20_000, 19_400]);
+    runner.stop(1_500, 19_400); // closes 500, nothing filled yet
+    const h = new MidHistory();
+    h.onTickEnd(2_000, 38_000);
+    runner.onTick(2_000, h);
+    expect(runner.mids.map(([t]) => t)).toEqual([0, 1_000]);
+    expect(runner.equity.times).toEqual([0, 1_000, 2_000]); // equity goes on until flat
+  });
+
+  it("keeps a bounded record", () => {
+    const history = new MidHistory();
+    const runner = new StrategyRunner(spec({ entry: { rule: "buyAfterDrop", pct: 0.2, windowSec: 5 } }), 0);
+    const cap = MAX_EQUITY_POINTS + 300;
+    for (let sec = 0; sec < cap + 2; sec++) {
+      history.onTickEnd(sec * 1_000, 40_000);
+      runner.onTick(sec * 1_000, history);
+    }
+    expect(runner.mids).toHaveLength(cap);
+    expect(runner.mids[0][0]).toBe(2_000);
+  });
+});

@@ -55,3 +55,8 @@
   position: relative;
   overflow: hidden;
 }
+
+/* The active panel: where a typed code opens. Amber is UI, never market direction. */
+.active {
+  border-color: var(--amber);
+}

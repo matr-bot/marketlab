@@ -277,6 +277,13 @@ export class MarketFeed {
     return this.sim.stopStrategy();
   }
 
+  /** What the strategy's rules read and its equity, as recorded: the glass box's Python input (D-065). Null before a strategy has seen a mid. */
+  runData(): { start_ms: number; mids: [number, number][]; equity: number[]; capital: number } | null {
+    const runner = this.sim.strategy;
+    if (runner === null || runner.capital === null) return null;
+    return { start_ms: runner.startedAt, mids: runner.mids.map(([t, m]) => [t, m]), equity: [...runner.equity.values], capital: runner.capital };
+  }
+
   /** Run `ticks` ticks of the simulation, with the narrator watching each, and take in their fills. */
   advance(ticks: number): void {
     if (!Number.isSafeInteger(ticks) || ticks < 0) throw new RangeError(`ticks must be a non-negative integer, got ${ticks}`);

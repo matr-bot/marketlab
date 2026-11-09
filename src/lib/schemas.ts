@@ -88,9 +88,6 @@ export const StrategyModelOutput = z.object({
 });
 export type StrategyModelOutput = z.infer<typeof StrategyModelOutput>;
 
-/** What a strategy becomes when the text gives no number for it (the AI's prompt and the offline parser use the same). */
-export const STRATEGY_DEFAULTS = { windowSec: 60, stopLossPct: 0.02, takeProfitPct: 0.02, timeExitSec: 300, qty: 500, cooldownSec: 30 } as const;
-
 /** The clamped spec the engine will run, plus the one-line reason (the AI's, or empty offline). */
 export interface StrategyParams {
   readonly spec: StrategySpec;

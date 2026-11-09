@@ -21,6 +21,8 @@ scope.onmessage = (event) => {
     if (msg.type === "start") {
       // The scenario's market arrives already warmed up and trading, with its headlines on the calendar.
       feed = new MarketFeed(createScenarioMarket(scenarioById(msg.scenarioId) ?? FREE_PLAY, msg.seed), msg.seed);
+      // A rerun keeps the student's strategy: it starts at the first tick, so the same seed and spec give the same run.
+      if (msg.strategy !== undefined) feed.startStrategy(msg.strategy);
       pacer = new TickPacer();
       lastRequestAt = performance.now();
       scope.postMessage({ type: "frame", frame: feed.frame() });
@@ -45,6 +47,12 @@ scope.onmessage = (event) => {
       if (feed !== null) scope.postMessage({ type: "order", result: feed.submitOrder(msg.order) });
     } else if (msg.type === "cancelOrders") {
       if (feed !== null) scope.postMessage({ type: "order", result: feed.cancelOrders() });
+    } else if (msg.type === "startStrategy") {
+      if (feed !== null) scope.postMessage({ type: "order", result: feed.startStrategy(msg.spec) });
+    } else if (msg.type === "stopStrategy") {
+      if (feed !== null) scope.postMessage({ type: "order", result: feed.stopStrategy() });
+    } else if (msg.type === "runData") {
+      if (feed !== null) scope.postMessage({ type: "runData", data: feed.runData() });
     }
   } catch (err) {
     scope.postMessage({ type: "error", message: err instanceof Error ? err.message : String(err) });

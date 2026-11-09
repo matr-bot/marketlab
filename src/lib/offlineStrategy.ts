@@ -1,11 +1,16 @@
 import { clampStrategy, type EntryRule, type StrategySpec } from "@/engine/strategy";
-import { STRATEGY_DEFAULTS } from "./schemas";
 
 // Offline strategy parser (D-064): when the AI is unavailable, simple menu phrasing still works, so
 // the demo sentence ("Buy after a quick 3% drop…") never depends on the network. It only reads what
 // is plainly there: a side (buy/long or sell/short), a direction word (drop or rise), and a percent.
 // Anything it cannot read clearly gives null, never a guess. The page labels its result as understood
 // offline, so it is never mistaken for the AI.
+
+/**
+ * What a strategy becomes when the text gives no number for it. The AI's prompt states the same
+ * defaults (interpret.ts). Kept here, not in schemas.ts, so the page can parse offline without Zod.
+ */
+export const STRATEGY_DEFAULTS = { windowSec: 60, stopLossPct: 0.02, takeProfitPct: 0.02, timeExitSec: 300, qty: 500, cooldownSec: 30 } as const;
 
 export const OFFLINE_STRATEGY_HELP = "AI unavailable · try simple phrasing: Buy after a 3% drop within 60 seconds, stop loss 2%, take profit 2%.";
 

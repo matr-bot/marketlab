@@ -33,6 +33,7 @@ export function ExecPanel({ exr }: { exr: FrameExecution | null }) {
             <tr>
               <th title="Sim time of the order's first fill.">TIME</th>
               <th title="Buy or sell.">SIDE</th>
+              <th title="Who sent it: YOU by hand, or STRAT, your strategy.">SRC</th>
               <th title="Shares filled.">QTY</th>
               <th title="Average price you got.">AVG</th>
               <th title="The mid price when your order arrived: the price you intended.">ARR MID</th>
@@ -47,6 +48,7 @@ export function ExecPanel({ exr }: { exr: FrameExecution | null }) {
               <tr key={r.orderId} data-testid="exr-row">
                 <td>{formatSimTime(r.time)}</td>
                 <td>{r.side === "buy" ? "BUY" : "SELL"}</td>
+                <td data-testid="exr-src">{r.source === "strategy" ? "STRAT" : "YOU"}</td>
                 <td>{formatQty(r.qty)}</td>
                 <td>{formatAvgPrice(r.avgPrice)}</td>
                 <td>{r.arrivalMidX2 === null ? "—" : formatAvgPrice(r.arrivalMidX2 / 2)}</td>

@@ -174,3 +174,31 @@ describe("parseCommand: command words vs headlines (CLAUDE.md, Command bar)", ()
     expect(err("MLAB")).toBe("Type a code or a headline after MLAB, e.g. MLAB FED. Type HELP for the list of commands.");
   });
 });
+
+describe("parseCommand: function codes, STRAT and STOP (D-064, D-066)", () => {
+  it("a function code alone, or after MLAB, opens it", () => {
+    for (const code of ["GP", "WHO", "CHAT", "TAPE", "BOOK", "TKT", "STRAT", "NEWS", "EXR"]) expect(parseCommand(code)).toEqual({ kind: "open", code });
+    expect(parseCommand("mlab news")).toEqual({ kind: "open", code: "NEWS" });
+    expect(parseCommand(" strat ")).toEqual({ kind: "open", code: "STRAT" });
+  });
+
+  it("STRAT followed by text is a strategy, kept as typed", () => {
+    expect(parseCommand("STRAT Buy after a quick 3% drop")).toEqual({ kind: "strategy", text: "Buy after a quick 3% drop" });
+    expect(parseCommand("mlab strat   buy  @ 187")).toEqual({ kind: "strategy", text: "buy @ 187" });
+  });
+
+  it("NEWS followed by a headline is that headline, without the prefix", () => {
+    expect(parseCommand("NEWS Fed raises rates")).toEqual({ kind: "news", headline: "Fed raises rates" });
+  });
+
+  it("STOP alone stops the strategy; a headline starting with it is a headline (D-061)", () => {
+    expect(parseCommand("stop")).toEqual({ kind: "stopStrategy" });
+    expect(parseCommand("Stop-loss orders pile up")).toEqual({ kind: "news", headline: "Stop-loss orders pile up" });
+    expect(parseCommand("Stop work at the plant")).toEqual({ kind: "news", headline: "Stop work at the plant" });
+    expect(err("STOP 3")).toBe('Unknown command "STOP 3". Type HELP for the list of commands.');
+  });
+
+  it("codes that are English words stay headlines when followed by words", () => {
+    for (const h of ["Tape shows heavy selling", "Book value jumps", "Strategy shift at MLAB", "Chat logs leaked"]) expect(parseCommand(h)).toEqual({ kind: "news", headline: h });
+  });
+});

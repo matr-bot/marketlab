@@ -830,3 +830,149 @@
 .exrScroll .table td:nth-child(2) {
   width: 52px;
 }
+
+/* ---------- STRAT (D-064) ---------- */
+.strat {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 6px 8px;
+  overflow: auto;
+}
+
+.stratInput {
+  width: 100%;
+  resize: none;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  padding: 3px 5px;
+  font: inherit;
+  caret-color: var(--amber);
+}
+
+.stratInput:focus {
+  border-color: var(--amber);
+  outline: none;
+}
+
+.stratSource {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stratGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 3px 10px;
+}
+
+.stratField {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.stratField .label {
+  min-width: 78px;
+}
+
+.stratField select.input {
+  width: auto;
+  text-align: left;
+}
+
+.stratRules {
+  margin: 0;
+  padding-left: 14px;
+  color: var(--fg);
+}
+
+.stratStats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0 8px;
+  margin: 0;
+}
+
+.stratStats dt {
+  color: var(--amber);
+}
+
+.stratStats dd {
+  margin: 0;
+  color: var(--fg);
+}
+
+.stratHead {
+  display: flex;
+  gap: 6px;
+}
+
+/* ---------- glass box (D-065) ---------- */
+.glass {
+  position: fixed;
+  inset: 12px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border: 1px solid var(--amber);
+}
+
+.glass:focus {
+  outline: none;
+}
+
+.glassGrid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  grid-template-rows: minmax(0, 0.75fr) minmax(0, 1.6fr);
+  gap: 2px;
+  padding: 2px;
+}
+
+.glassPart {
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  overflow: auto;
+  min-height: 0;
+}
+
+.glassPart .sectionHead {
+  margin-top: 0;
+  font-size: inherit;
+  font-weight: 400;
+}
+
+.glassQuote {
+  color: var(--fg);
+  margin: 4px 0;
+}
+
+.formula {
+  border-bottom: 1px solid var(--border);
+  padding: 3px 0;
+}
+
+.formulaSym {
+  color: var(--amber-dim);
+}
+
+.formulaNum {
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.code {
+  margin: 4px 0;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  color: var(--fg);
+  white-space: pre;
+  overflow: auto;
+}

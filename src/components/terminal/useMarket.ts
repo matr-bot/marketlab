@@ -5,6 +5,8 @@ import type { Attribution } from "@/engine/attribution";
 import type { PresetResult } from "@/engine/feed";
 import type { ShockParams } from "@/engine/fundamental";
 import type { UserOrder, UserQueueResult } from "@/engine/simulation";
+import type { StrategySpec } from "@/engine/strategy";
+import type { RunData } from "@/lib/glassbox/python";
 import { applyFrame, type MarketState } from "@/lib/marketState";
 import type { FromWorker, ToWorker } from "@/worker/protocol";
 
@@ -15,6 +17,8 @@ export interface RunSpec {
   readonly seed: number;
   readonly scenarioId: string;
   readonly runId: number;
+  /** A strategy to start at the open (RERUN and SEED keep the student's strategy running; D-062). */
+  readonly strategy?: StrategySpec | null;
 }
 
 export interface MarketControls {
@@ -30,6 +34,8 @@ export interface MarketHandlers {
   readonly onOrderResult: (result: UserQueueResult) => void;
   /** The worker answered a WHO request for a window (a clicked candle, D-054). */
   readonly onWho: (attribution: Attribution) => void;
+  /** The strategy's run data arrived, for the glass box's download. */
+  readonly onRunData: (data: RunData | null) => void;
 }
 
 /**
@@ -52,6 +58,11 @@ export function useMarket(run: RunSpec | null, controls: MarketControls, handler
     controlsRef.current = controls;
   });
   const workerRef = useRef<Worker | null>(null);
+  // Read when a run starts, not a reason to restart one.
+  const strategyRef = useRef(run?.strategy ?? null);
+  useEffect(() => {
+    strategyRef.current = run?.strategy ?? null;
+  });
 
   const seed = run?.seed;
   const scenarioId = run?.scenarioId;
@@ -91,6 +102,10 @@ export function useMarket(run: RunSpec | null, controls: MarketControls, handler
         handlersRef.current.onWho(msg.attribution);
         return;
       }
+      if (msg.type === "runData") {
+        handlersRef.current.onRunData(msg.data);
+        return;
+      }
       market = applyFrame(market, msg.frame);
       setStatus({ kind: "live", market });
       // Paused: nothing is moving, so check back a few times a second instead of every animation frame.
@@ -100,7 +115,8 @@ export function useMarket(run: RunSpec | null, controls: MarketControls, handler
     worker.onerror = (event) => {
       if (!stopped) setStatus({ kind: "error", message: event.message || "the simulation worker failed to load" });
     };
-    send({ type: "start", seed, scenarioId });
+    const strategy = strategyRef.current;
+    send(strategy ? { type: "start", seed, scenarioId, strategy } : { type: "start", seed, scenarioId });
 
     return () => {
       stopped = true;
@@ -120,5 +136,8 @@ export function useMarket(run: RunSpec | null, controls: MarketControls, handler
     sendCustomShock: useCallback((fairValuePct: number, panicSensitivity: number, durationSec: number) => post({ type: "customShock", fairValuePct, panicSensitivity, durationSec }), [post]),
     sendOrder: useCallback((order: UserOrder) => post({ type: "order", order }), [post]),
     sendCancel: useCallback(() => post({ type: "cancelOrders" }), [post]),
+    sendStrategy: useCallback((spec: StrategySpec) => post({ type: "startStrategy", spec }), [post]),
+    sendStopStrategy: useCallback(() => post({ type: "stopStrategy" }), [post]),
+    requestRunData: useCallback(() => post({ type: "runData" }), [post]),
   };
 }

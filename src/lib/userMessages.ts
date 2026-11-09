@@ -6,6 +6,11 @@ import { formatAvgPrice, formatPrice, formatQty } from "./format";
  * it comes from the event the engine logged.
  */
 export function formatUserEvent(e: UserEvent): string {
+  // The strategy's orders say so, so they are never mistaken for the student's own (D-062).
+  return e.source === "strategy" ? `STRAT · ${describe(e)}` : describe(e);
+}
+
+function describe(e: UserEvent): string {
   if (e.kind === "cancel") return e.message;
   const side = e.side === "buy" ? "BUY" : "SELL";
   const what = `${side} ${formatQty(e.requestedQty)}${e.limitPrice !== null ? ` @ ${formatPrice(e.limitPrice)}` : ""}`;

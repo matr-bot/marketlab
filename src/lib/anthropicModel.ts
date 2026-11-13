@@ -3,6 +3,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { z } from "zod";
 import { MODEL, STRATEGY_SYSTEM_PROMPT, SYSTEM_PROMPT, type ModelCall, type ModelResult, type StrategyModelCall } from "./interpret";
 import { ModelOutput, StrategyModelOutput } from "./schemas";
+import { ScenarioModelOutput, SCENARIO_SYSTEM_PROMPT } from "./scenarioInterpret";
 
 // The one real model call (server-only: imported by /api/interpret and the live-check script,
 // never by a client component). Claude Haiku 5.5 with structured outputs at low effort; it takes
@@ -13,13 +14,13 @@ import { ModelOutput, StrategyModelOutput } from "./schemas";
 export const TIMEOUT_MS = 6_000;
 
 /** One structured-output call: the user's text goes inside `<tag>` tags (angle brackets removed) as data. */
-function createParseCall<S extends z.ZodType>(apiKey: string, system: string, schema: S, tag: string): (text: string) => Promise<ModelResult<z.infer<S>>> {
-  const client = new Anthropic({ apiKey, timeout: TIMEOUT_MS, maxRetries: 0 });
+function createParseCall<S extends z.ZodType>(apiKey: string, system: string, schema: S, tag: string, timeoutMs = TIMEOUT_MS, maxTokens = 2_048): (text: string) => Promise<ModelResult<z.infer<S>>> {
+  const client = new Anthropic({ apiKey, timeout: timeoutMs, maxRetries: 0 });
   return async (text) => {
     try {
       const response = await client.messages.parse({
         model: MODEL,
-        max_tokens: 2_048, // thinking counts toward max_tokens on this model
+        max_tokens: maxTokens, // thinking counts toward max_tokens on this model
         output_config: { effort: "low", format: zodOutputFormat(schema) },
         system,
         messages: [{ role: "user", content: `<${tag}>${text.replace(/[<>]/g, "")}</${tag}>` }],
@@ -42,4 +43,8 @@ export function createModelCall(apiKey: string): ModelCall {
 
 export function createStrategyModelCall(apiKey: string): StrategyModelCall {
   return createParseCall(apiKey, STRATEGY_SYSTEM_PROMPT, StrategyModelOutput, "strategy");
+}
+
+export function createScenarioModelCall(apiKey: string) {
+  return createParseCall(apiKey, SCENARIO_SYSTEM_PROMPT, ScenarioModelOutput, "scenario", 9_000, 4_096);
 }

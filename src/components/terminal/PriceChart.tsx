@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Candle, FrameHeadline } from "@/engine/feed";
 import { formatSimTime } from "@/engine/simClock";
 import { formatPrice } from "@/lib/format";
@@ -13,6 +13,7 @@ const MIN_SLOT = 6; // px per candle: candles widen to fill the panel, up to MAX
 const MAX_SLOT = 14;
 const MIN_RANGE = 10; // cents shown at least, so a quiet market is not blown up to full height
 const VOLUME_SHARE = 0.18; // bottom part of the plot used for volume bars
+export const FOCUS_WINDOW_MS = 30_000;
 const STEPS = [1, 2, 5, 10, 20, 25, 50, 100, 200, 500, 1_000, 2_000, 5_000, 10_000];
 
 /** Price chart (GP): candles from engine fills, volume bars, and the last price on the axis. */
@@ -27,6 +28,13 @@ interface Geometry {
 /** A headline's marker label: short codes as they are, long AI headlines shortened. */
 export function markerLabel(code: string): string {
   return code.length <= 12 ? code : `${code.slice(0, 11).trimEnd()}…`;
+}
+
+/** Select a drawing window only; the feed and the page keep every historical candle. */
+export function chartCandles(candles: readonly Candle[], candleMs: number, range: "full" | "30s"): readonly Candle[] {
+  if (range === "full" || candles.length === 0) return candles;
+  const cutoff = candles[candles.length - 1].start - Math.max(FOCUS_WINDOW_MS, candleMs) + candleMs;
+  return candles.filter((c) => c.start >= cutoff);
 }
 
 export function PriceChart({
@@ -49,6 +57,8 @@ export function PriceChart({
   const geometry = useRef<Geometry | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
+  const [range, setRange] = useState<"full" | "30s">("full");
+  const shownCandles = useMemo(() => chartCandles(candles, candleMs, range), [candles, candleMs, range]);
 
   useEffect(() => {
     const box = boxRef.current;
@@ -67,8 +77,8 @@ export function PriceChart({
     const g = canvas.getContext("2d");
     if (g === null) return;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    geometry.current = draw(g, size.w, size.h, candles, candleMs, last, headlines, selected, getComputedStyle(canvas).fontFamily);
-  }, [size, candles, candleMs, last, headlines, selected]);
+    geometry.current = draw(g, size.w, size.h, shownCandles, candleMs, last, headlines, selected, getComputedStyle(canvas).fontFamily);
+  }, [size, shownCandles, candleMs, last, headlines, selected]);
 
   // Click a candle to see who traded in it (WHO, D-054); click it again to go back to live.
   const onClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -78,13 +88,17 @@ export function PriceChart({
     const ago = Math.round((geo.plotW - geo.slot / 2 - 2 - x) / geo.slot);
     if (x >= geo.plotW || ago < 0 || ago >= geo.fits) return;
     const start = geo.newest - ago * candleMs;
-    if (!candles.some((c) => c.start === start)) return;
+    if (!shownCandles.some((c) => c.start === start)) return;
     onSelect(start === selected ? null : start);
   };
 
   return (
-    <div ref={boxRef} className={styles.chart} data-testid="chart" data-markers={headlines.map((h) => h.code).join("|")} data-selected={selected ?? ""} onClick={onClick}>
+    <div ref={boxRef} className={styles.chart} data-testid="chart" data-range={range} data-markers={headlines.map((h) => h.code).join("|")} data-selected={selected ?? ""} onClick={onClick}>
       <canvas ref={canvasRef} aria-label="Price chart: click a candle to see who traded in it" role="img" />
+      <div className={styles.chartControls} role="group" aria-label="Price chart range" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className={styles.chartRangeButton} aria-pressed={range === "full"} onClick={() => setRange("full")} title="Show all retained candles and the full price move">FULL</button>
+        <button type="button" className={styles.chartRangeButton} aria-pressed={range === "30s"} onClick={() => setRange("30s")} title="Focus on the last 30 seconds of trades; older candles are retained">30S</button>
+      </div>
     </div>
   );
 }

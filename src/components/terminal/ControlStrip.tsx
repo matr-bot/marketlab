@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { SPEEDS } from "@/lib/command";
 import styles from "./terminal.module.css";
 
@@ -29,6 +30,7 @@ export function ControlStrip({ paused, speed, onCommand }: { paused: boolean; sp
       <button type="button" className={styles.chip} data-testid="strip-link" onClick={() => onCommand("LINK")} title="Copy a link that reopens this exact scenario and seed">
         LINK
       </button>
+      <Link href="/studio" prefetch={false} className={styles.chip} style={{ textDecoration: "none" }} title="Interpret an open-ended hypothetical event across fictional assets">STUDIO</Link>
       <span className={styles.spacer} />
       <span className={styles.dim}>Type a headline or a command anywhere · FED · SHOCK -3 · BUY 500 · SELL 500 @ 187.25 · SCN · HELP</span>
     </footer>

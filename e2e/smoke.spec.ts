@@ -97,6 +97,24 @@ test("the offline headline FED, typed into the command bar, moves the market wit
   expect(errors).toEqual([]);
 });
 
+test("GP can focus on recent trades and return to the full chart after FED", async ({ page }) => {
+  await page.goto("/?seed=187");
+  await expect(page.getByTestId("last-price")).toBeVisible({ timeout: 5_000 });
+  const chart = page.getByTestId("chart");
+  await expect(chart).toHaveAttribute("data-range", "full");
+  await page.keyboard.type("FED");
+  await page.keyboard.press("Enter");
+  await expect(chart).toHaveAttribute("data-markers", "FED");
+  await chart.getByRole("button", { name: "30S" }).click();
+  await expect(chart).toHaveAttribute("data-range", "30s");
+  await expect(chart.getByRole("button", { name: "30S" })).toHaveAttribute("aria-pressed", "true");
+  await expect(chart).toHaveAttribute("data-markers", "FED");
+  await expect(page.getByTestId("tape").locator("tbody tr").first()).toBeVisible();
+  await chart.getByRole("button", { name: "FULL" }).click();
+  await expect(chart).toHaveAttribute("data-range", "full");
+  await expect(chart.getByRole("button", { name: "FULL" })).toHaveAttribute("aria-pressed", "true");
+});
+
 test("typing FED 30 times quickly never freezes the page (D-051)", async ({ page }) => {
   const errors: string[] = [];
   page.on("console", (msg) => {

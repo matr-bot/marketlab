@@ -20,8 +20,8 @@ describe("POST /api/interpret: HTTP checks (D-052)", () => {
     expect((await post(JSON.stringify({ headline: "Fed hikes" }), {})).status).toBe(403);
   });
 
-  it("refuses bodies over 1 KB, malformed JSON, and headlines outside 1 to 200 characters", async () => {
-    expect((await post(JSON.stringify({ headline: "x".repeat(2_000) }))).status).toBe(413);
+  it("refuses bodies over 2 KB, malformed JSON, and headlines outside 1 to 200 characters", async () => {
+    expect((await post(JSON.stringify({ headline: "x".repeat(3_000) }))).status).toBe(413);
     expect((await post("{not json"))).toHaveProperty("status", 400);
     expect((await post(JSON.stringify({ headline: "   " }))).status).toBe(400);
     expect((await post(JSON.stringify({ headline: "x".repeat(201) }))).status).toBe(400);
@@ -34,6 +34,25 @@ describe("POST /api/interpret: HTTP checks (D-052)", () => {
     expect(await res.json()).toMatchObject({ ok: true, source: "offline", preset: "FED" });
     const none = await (await post(JSON.stringify({ headline: "Aliens land in Ohio" }))).json();
     expect(none).toMatchObject({ ok: true, source: "offline", preset: null, scenario: null, message: "AI unavailable · offline, only clear events work (a rate hike, fraud, a beat, a miss, a downgrade), or type FED, CEO, BEAT or DOWNGRADE on its own." });
+  });
+});
+
+describe("POST /api/interpret: open-ended scenarios", () => {
+  let saved: string | undefined;
+  beforeEach(() => { saved = process.env.ANTHROPIC_API_KEY; delete process.env.ANTHROPIC_API_KEY; });
+  afterEach(() => { if (saved !== undefined) process.env.ANTHROPIC_API_KEY = saved; });
+
+  it("never silently applies an event when the AI service is unconfigured", async () => {
+    for (const text of ["SpaceX IPO", "Iran blocks the Strait of Hormuz", "A previously unseen industrial accident changes regional freight costs"]) {
+      const res = await post(JSON.stringify({ kind: "scenario", text }));
+      expect(await res.json()).toMatchObject({ ok: false, source: "unavailable", message: expect.stringContaining("Nothing was applied") });
+    }
+  });
+
+  it("checks the scenario length without changing headline and strategy contracts", async () => {
+    expect((await post(JSON.stringify({ kind: "scenario", text: " " }))).status).toBe(400);
+    expect((await post(JSON.stringify({ kind: "scenario", text: "x".repeat(501) }))).status).toBe(400);
+    expect(await (await post(JSON.stringify({ headline: "Fed hikes" }))).json()).toMatchObject({ source: "offline", preset: "FED" });
   });
 });
 

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { Scenario } from "@/engine/scenarios";
 import { SCENARIOS } from "@/engine/scenarios";
 import type { AgentType } from "@/engine/types";
@@ -81,6 +82,7 @@ export function NewsPanel({ scenario, market, onCommand }: { scenario: Scenario;
           <span className={styles.label}>TEACHES </span>
           {scenario.teaches}
         </p>
+        <p className={styles.para}><Link href="/studio" prefetch={false} style={{ color: "var(--amber)" }}>OPEN MARKET SCENARIO STUDIO →</Link> <span className={styles.dim}>Explore an open-ended hypothetical across five fictional assets.</span></p>
 
         <div className={styles.statRow} data-testid="scenario-stats">
           <span title="The last trade price when the scenario opened.">

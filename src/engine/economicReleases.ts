@@ -62,6 +62,11 @@ export function fairValueChange(pct: number): string {
   return `${pct > 0 ? "+" : ""}${(pct * 100).toFixed(1)}%`;
 }
 
+/** Price moves are percentage points; fair value is a fraction. Classify from the unrounded peak. */
+export function releaseOvershoot(peakPct: number | null, fairValuePct: number): boolean {
+  return peakPct !== null && Math.sign(peakPct) === Math.sign(fairValuePct) && Math.abs(peakPct) - Math.abs(fairValuePct * 100) > 0.3;
+}
+
 export function releaseLine(release: EconomicRelease): string {
   return `${release.indicator} ${releaseValue(release.indicator, release.actual)} vs ${releaseValue(release.indicator, release.forecast)} expected → fair value ${fairValueChange(release.shock.fairValuePct)}`;
 }

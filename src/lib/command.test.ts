@@ -146,7 +146,7 @@ describe("parseCommand: running the market and the scenario", () => {
     expect(parseCommand("scenarios")).toEqual({ kind: "scenario", id: null });
     expect(parseCommand("SCN Rate-Shock")).toEqual({ kind: "scenario", id: "rate-shock" });
     expect(parseCommand("SCENARIO quiet-buy")).toEqual({ kind: "scenario", id: "quiet-buy" });
-    expect(err("SCN moon")).toBe("Unknown scenario \"moon\". Scenarios: free, rate-shock, earnings-miss, fraud, whipsaw, quiet-buy, macro-day.");
+    expect(err("SCN moon")).toBe("Unknown scenario \"moon\". Scenarios: free, rate-shock, earnings-miss, fraud, whipsaw, quiet-buy, macro-day, demo.");
     expect(err("SCN rate shock")).toContain("Unknown scenario");
   });
 

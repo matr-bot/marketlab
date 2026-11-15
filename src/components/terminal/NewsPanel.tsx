@@ -121,13 +121,9 @@ export function NewsPanel({ scenario, market, onCommand }: { scenario: Scenario;
         {releaseHeadline?.release !== undefined && <div className={styles.releaseCard} data-testid="release-card" data-indicator={releaseHeadline.release.indicator}>
           <div className={styles.sectionHead}>HYPOTHETICAL RELEASE · {releaseHeadline.release.indicator}</div>
           <p>{releaseLine(releaseHeadline.release)}</p>
-          <p>FAIR VALUE {fairValueChange(releaseHeadline.fairValuePct)} · {releaseHeadline.reaction === null ? "30 s price reaction pending" : releaseHeadline.reaction.pricePct === null ? "no post-release trades in 30 s" : (() => {
-            const pricePct = releaseHeadline.reaction.pricePct;
-            const overshoot = pricePct !== 0 && Math.sign(pricePct) === Math.sign(releaseHeadline.fairValuePct) && Math.abs(pricePct) > Math.abs(releaseHeadline.fairValuePct);
-            return `PRICE ${pricePct > 0 ? "+" : ""}${pricePct.toFixed(2)}% IN 30 S${overshoot ? " (OVERSHOOT)" : ""}`;
-          })()}</p>
+          <p>FAIR VALUE {fairValueChange(releaseHeadline.fairValuePct)} · {releaseHeadline.reaction === null ? "30 s reaction pending" : releaseHeadline.reaction.pricePct === null ? "no post-release trades in 30 s" : `PEAK ${releaseHeadline.reaction.peakPct! > 0 ? "+" : ""}${releaseHeadline.reaction.peakPct!.toFixed(2)}% · AT 30 S ${releaseHeadline.reaction.pricePct > 0 ? "+" : ""}${releaseHeadline.reaction.pricePct.toFixed(2)}%${releaseHeadline.reaction.overshoot ? " (OVERSHOOT)" : ""}`}</p>
           <p>PANIC {releaseHeadline.release.shock.panicSensitivity.toFixed(2)}× · VOLATILITY {releaseHeadline.release.shock.volatilityMultiplier.toFixed(2)}× · LIQUIDITY {releaseHeadline.release.shock.liquidityMultiplier.toFixed(2)}×</p>
-          <p className={styles.dim}>Price is the last executed trade before the release versus the last executed trade in its first 30 s.</p>
+          <p className={styles.dim}>Executed trades versus the last trade before release. Peak is the furthest move toward fair value; overshoot requires more than 0.3 percentage points beyond it.</p>
         </div>}
 
 

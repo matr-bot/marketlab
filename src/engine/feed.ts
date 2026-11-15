@@ -1,7 +1,7 @@
 import { attribute, type Attribution } from "./attribution";
 import { buildOrderReports, totalExecution, type ExecutionTotals, type OrderReport } from "./executionReport";
 import { clampShock, type ShockParams } from "./fundamental";
-import { makeEconomicRelease, releaseLine, type EconomicRelease, type Indicator } from "./economicReleases";
+import { makeEconomicRelease, releaseLine, releaseOvershoot, type EconomicRelease, type Indicator } from "./economicReleases";
 import { maxDrawdownOf, returnsOf, sharpeOf, type DrawdownResult, type SharpeResult } from "./metrics";
 import type { Fill } from "./matchingEngine";
 import { Narrator, type ChatMessage } from "./narrator";
@@ -55,12 +55,18 @@ export interface FrameHeadline {
   readonly release?: EconomicRelease;
 }
 
-/** Executed-price reaction from the last trade before the release to the last trade in [0, 30 s). */
+/** Executed-price reaction from the last trade before the release, measured over [0, 30 s). */
 export interface FrameReleaseReaction {
   readonly seq: number;
   readonly priceBefore: Cents | null;
   readonly priceAfter: Cents | null;
+  /** Furthest executed price in the fair-value direction, including the starting price. */
+  readonly peakPrice: Cents | null;
+  readonly peakPct: number | null;
+  /** Last executed price in the first 30 s, versus the pre-release trade. */
   readonly pricePct: number | null;
+  /** Peak exceeds the fair-value move in the same direction by more than 0.3 percentage points. */
+  readonly overshoot: boolean;
 }
 
 /** A headline's first-minute P&L by agent type in cents (D-047). Sent once, when the minute is over. */
@@ -397,10 +403,14 @@ export class MarketFeed {
       if (s.release === undefined || this.sentReactions.has(s.seq) || this.sim.clock.now < s.time + 30_000) continue;
       const before = s.releaseBasePrice ?? null;
       // Use the full execution log: a frame can arrive long after the 10-minute WHO buffer expires.
-      const last = this.sim.engine.fills.findLast((f) => f.time < s.time + 30_000);
-      const after = last === undefined || last.time < s.time ? null : last.price;
+      const fills = this.sim.engine.fills.filter((f) => f.time >= s.time && f.time < s.time + 30_000);
+      const after = fills.at(-1)?.price ?? null;
       const pricePct = before === null || after === null ? null : Math.round(((after - before) / before) * 10_000) / 100;
-      out.push({ seq: s.seq, priceBefore: before, priceAfter: after, pricePct });
+      const peakPrice = before === null ? null : fills.reduce((peak, f) => s.shock.fairValuePct < 0 ? Math.min(peak, f.price) : Math.max(peak, f.price), before);
+      const rawPeakPct = before === null || peakPrice === null ? null : ((peakPrice - before) / before) * 100;
+      const peakPct = rawPeakPct === null ? null : Math.round(rawPeakPct * 100) / 100;
+      const overshoot = releaseOvershoot(rawPeakPct, s.shock.fairValuePct);
+      out.push({ seq: s.seq, priceBefore: before, priceAfter: after, peakPrice, peakPct, pricePct, overshoot });
       this.sentReactions.add(s.seq);
     }
     return out;

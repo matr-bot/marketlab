@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { makeEconomicRelease, RELEASE_CALIBRATION, releaseLine } from "./economicReleases";
+import { makeEconomicRelease, RELEASE_CALIBRATION, releaseLine, releaseOvershoot } from "./economicReleases";
 import { presetByCode } from "./presets";
 import { MarketFeed } from "./feed";
 import { createScenarioMarket, FREE_PLAY } from "./scenarios";
@@ -40,6 +40,13 @@ describe("hypothetical economic release calibration", () => {
     expect(() => makeEconomicRelease("GDP", Number.NaN)).toThrow(RangeError);
   });
 
+  it("requires a directional peak more than 0.3 percentage points beyond fair value", () => {
+    expect(releaseOvershoot(-3.3, -0.03)).toBe(false);
+    expect(releaseOvershoot(-3.31, -0.03)).toBe(true);
+    expect(releaseOvershoot(3.31, -0.03)).toBe(false);
+    expect(releaseOvershoot(null, -0.03)).toBe(false);
+  });
+
   it("shares FED's digest gate and sends a 30 s reaction from actual executed prices, once", () => {
     const feed = new MarketFeed(createScenarioMarket(FREE_PLAY, 187), 187);
     feed.frame();
@@ -53,19 +60,23 @@ describe("hypothetical economic release calibration", () => {
     const frame = feed.frame();
     const reaction = frame.releaseReactions[0];
     const shock = feed.sim.shocks[0];
-    const last = feed.sim.engine.fills.filter((f) => f.time >= shock.time && f.time < shock.time + 30_000).at(-1);
-    expect(reaction).toMatchObject({ seq: shock.seq, priceBefore: shock.releaseBasePrice, priceAfter: last?.price ?? null });
+    const fills = feed.sim.engine.fills.filter((f) => f.time >= shock.time && f.time < shock.time + 30_000);
+    const last = fills.at(-1);
+    const peak = Math.min(shock.releaseBasePrice!, ...fills.map((f) => f.price));
+    expect(reaction).toMatchObject({ seq: shock.seq, priceBefore: shock.releaseBasePrice, priceAfter: last?.price ?? null, peakPrice: peak });
     if (last !== undefined && shock.releaseBasePrice !== null) expect(reaction.pricePct).toBe(Math.round(((last.price - shock.releaseBasePrice!) / shock.releaseBasePrice!) * 10_000) / 100);
     expect(reaction.pricePct).toBe(-1.09); // seed 187: the executed price moved less than the -1.2% fair-value jump
+    expect(reaction.peakPct).toBe(Math.round(((peak - shock.releaseBasePrice!) / shock.releaseBasePrice!) * 10_000) / 100);
+    expect(reaction.overshoot).toBe(false);
     expect(feed.frame().releaseReactions).toEqual([]);
     expect(feed.applyRelease("JOBS", 150)).toMatchObject({ ok: true });
   });
 
-  it("pins a stronger RATES executed-price move for the release card's overshoot label", () => {
+  it("pins RATES peak and 30 s executed moves separately", () => {
     const feed = new MarketFeed(createScenarioMarket(FREE_PLAY, 187), 187);
     feed.frame();
     feed.applyRelease("RATES");
     feed.advance(300);
-    expect(feed.frame().releaseReactions[0].pricePct).toBe(-3.02);
+    expect(feed.frame().releaseReactions[0]).toMatchObject({ peakPct: -5.23, pricePct: -3.02, overshoot: true });
   });
 });

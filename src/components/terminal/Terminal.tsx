@@ -119,8 +119,8 @@ export function Terminal() {
   const [news, setNews] = useState<NewsState>({ phase: "idle" });
   const [whoWindow, setWhoWindow] = useState<Attribution | null>(null);
   const [selectedCandle, setSelectedCandle] = useState<number | null>(null);
-  // An assigned scenario opens with its brief (NEWS) in panel 7; free play opens with STRAT.
-  const [slots, setSlots] = useState<Record<Slot, FunctionCode>>(() => (initial !== null && initial.run.scenario.id !== FREE_PLAY.id ? { ...DEFAULT_SLOTS, 7: "NEWS" } : { ...DEFAULT_SLOTS }));
+  // Demo keeps STRAT in panel 7 and puts the release calendar in panel 2.
+  const [slots, setSlots] = useState<Record<Slot, FunctionCode>>(() => initial?.run.scenario.id === "demo" ? { ...DEFAULT_SLOTS, 2: "NEWS" } : initial !== null && initial.run.scenario.id !== FREE_PLAY.id ? { ...DEFAULT_SLOTS, 7: "NEWS" } : { ...DEFAULT_SLOTS });
   const [active, setActive] = useState<Slot>(DEFAULT_ACTIVE);
   const [strat, setStrat] = useState<StratState>({ phase: "compose", message: null });
   /** The English behind the strategy that was started: what the glass box quotes. */
@@ -311,7 +311,8 @@ export function Terminal() {
         // A scenario runs on its own seed, so a whole class sees the same market; say so if it replaces yours (QA #10).
         const seedNote = run !== null && run.seed !== scenario.seed ? ` It runs on its own seed, ${scenario.seed} (yours was ${run.seed}; SEED ${run.seed} reruns it on yours).` : "";
         restart({ scenario, seed: scenario.seed, runId: (run?.runId ?? 0) + 1 }, `Opening "${scenario.title}". Its brief and task are in NEWS.${seedNote}`);
-        open("NEWS");
+        if (scenario.id === "demo") setSlots({ ...DEFAULT_SLOTS, 2: "NEWS" });
+        else open("NEWS");
         return;
       }
       case "seed":

@@ -25,7 +25,7 @@ describe("the scenario library is well-formed", () => {
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids[0]).toBe("free");
     for (const id of ids) expect(id).toMatch(/^[a-z0-9-]+$/);
-    expect(ids).toEqual(["free", "rate-shock", "earnings-miss", "fraud", "whipsaw", "quiet-buy", "macro-day"]);
+    expect(ids).toEqual(["free", "rate-shock", "earnings-miss", "fraud", "whipsaw", "quiet-buy", "macro-day", "demo"]);
   });
 
   it("every scenario has a brief, a task, a lesson, a valid seed and headlines in time order inside its duration", () => {
@@ -70,6 +70,22 @@ describe("hypothetical macro-day", () => {
     expect(s.task).toContain("fair-value change");
     expect(s.task).toContain("30 seconds");
     expect(s.task).toContain("overshoot");
+  });
+});
+
+describe("hypothetical four-minute demo", () => {
+  it("pins CPI and RATES 30-second reaction windows to distinct times on seed 4107", () => {
+    const s = scenarioById("demo")!;
+    expect(s.seed).toBe(4107);
+    expect(s.durationSec).toBe(240);
+    expect(s.shocks.map((r) => [r.code, r.atSec])).toEqual([["CPI", 10], ["RATES", 120]]);
+    expect(s.shocks[1].atSec - s.shocks[0].atSec).toBeGreaterThan(30);
+    expect(s.shocks.every((r) => r.release !== undefined)).toBe(true);
+    expect(s.task).toContain("strategy");
+    expect(s.task).toContain("peak");
+    const sim = createScenarioMarket(s);
+    sim.run(1_210);
+    expect(sim.shocks.map((r) => [r.label, r.release?.indicator])).toEqual([["CPI", "CPI"], ["RATES", "RATES"]]);
   });
 });
 
@@ -118,7 +134,7 @@ describe("each scenario plays out as its brief says", () => {
   });
 
   it("negative headlines pull the price down by more than 1% within a minute, positive ones push it up", () => {
-    for (const s of SCENARIOS.filter((x) => x.id !== "macro-day")) {
+    for (const s of SCENARIOS.filter((x) => x.id !== "macro-day" && x.id !== "demo")) {
       for (const sh of s.shocks) {
         const before = midAt(s.id, sh.atSec - 1);
         const after = midAt(s.id, sh.atSec + 60);

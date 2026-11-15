@@ -54,9 +54,10 @@ export const FREE_PLAY: Scenario = {
   durationSec: 600,
 };
 
+const cpiRelease = makeEconomicRelease("CPI");
 const ratesRelease = makeEconomicRelease("RATES");
 const macroReleases = [
-  { atSec: 30, release: makeEconomicRelease("CPI") },      // 09:40:30
+  { atSec: 30, release: cpiRelease },                       // 09:40:30
   { atSec: 390, release: makeEconomicRelease("JOBS") },    // 09:46:30
   { atSec: 750, release: makeEconomicRelease("GDP") },     // 09:52:30
   { atSec: 1110, release: ratesRelease },                    // 09:58:30
@@ -130,6 +131,19 @@ export const SCENARIOS: readonly Scenario[] = [
     seed: 4106,
     shocks: macroReleases.map(({ atSec, release }) => ({ atSec, code: release.indicator, headline: releaseLine(release), shock: release.shock, release })),
     durationSec: 1440,
+  },
+  {
+    id: "demo",
+    title: "Hypothetical macro demo",
+    brief: "A short MLAB session has CPI at 09:40:10 and RATES at 09:42:00. Both releases are hypothetical; their 30-second price reactions do not overlap.",
+    task: "Build a strategy before CPI lands. Compare each forecast with the actual, then compare fair value with the peak and 30-second executed-price moves. Identify any overshoot beyond 0.3 percentage points and inspect your strategy's trades and execution cost.",
+    teaches: "Economic surprises, strategy execution, overshoot",
+    seed: 4107,
+    shocks: [
+      { atSec: 10, code: "CPI", headline: releaseLine(cpiRelease), shock: cpiRelease.shock, release: cpiRelease },
+      { atSec: 120, code: "RATES", headline: releaseLine(ratesRelease), shock: ratesRelease.shock, release: ratesRelease },
+    ],
+    durationSec: 240,
   },
 ];
 

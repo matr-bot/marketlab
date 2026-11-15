@@ -1,4 +1,4 @@
-import type { Candle, Frame, FrameExecution, FrameHeadline, FrameStrategy, FrameTrade } from "@/engine/feed";
+import type { Candle, Frame, FrameExecution, FrameHeadline, FrameReleaseReaction, FrameStrategy, FrameTrade } from "@/engine/feed";
 import type { ChatMessage } from "@/engine/narrator";
 import type { Scenario, ScenarioTarget } from "@/engine/scenarios";
 import type { Desk, UserEvent } from "@/engine/simulation";
@@ -22,6 +22,7 @@ export const MAX_USER_EVENTS = 50;
 /** A headline the page knows about, with its first-minute P&L once the worker has sent it. */
 export interface HeadlineState extends FrameHeadline {
   readonly pnlByType: Readonly<Partial<Record<AgentType, number>>> | null;
+  readonly reaction: FrameReleaseReaction | null;
 }
 
 export interface MarketState {
@@ -127,9 +128,10 @@ export function scenarioProgress(state: MarketState, scenario: Scenario): Scenar
 }
 
 function mergeHeadlines(have: readonly HeadlineState[], frame: Frame): readonly HeadlineState[] {
-  if (frame.headlines.length === 0 && frame.impacts.length === 0) return have;
+  if (frame.headlines.length === 0 && frame.impacts.length === 0 && frame.releaseReactions.length === 0) return have;
   const pnl = new Map(frame.impacts.map((i) => [i.seq, i.pnlByType]));
-  const merged = [...have, ...frame.headlines.map((h) => ({ ...h, pnlByType: null }))].map((h) => (pnl.has(h.seq) ? { ...h, pnlByType: pnl.get(h.seq)! } : h));
+  const reaction = new Map(frame.releaseReactions.map((r) => [r.seq, r]));
+  const merged = [...have, ...frame.headlines.map((h) => ({ ...h, pnlByType: null, reaction: null }))].map((h) => ({ ...h, pnlByType: pnl.get(h.seq) ?? h.pnlByType, reaction: reaction.get(h.seq) ?? h.reaction }));
   return merged.length > MAX_HEADLINES ? merged.slice(merged.length - MAX_HEADLINES) : merged;
 }
 

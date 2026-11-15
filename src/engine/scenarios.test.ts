@@ -25,7 +25,7 @@ describe("the scenario library is well-formed", () => {
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids[0]).toBe("free");
     for (const id of ids) expect(id).toMatch(/^[a-z0-9-]+$/);
-    expect(ids).toEqual(["free", "rate-shock", "earnings-miss", "fraud", "whipsaw", "quiet-buy"]);
+    expect(ids).toEqual(["free", "rate-shock", "earnings-miss", "fraud", "whipsaw", "quiet-buy", "macro-day"]);
   });
 
   it("every scenario has a brief, a task, a lesson, a valid seed and headlines in time order inside its duration", () => {
@@ -56,6 +56,20 @@ describe("the scenario library is well-formed", () => {
   it("scenarios other than free play each use their own seed", () => {
     const seeds = SCENARIOS.map((s) => s.seed);
     expect(new Set(seeds).size).toBe(seeds.length);
+  });
+});
+
+describe("hypothetical macro-day", () => {
+  it("schedules four 5-minute stress windows with 1-minute gaps and an exact task", () => {
+    const s = scenarioById("macro-day")!;
+    expect(s.seed).toBe(4106);
+    expect(s.durationSec).toBe(1440);
+    expect(s.shocks.map((r) => [r.code, r.atSec])).toEqual([["CPI", 30], ["JOBS", 390], ["GDP", 750], ["RATES", 1110]]);
+    expect(s.shocks.every((r) => r.release !== undefined && r.shock.durationSec === 300)).toBe(true);
+    expect(s.shocks.slice(1).every((r, i) => r.atSec - s.shocks[i].atSec >= s.shocks[i].shock.durationSec + 60)).toBe(true);
+    expect(s.task).toContain("fair-value change");
+    expect(s.task).toContain("30 seconds");
+    expect(s.task).toContain("overshoot");
   });
 });
 
@@ -104,7 +118,7 @@ describe("each scenario plays out as its brief says", () => {
   });
 
   it("negative headlines pull the price down by more than 1% within a minute, positive ones push it up", () => {
-    for (const s of SCENARIOS) {
+    for (const s of SCENARIOS.filter((x) => x.id !== "macro-day")) {
       for (const sh of s.shocks) {
         const before = midAt(s.id, sh.atSec - 1);
         const after = midAt(s.id, sh.atSec + 60);

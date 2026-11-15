@@ -1,4 +1,5 @@
 import { createDemoMarket, DEMO_SEED, WARMUP_TICKS } from "./demoMarket";
+import { makeEconomicRelease, releaseLine, type EconomicRelease } from "./economicReleases";
 import type { ShockParams } from "./fundamental";
 import type { Simulation } from "./simulation";
 import type { Side } from "./types";
@@ -16,6 +17,7 @@ export interface ScenarioShock {
   readonly code: string;
   readonly headline: string;
   readonly shock: ShockParams;
+  readonly release?: EconomicRelease;
 }
 
 /** A measurable goal: trade this much, and the debrief reports the cost. */
@@ -52,6 +54,14 @@ export const FREE_PLAY: Scenario = {
   durationSec: 600,
 };
 
+const ratesRelease = makeEconomicRelease("RATES");
+const macroReleases = [
+  { atSec: 30, release: makeEconomicRelease("CPI") },      // 09:40:30
+  { atSec: 390, release: makeEconomicRelease("JOBS") },    // 09:46:30
+  { atSec: 750, release: makeEconomicRelease("GDP") },     // 09:52:30
+  { atSec: 1110, release: ratesRelease },                    // 09:58:30
+] as const;
+
 export const SCENARIOS: readonly Scenario[] = [
   FREE_PLAY,
   {
@@ -61,7 +71,7 @@ export const SCENARIOS: readonly Scenario[] = [
     task: "Before the news, decide whether to hold, sell or stay out. Trade through the headline, then explain who sold, why the price overshot, and what your trades cost you.",
     teaches: "News, fair value, overreaction",
     seed: 4101,
-    shocks: [{ atSec: 30, code: "HIKE", headline: "Fed surprise hike 75bps", shock: { fairValuePct: -0.03, panicSensitivity: 1.5, durationSec: 300, volatilityMultiplier: 1, liquidityMultiplier: 1 } }],
+    shocks: [{ atSec: 30, code: "HIKE", headline: "Fed surprise hike 75bps", shock: ratesRelease.shock, release: ratesRelease }],
     durationSec: 420,
   },
   {
@@ -111,6 +121,16 @@ export const SCENARIOS: readonly Scenario[] = [
     target: { side: "buy", qty: 50_000 },
     durationSec: 900,
   },
+  {
+    id: "macro-day",
+    title: "Hypothetical macro day",
+    brief: "Four hypothetical releases arrive at 09:40:30 (CPI), 09:46:30 (JOBS), 09:52:30 (GDP), and 09:58:30 (RATES). Each stress window lasts 5 minutes, with a 1-minute gap before the next release.",
+    task: "Before each print, compare the forecast with your expectation. After it lands, compare the fair-value change with MLAB's executed-price move after 30 seconds. Identify any overshoot and explain what the crowd did; you may trade and inspect your execution cost.",
+    teaches: "Economic surprises, price discovery, overshoot",
+    seed: 4106,
+    shocks: macroReleases.map(({ atSec, release }) => ({ atSec, code: release.indicator, headline: releaseLine(release), shock: release.shock, release })),
+    durationSec: 1440,
+  },
 ];
 
 const BY_ID: ReadonlyMap<string, Scenario> = new Map(SCENARIOS.map((s) => [s.id, s]));
@@ -154,6 +174,6 @@ export function createScenarioMarket(scenario: Scenario, seed: number = scenario
   const sim = createDemoMarket(seed);
   sim.run(WARMUP_TICKS);
   const start = sim.clock.now;
-  for (const s of scenario.shocks) sim.scheduleShock(start + s.atSec * 1_000, s.shock, s.code, s.headline);
+  for (const s of scenario.shocks) sim.scheduleShock(start + s.atSec * 1_000, s.shock, s.code, s.headline, s.release);
   return sim;
 }

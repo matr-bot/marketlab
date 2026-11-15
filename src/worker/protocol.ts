@@ -1,6 +1,7 @@
 import type { Attribution } from "@/engine/attribution";
 import type { Frame, PresetResult } from "@/engine/feed";
 import type { ShockParams } from "@/engine/fundamental";
+import type { Indicator } from "@/engine/economicReleases";
 import type { UserOrder, UserQueueResult } from "@/engine/simulation";
 import type { StrategySpec } from "@/engine/strategy";
 import type { RunData } from "@/lib/glassbox/python";
@@ -16,6 +17,8 @@ export type ToWorker =
   | { readonly type: "frame"; readonly speed: number; readonly paused: boolean }
   /** Apply an offline preset headline at the start of the next tick (D-048); answered with `shock`. */
   | { readonly type: "shock"; readonly code: string }
+  /** Hypothetical release, through the same 3 s digest gate as a preset. */
+  | { readonly type: "release"; readonly indicator: Indicator; readonly actual?: number }
   /** Apply a headline with explicit params (AI or edited, D-052); answered with `shock`. */
   | { readonly type: "shockParams"; readonly shock: ShockParams; readonly label: string }
   /** Who moved the price in [from, to) (a clicked candle, D-054); answered with `who`. */

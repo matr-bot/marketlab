@@ -1,5 +1,6 @@
 import type { Fill } from "./matchingEngine";
 import type { Simulation } from "./simulation";
+import { releaseLine } from "./economicReleases";
 
 // The desk-chat narrator (D-055, CLAUDE.md "Desk chat panel"). Deterministic, not AI: it watches the
 // simulation at every tick end and posts short desk-style messages built only from engine numbers
@@ -154,7 +155,7 @@ export class Narrator {
       this.seenShock = s.seq + 1;
       const pct = (100 * s.shock.fairValuePct).toFixed(1);
       const sign = s.shock.fairValuePct > 0 ? "+" : "";
-      this.push("headline", `${s.label} · fair value ${sign}${pct}%: value traders now price MLAB at ${price(s.fairValueAfter)}.`, now);
+      this.push("headline", s.release === undefined ? `${s.label} · fair value ${sign}${pct}%: value traders now price MLAB at ${price(s.fairValueAfter)}.` : releaseLine(s.release), now);
       this.watches.push({ seq: s.seq, time: s.time, label: s.label, m0: mid ?? s.fairValueBefore, down: s.fairValueAfter < s.fairValueBefore, extreme: mid ?? s.fairValueBefore, flowDone: false, recoveryDone: false, impactDone: false });
       this.panicSellers = new Set();
       this.panicAnnounced = 0;

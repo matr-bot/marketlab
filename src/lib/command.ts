@@ -1,6 +1,7 @@
 import { PRESETS, presetByCode } from "@/engine/presets";
 import { parseSeed, SCENARIOS, scenarioById } from "@/engine/scenarios";
 import { MAX_USER_ORDER_QTY, type UserOrder } from "@/engine/simulation";
+import { INDICATORS, type Indicator } from "@/engine/economicReleases";
 
 // The command bar (CLAUDE.md, Command bar). Keyboard first: every action in the terminal is a
 // command, and the buttons on the page just run the same ones. Known codes and commands are matched
@@ -13,6 +14,8 @@ export type Command =
   | { readonly kind: "empty" }
   /** A preset headline: FED, CEO, BEAT, DOWNGRADE (D-048). */
   | { readonly kind: "shock"; readonly code: string; readonly headline: string }
+  /** Hypothetical economic release; null means the catalog's authored actual. */
+  | { readonly kind: "release"; readonly indicator: Indicator; readonly actual: number | null }
   /** Any other text: a headline for the AI to interpret (D-052). */
   | { readonly kind: "news"; readonly headline: string }
   /** The student's own headline: fair-value change as a fraction (−0.03 = −3%), panic sensitivity, duration in seconds. */
@@ -56,6 +59,7 @@ export const HELP_LINES: readonly (readonly [string, string])[] = [
   ["GP · BOOK · TAPE · TKT · EXR · STRAT · NEWS · WHO · CHAT", "Open that function in the active panel (click a panel's header to make it active; panel 7 by default)."],
   ["STRAT buy after a 3% drop", "Describe a strategy in plain English. Check its rules, then Enter starts it trading. STOP stops it."],
   ["FED · CEO · BEAT · DOWNGRADE", "Send a ready-made headline. The crowd reacts; fair value jumps and panic sellers may cascade."],
+  ["CPI 3.4 · JOBS 150K · GDP 2.3 · RATES +0.75", "Hypothetical MLAB releases. A code alone uses an authored example; an optional number sets the actual. JOBS 150 and 150K mean the same thing. FED is the default RATES release."],
   ["Any other text", "A headline in your own words. The AI turns it into parameters you check and edit before they apply. If the AI is unavailable, only a clear event (a rate hike, fraud, a beat, a miss, a downgrade) maps to an offline preset, and the reply says which words matched; anything else has no effect."],
   ["SHOCK -3", "Your own shock: fair value falls 3%, with panic sellers 1.5× as jumpy for 300 s (a rise adds no panic). Set both: SHOCK -3 2 120. Values past the limits (±20%) are capped, and the reply says so."],
   ["BUY 500 · SELL 500", "A market order: trades at once against the book at the best prices, then the next, until filled."],
@@ -71,6 +75,17 @@ const PERCENT = /^[+-]?\d+(\.\d+)?%?$/;
 const PLAIN_NUMBER = /^\d+(\.\d+)?$/;
 /** A word that starts like a number ("500", "-3", "$187", "--3"): after a command word, it means a command. */
 const NUMBERISH = /^[-+$.]*\d/;
+
+function parseRelease(indicator: Indicator, args: readonly string[]): Command {
+  const example = indicator === "JOBS" ? "JOBS 150K" : indicator === "RATES" ? "RATES +0.75" : indicator === "GDP" ? "GDP 2.3" : "CPI 3.4";
+  if (args.length === 0) return { kind: "release", indicator, actual: null };
+  const token = args[0];
+  const valid = indicator === "JOBS" ? /^[+-]?\d+[kK]?$/.test(token) : /^[+-]?\d+(?:\.\d{1,2})?%?$/.test(token);
+  if (args.length !== 1 || !valid) return { kind: "error", message: `${indicator} needs one actual value, e.g. ${example}.` };
+  const actual = Number(token.replace(/[kK%]$/, ""));
+  if (!Number.isFinite(actual) || Math.abs(actual) > (indicator === "JOBS" ? 10_000 : 100)) return { kind: "error", message: `${indicator} needs one actual value, e.g. ${example}.` };
+  return { kind: "release", indicator, actual };
+}
 
 /** "-3", "-3%", "+2.5%" → −0.03 etc. as a fraction; null if not a number. */
 function parsePercent(text: string): number | null {
@@ -139,6 +154,10 @@ export function parseCommand(input: string): Command {
 
   const preset = words.length === 1 ? presetByCode(verb) : undefined;
   if (preset) return { kind: "shock", code: preset.code, headline: preset.headline };
+  if ((INDICATORS as readonly string[]).includes(verb)) {
+    if (args.length > 1 && !numeric) return news;
+    return parseRelease(verb as Indicator, args);
+  }
   // A function code alone opens it; followed by words it is a headline (D-061), except STRAT and NEWS below.
   if (args.length === 0 && (FUNCTION_CODES as readonly string[]).includes(verb)) return { kind: "open", code: verb as FunctionCode };
   // STRAT is not an English word: whatever follows is the strategy. NEWS <headline> is a headline

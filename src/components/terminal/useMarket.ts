@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Attribution } from "@/engine/attribution";
 import type { PresetResult } from "@/engine/feed";
 import type { ShockParams } from "@/engine/fundamental";
+import type { Indicator } from "@/engine/economicReleases";
 import type { UserOrder, UserQueueResult } from "@/engine/simulation";
 import type { StrategySpec } from "@/engine/strategy";
 import type { RunData } from "@/lib/glassbox/python";
@@ -131,6 +132,7 @@ export function useMarket(run: RunSpec | null, controls: MarketControls, handler
   return {
     status,
     sendShock: useCallback((code: string) => post({ type: "shock", code }), [post]),
+    sendRelease: useCallback((indicator: Indicator, actual: number | null) => post({ type: "release", indicator, ...(actual === null ? {} : { actual }) }), [post]),
     sendParams: useCallback((shock: ShockParams, label: string) => post({ type: "shockParams", shock, label }), [post]),
     requestWho: useCallback((from: number, to: number) => post({ type: "who", from, to }), [post]),
     sendCustomShock: useCallback((fairValuePct: number, panicSensitivity: number, durationSec: number) => post({ type: "customShock", fairValuePct, panicSensitivity, durationSec }), [post]),

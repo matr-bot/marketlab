@@ -54,7 +54,7 @@ const DEFAULT_SLOTS: Readonly<Record<Slot, FunctionCode>> = { 1: "GP", 2: "WHO",
 /** The panel a typed code opens in until another is clicked. */
 const DEFAULT_ACTIVE: Slot = 7;
 
-const WELCOME = "Type a headline, or FED, BUY 500, STRAT <your idea> or HELP, and press Enter.";
+const WELCOME = "Type a headline, CPI 3.4, FED, BUY 500, STRAT <your idea> or HELP, and press Enter.";
 
 /** Ask /api/interpret; if the route itself is unreachable (no Wi-Fi), fall back here the same way. */
 async function interpret(headline: string): Promise<InterpretResponse> {
@@ -155,7 +155,7 @@ export function Terminal() {
     [say],
   );
   const spec: RunSpec | null = run === null ? null : { seed: run.seed, scenarioId: run.scenario.id, runId: run.runId, strategy: run.strategy };
-  const { status, sendShock, sendParams, requestWho, sendCustomShock, sendOrder, sendCancel, sendStrategy, sendStopStrategy, requestRunData } = useMarket(spec, { speed, paused }, { onShockResult, onOrderResult, onWho, onRunData });
+  const { status, sendShock, sendRelease, sendParams, requestWho, sendCustomShock, sendOrder, sendCancel, sendStrategy, sendStopStrategy, requestRunData } = useMarket(spec, { speed, paused }, { onShockResult, onOrderResult, onWho, onRunData });
 
   const market = status.kind === "live" ? status.market : null;
   const latestEvent = market?.userEvents.at(-1) ?? null;
@@ -251,6 +251,10 @@ export function Terminal() {
       case "shock":
         setNews({ phase: "idle" });
         sendShock(cmd.code);
+        return;
+      case "release":
+        setNews({ phase: "idle" });
+        sendRelease(cmd.indicator, cmd.actual);
         return;
       case "customShock":
         setNews({ phase: "idle" });

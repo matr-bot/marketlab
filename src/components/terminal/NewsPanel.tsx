@@ -4,6 +4,8 @@ import type { Scenario } from "@/engine/scenarios";
 import { SCENARIOS } from "@/engine/scenarios";
 import type { AgentType } from "@/engine/types";
 import { formatDollars, formatElapsed, formatPercent, formatPrice, formatQty, formatBps } from "@/lib/format";
+import { fairValueChange, releaseLine, releaseValue } from "@/engine/economicReleases";
+import { formatSimTime } from "@/engine/simClock";
 import { scenarioProgress, type HeadlineState, type MarketState } from "@/lib/marketState";
 import styles from "./terminal.module.css";
 import { useOverflowFade } from "./useOverflowFade";
@@ -38,6 +40,8 @@ export function NewsPanel({ scenario, market, onCommand }: { scenario: Scenario;
   const done = p.elapsedSec >= scenario.durationSec;
   const mm = pnl?.marketMaker;
   const informed = pnl?.value;
+  const releaseHeadline = headlines.find((h) => h.release !== undefined);
+  const scheduled = scenario.shocks.filter((s) => s.release !== undefined);
   return (
     <div className={styles.newsWrap} data-testid="news-panel">
       {/* Pinned: what the scenario is, how far along, and the target if it has one, always visible (QA #6). */}
@@ -99,6 +103,32 @@ export function NewsPanel({ scenario, market, onCommand }: { scenario: Scenario;
             <span className={styles.label}>HIGH</span> {p.high === null ? "—" : formatPrice(p.high)}
           </span>
         </div>
+
+        {scheduled.length > 0 && <div className={styles.releaseCalendar} data-testid="release-calendar">
+          <div className={styles.sectionHead}>HYPOTHETICAL RELEASE CALENDAR</div>
+          {scheduled.map((s) => {
+            const at = market.startTime + s.atSec * 1_000;
+            const landed = market.headlines.some((h) => h.time >= at && h.code === s.code && h.release !== undefined);
+            return <div key={`${s.code}-${s.atSec}`} className={styles.releaseRow} data-indicator={s.code} data-state={landed ? "released" : "upcoming"}>
+              <span>{formatSimTime(at).slice(0, 8)}</span>
+              <span>{s.code}</span>
+              <span>FORECAST {releaseValue(s.release!.indicator, s.release!.forecast)}</span>
+              <span>{landed ? "RELEASED" : `IN ${formatElapsed(Math.ceil((at - market.frame.time) / 1000))}`}</span>
+            </div>;
+          })}
+        </div>}
+
+        {releaseHeadline?.release !== undefined && <div className={styles.releaseCard} data-testid="release-card" data-indicator={releaseHeadline.release.indicator}>
+          <div className={styles.sectionHead}>HYPOTHETICAL RELEASE · {releaseHeadline.release.indicator}</div>
+          <p>{releaseLine(releaseHeadline.release)}</p>
+          <p>FAIR VALUE {fairValueChange(releaseHeadline.fairValuePct)} · {releaseHeadline.reaction === null ? "30 s price reaction pending" : releaseHeadline.reaction.pricePct === null ? "no post-release trades in 30 s" : (() => {
+            const pricePct = releaseHeadline.reaction.pricePct;
+            const overshoot = pricePct !== 0 && Math.sign(pricePct) === Math.sign(releaseHeadline.fairValuePct) && Math.abs(pricePct) > Math.abs(releaseHeadline.fairValuePct);
+            return `PRICE ${pricePct > 0 ? "+" : ""}${pricePct.toFixed(2)}% IN 30 S${overshoot ? " (OVERSHOOT)" : ""}`;
+          })()}</p>
+          <p>PANIC {releaseHeadline.release.shock.panicSensitivity.toFixed(2)}× · VOLATILITY {releaseHeadline.release.shock.volatilityMultiplier.toFixed(2)}× · LIQUIDITY {releaseHeadline.release.shock.liquidityMultiplier.toFixed(2)}×</p>
+          <p className={styles.dim}>Price is the last executed trade before the release versus the last executed trade in its first 30 s.</p>
+        </div>}
 
 
         <div className={styles.sectionHead}>HEADLINES</div>

@@ -1,6 +1,7 @@
 import { attribute, type Attribution } from "./attribution";
 import { buildOrderReports, totalExecution, type ExecutionTotals, type OrderReport } from "./executionReport";
 import { clampShock, type ShockParams } from "./fundamental";
+import { makeEconomicRelease, releaseLine, type EconomicRelease, type Indicator } from "./economicReleases";
 import { maxDrawdownOf, returnsOf, sharpeOf, type DrawdownResult, type SharpeResult } from "./metrics";
 import type { Fill } from "./matchingEngine";
 import { Narrator, type ChatMessage } from "./narrator";
@@ -51,6 +52,15 @@ export interface FrameHeadline {
   readonly headline: string;
   /** The (clamped) fair-value jump, as a fraction: −0.03 = −3%. */
   readonly fairValuePct: number;
+  readonly release?: EconomicRelease;
+}
+
+/** Executed-price reaction from the last trade before the release to the last trade in [0, 30 s). */
+export interface FrameReleaseReaction {
+  readonly seq: number;
+  readonly priceBefore: Cents | null;
+  readonly priceAfter: Cents | null;
+  readonly pricePct: number | null;
 }
 
 /** A headline's first-minute P&L by agent type in cents (D-047). Sent once, when the minute is over. */
@@ -143,6 +153,8 @@ export interface Frame {
   readonly candles: readonly Candle[];
   /** Headlines applied since the last frame (each is sent exactly once; D-051). */
   readonly headlines: readonly FrameHeadline[];
+  /** Finalized 30 s release reactions, each sent once. */
+  readonly releaseReactions: readonly FrameReleaseReaction[];
   /** First-minute P&L records finalized since the last frame (each sent exactly once). */
   readonly impacts: readonly FrameImpact[];
   /** Desk-chat messages posted since the last frame (each sent exactly once; D-055). */
@@ -199,6 +211,7 @@ export class MarketFeed {
   private whoFills: Fill[] = [];
   /** Next headline / impact seq to send. */
   private nextHeadline = 0;
+  private readonly sentReactions = new Set<number>();
   private nextImpact = 0;
   private nextUserEvent = 0;
   private dropped = 0;
@@ -236,8 +249,16 @@ export class MarketFeed {
   applyPreset(code: string): PresetResult {
     const preset = presetByCode(code);
     if (preset === undefined) return { ok: false, message: `Unknown headline code "${code.slice(0, 20)}".` };
-    const r = this.sim.applyShock(preset.shock, preset.code);
+    const r = this.sim.applyShock(preset.shock, preset.code, preset.release === undefined ? undefined : preset.headline, preset.release);
     return r.ok ? { ok: true, code: preset.code, headline: preset.headline } : { ok: false, message: r.message };
+  }
+
+  /** A hypothetical release uses the same pending slot and 3 s digest rule as FED. */
+  applyRelease(indicator: Indicator, actual?: number): PresetResult {
+    const release = makeEconomicRelease(indicator, actual);
+    const headline = releaseLine(release);
+    const r = this.sim.applyShock(release.shock, indicator, headline, release);
+    return r.ok ? { ok: true, code: indicator, headline } : { ok: false, message: r.message };
   }
 
   /**
@@ -346,6 +367,7 @@ export class MarketFeed {
       candleMs: this.candleMs,
       candles: this.dirtyFrom === null ? [] : this.candles.slice(this.dirtyFrom).map((c) => ({ ...c })),
       headlines: this.newHeadlines(),
+      releaseReactions: this.newReactions(),
       impacts: this.newImpacts(),
       chat: this.narrator.take(),
       who: this.attribute(this.sim.clock.now - WHO_WINDOW_MS, this.sim.clock.now + 1),
@@ -364,8 +386,23 @@ export class MarketFeed {
   private newHeadlines(): FrameHeadline[] {
     const out = this.sim.shocks
       .filter((s) => s.seq >= this.nextHeadline)
-      .map((s) => ({ seq: s.seq, time: s.time, code: s.label, headline: s.headline ?? presetByCode(s.label)?.headline ?? s.label, fairValuePct: s.shock.fairValuePct }));
+      .map((s) => ({ seq: s.seq, time: s.time, code: s.label, headline: s.headline ?? presetByCode(s.label)?.headline ?? s.label, fairValuePct: s.shock.fairValuePct, ...(s.release === undefined ? {} : { release: s.release }) }));
     if (out.length > 0) this.nextHeadline = out[out.length - 1].seq + 1;
+    return out;
+  }
+
+  private newReactions(): FrameReleaseReaction[] {
+    const out: FrameReleaseReaction[] = [];
+    for (const s of this.sim.shocks) {
+      if (s.release === undefined || this.sentReactions.has(s.seq) || this.sim.clock.now < s.time + 30_000) continue;
+      const before = s.releaseBasePrice ?? null;
+      // Use the full execution log: a frame can arrive long after the 10-minute WHO buffer expires.
+      const last = this.sim.engine.fills.findLast((f) => f.time < s.time + 30_000);
+      const after = last === undefined || last.time < s.time ? null : last.price;
+      const pricePct = before === null || after === null ? null : Math.round(((after - before) / before) * 10_000) / 100;
+      out.push({ seq: s.seq, priceBefore: before, priceAfter: after, pricePct });
+      this.sentReactions.add(s.seq);
+    }
     return out;
   }
 

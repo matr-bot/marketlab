@@ -8,6 +8,7 @@ import type { AgentType, CancelResult, Cents, OrderId, RejectReason, Side } from
 import { DEFAULT_VOLATILITY_PARAMS, VolatilityEstimator, type VolatilityParams } from "./volatility";
 import { clampStrategy, StrategyRunner, type StrategyIntent, type StrategySpec } from "./strategy";
 import { clampShock, DEFAULT_FUNDAMENTAL_PARAMS, Fundamental, MidHistory, type FundamentalParams, type ShockParams } from "./fundamental";
+import type { EconomicRelease } from "./economicReleases";
 
 // The simulation loop (D-023). Each tick: advance the clock 100 ms, take every agent arrival in
 // that window in exact time order, and let each agent act at its arrival's timestamp. Orders
@@ -131,6 +132,9 @@ export interface ShockEvent {
   /** The headline text, when it differs from the label (a scenario or custom shock). */
   readonly headline?: string;
   readonly shock: ShockParams;
+  readonly release?: EconomicRelease;
+  /** Last executed price immediately before a release, for its exact 30 s reaction. */
+  readonly releaseBasePrice?: Cents | null;
   /** Fair value just before and just after the jump, in cents. */
   readonly fairValueBefore: number;
   readonly fairValueAfter: number;
@@ -175,9 +179,9 @@ export class Simulation {
   readonly fundamental: Fundamental;
   /** The mid once per second, for drawdown windows. */
   readonly midHistory = new MidHistory();
-  private pendingShock: { shock: ShockParams; label: string; headline?: string } | null = null;
+  private pendingShock: { shock: ShockParams; label: string; headline?: string; release?: EconomicRelease } | null = null;
   /** Scenario headlines due at fixed sim times, soonest first (ties keep the order they were added). */
-  private readonly scheduled: { at: number; shock: ShockParams; label: string; headline?: string }[] = [];
+  private readonly scheduled: { at: number; shock: ShockParams; label: string; headline?: string; release?: EconomicRelease }[] = [];
   /** The student's commands waiting for the next tick, in the order they were sent. */
   private userQueue: UserCommand[] = [];
   /** The student's strategy, running or stopped, or null before the first one (D-062). */
@@ -255,13 +259,13 @@ export class Simulation {
    * with nothing queued, if one is already waiting or the last was under SHOCK_SPACING_MS of sim
    * time ago (D-051), so a burst of commands can never pile up work.
    */
-  applyShock(shock: ShockParams, label: string, headline?: string): ShockResult {
+  applyShock(shock: ShockParams, label: string, headline?: string, release?: EconomicRelease): ShockResult {
     const at = this.clock.now; // the next tick starts here
     if (this.pendingShock !== null || (this.lastShockTime !== null && at < this.lastShockTime + SHOCK_SPACING_MS)) {
       const waitMs = this.pendingShock !== null ? SHOCK_SPACING_MS : this.lastShockTime! + SHOCK_SPACING_MS - at;
       return { ok: false, reason: "SHOCK_TOO_SOON", message: `The market is still digesting the last headline. Try again in ${Math.ceil(waitMs / 1000)} s.` };
     }
-    this.pendingShock = headline === undefined ? { shock, label } : { shock, label, headline };
+    this.pendingShock = { shock, label, ...(headline === undefined ? {} : { headline }), ...(release === undefined ? {} : { release }) };
     return { ok: true };
   }
 
@@ -271,11 +275,11 @@ export class Simulation {
    * headlines are not rate-limited: the author chose their spacing. Throws on misuse (a bug in our
    * code), never on market flow.
    */
-  scheduleShock(atMs: number, shock: ShockParams, label: string, headline?: string): void {
+  scheduleShock(atMs: number, shock: ShockParams, label: string, headline?: string, release?: EconomicRelease): void {
     if (!Number.isSafeInteger(atMs) || atMs < 0) throw new RangeError(`atMs must be a non-negative integer, got ${atMs}`);
     if (this.scheduled.length >= MAX_SCHEDULED_SHOCKS) throw new RangeError(`at most ${MAX_SCHEDULED_SHOCKS} scheduled headlines`);
     clampShock(shock); // a non-finite number must fail now, not in the middle of a tick
-    const entry = headline === undefined ? { at: atMs, shock, label } : { at: atMs, shock, label, headline };
+    const entry = { at: atMs, shock, label, ...(headline === undefined ? {} : { headline }), ...(release === undefined ? {} : { release }) };
     let i = this.scheduled.length;
     while (i > 0 && this.scheduled[i - 1].at > atMs) i--;
     this.scheduled.splice(i, 0, entry);
@@ -311,12 +315,12 @@ export class Simulation {
     const window = this.clock.advance();
     while (this.scheduled.length > 0 && this.scheduled[0].at <= window.start) {
       const due = this.scheduled.shift()!;
-      this.commitShock(due.shock, due.label, due.headline, window.start);
+      this.commitShock(due.shock, due.label, due.headline, window.start, due.release);
     }
     if (this.pendingShock !== null) {
-      const { shock, label, headline } = this.pendingShock;
+      const { shock, label, headline, release } = this.pendingShock;
       this.pendingShock = null;
-      this.commitShock(shock, label, headline, window.start);
+      this.commitShock(shock, label, headline, window.start, release);
     }
     this.runUserCommands(window.start);
     this.runStrategy(window.start);
@@ -346,12 +350,12 @@ export class Simulation {
   }
 
   /** Apply a headline now (the start of a tick): fair value jumps, the event is logged, its P&L window opens. */
-  private commitShock(shock: ShockParams, label: string, headline: string | undefined, time: number): void {
+  private commitShock(shock: ShockParams, label: string, headline: string | undefined, time: number, release?: EconomicRelease): void {
     this.lastShockTime = time;
     const seq = this.shockSeq++;
     const before = this.fundamental.value;
     const applied = this.fundamental.shock(shock, time);
-    const event: ShockEvent = { seq, time, label, ...(headline === undefined ? {} : { headline }), shock: applied, fairValueBefore: before, fairValueAfter: this.fundamental.value };
+    const event: ShockEvent = { seq, time, label, ...(headline === undefined ? {} : { headline }), shock: applied, ...(release === undefined ? {} : { release, releaseBasePrice: this.last }), fairValueBefore: before, fairValueAfter: this.fundamental.value };
     this.shockLog.push(Object.freeze(event));
     const record: ImpactRecord = { seq, time, label, start: this.valueByType(), pnlByType: null };
     this.impacts.push(record);

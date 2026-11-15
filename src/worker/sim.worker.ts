@@ -36,6 +36,8 @@ scope.onmessage = (event) => {
     } else if (msg.type === "shock") {
       // Never throws: an unknown code or a headline too soon after the last one is refused as data.
       if (feed !== null) scope.postMessage({ type: "shock", result: feed.applyPreset(msg.code) });
+    } else if (msg.type === "release") {
+      if (feed !== null) scope.postMessage({ type: "shock", result: feed.applyRelease(msg.indicator, msg.actual) });
     } else if (msg.type === "shockParams") {
       if (feed !== null) scope.postMessage({ type: "shock", result: feed.applyParams(msg.shock, msg.label) });
     } else if (msg.type === "who") {

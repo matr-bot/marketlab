@@ -37,6 +37,31 @@ describe("parseCommand: offline headlines from the command bar (D-048)", () => {
   });
 });
 
+describe("hypothetical economic release commands", () => {
+  it("uses authored actuals for bare codes and accepts requested units", () => {
+    expect(parseCommand("CPI")).toEqual({ kind: "release", indicator: "CPI", actual: null });
+    expect(parseCommand("cpi 3.4")).toEqual({ kind: "release", indicator: "CPI", actual: 3.4 });
+    expect(parseCommand("JOBS 150")).toEqual(parseCommand("JOBS 150K"));
+    expect(parseCommand("JOBS 150K")).toEqual({ kind: "release", indicator: "JOBS", actual: 150 });
+    expect(parseCommand("GDP 2.3")).toEqual({ kind: "release", indicator: "GDP", actual: 2.3 });
+    expect(parseCommand("RATES 0.75")).toEqual(parseCommand("RATES +0.75"));
+    expect(parseCommand("RATES +0.75")).toEqual({ kind: "release", indicator: "RATES", actual: 0.75 });
+  });
+
+  it("explains malformed releases with an example, without treating numbers as headlines", () => {
+    for (const input of ["CPI abc", "CPI 3.4 4.0"]) expect(err(input)).toContain("CPI 3.4");
+    expect(err("JOBS 150.5K")).toContain("JOBS 150K");
+    expect(err("RATES +0.755")).toContain("RATES +0.75");
+    expect(err("GDP 2.3 4")).toContain("GDP 2.3");
+    expect(parseCommand("CPI rises unexpectedly")).toEqual({ kind: "news", headline: "CPI rises unexpectedly" });
+  });
+
+  it("documents all four codes and FED's alias in HELP", () => {
+    expect(HELP_LINES.flat().join(" ")).toContain("CPI 3.4");
+    expect(HELP_LINES.flat().join(" ")).toContain("FED is the default RATES release");
+  });
+});
+
 describe("parseCommand: SHOCK with your own numbers", () => {
   it("a percent is a fair-value change; panic sensitivity and duration default sensibly", () => {
     for (const input of ["SHOCK -3", "shock -3%", "SHOCK -3.0", "MLAB SHOCK -3"]) {
@@ -121,7 +146,7 @@ describe("parseCommand: running the market and the scenario", () => {
     expect(parseCommand("scenarios")).toEqual({ kind: "scenario", id: null });
     expect(parseCommand("SCN Rate-Shock")).toEqual({ kind: "scenario", id: "rate-shock" });
     expect(parseCommand("SCENARIO quiet-buy")).toEqual({ kind: "scenario", id: "quiet-buy" });
-    expect(err("SCN moon")).toBe("Unknown scenario \"moon\". Scenarios: free, rate-shock, earnings-miss, fraud, whipsaw, quiet-buy.");
+    expect(err("SCN moon")).toBe("Unknown scenario \"moon\". Scenarios: free, rate-shock, earnings-miss, fraud, whipsaw, quiet-buy, macro-day.");
     expect(err("SCN rate shock")).toContain("Unknown scenario");
   });
 

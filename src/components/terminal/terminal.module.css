@@ -1013,6 +1013,30 @@
   margin-top: 4px;
 }
 
+.releaseCalendar,
+.releaseCard {
+  border: 1px solid var(--border);
+  margin: 6px 0;
+  padding: 4px 6px;
+  color: var(--fg);
+}
+
+.releaseRow {
+  display: grid;
+  grid-template-columns: 65px 48px 1fr auto;
+  gap: 4px;
+  padding: 2px 0;
+  white-space: nowrap;
+}
+
+.releaseRow + .releaseRow {
+  border-top: 1px solid var(--grid);
+}
+
+.releaseCard p {
+  margin: 3px 0;
+}
+
 /* BOOK: the student's own resting orders (QA #8). Amber is UI, not price direction. */
 .bookMine .bookSide {
   color: var(--amber);

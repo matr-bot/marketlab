@@ -244,7 +244,7 @@ describe("MarketFeed: headlines (D-048, D-051)", () => {
     expect(feed.applyPreset("fed")).toEqual({ ok: true, code: "FED", headline: "Fed surprise hike 75bps" }); // case-insensitive
     expect(feed.frame().headlines).toEqual([]); // queued, not applied until the next tick
     feed.advance(1);
-    expect(feed.frame().headlines).toEqual([{ seq: 0, time: 60_000, code: "FED", headline: "Fed surprise hike 75bps", fairValuePct: -0.03 }]);
+    expect(feed.frame().headlines).toEqual([expect.objectContaining({ seq: 0, time: 60_000, code: "FED", headline: "Fed surprise hike 75bps", fairValuePct: -0.03, release: expect.objectContaining({ indicator: "RATES", forecast: 0.25, actual: 0.75 }) })]);
     expect(feed.frame().headlines).toEqual([]); // sent exactly once
     feed.advance(598);
     expect(feed.frame().impacts).toEqual([]); // 59.9 s: not final yet

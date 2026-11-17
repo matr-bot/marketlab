@@ -144,7 +144,7 @@ export function StrategyPanel({
           ))}
         </div>
         <div className={styles.formRow}>
-          <button type="button" className={`${styles.chip} ${styles.segOn}`} data-testid="strat-start" onClick={onStart}>
+          <button type="button" className={styles.secondary} data-testid="strat-start" onClick={onStart}>
             START (ENTER)
           </button>
           <button type="button" className={styles.chip} onClick={onCancel}>
@@ -175,8 +175,8 @@ export function StrategyPanel({
         </span>
       </div>
       <div className={styles.formRow}>
-        <button type="button" className={`${styles.chip} ${styles.segOn}`} data-testid="strat-reveal" onClick={onReveal}>
-          SHOW ME WHAT I BUILT
+        <button type="button" className={styles.secondary} data-testid="strat-reveal" title="The glass box: your strategy as English, rules, formulas with real numbers, and Python" onClick={onReveal}>
+          BACKTEST
         </button>
         {strategy.status === "running" && (
           <button type="button" className={styles.chip} data-testid="strat-stop" onClick={onStop}>

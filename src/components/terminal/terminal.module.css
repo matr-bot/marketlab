@@ -539,6 +539,21 @@
   border-color: var(--label);
 }
 
+/* Secondary action: outlined (D-069; the spec is SECONDARY_BUTTON in tokens.ts). */
+.secondary {
+  background: transparent;
+  border: 1px solid var(--data);
+  color: var(--data);
+  border-radius: 0;
+  padding: 1px 9px;
+  cursor: pointer;
+  letter-spacing: 0.06em;
+}
+
+.secondary:hover {
+  background: var(--border);
+}
+
 .segOn {
   background: var(--border);
   border-color: var(--label);

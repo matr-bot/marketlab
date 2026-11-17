@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
-import { cssVar, cssVariables, TOKENS, type Token } from "./tokens";
+import { cssVar, cssVariables, SECONDARY_BUTTON, TOKENS, type Token } from "./tokens";
 
 // D-068: every color comes from tokens.ts, and amber (`accent`) appears only in the allowed places.
 
@@ -82,5 +82,34 @@ describe("color tokens (D-068)", () => {
       }
     }
     expect(misuse).toEqual([]);
+  });
+
+  /** The declarations of one rule (exact selector) in a stylesheet, as a property → value map. */
+  function declarations(file: string, selector: string): Record<string, string> | undefined {
+    const found = rules(readFileSync(join(ROOT, file), "utf8")).find(([sel]) => sel === selector);
+    if (found === undefined) return undefined;
+    return Object.fromEntries(
+      found[1]
+        .split(";")
+        .map((d) => d.split(":").map((x) => x.trim()))
+        .filter((d) => d.length >= 2 && d[0] !== "")
+        .map(([k, ...v]) => [k, v.join(":")]),
+    );
+  }
+
+  it("implements the secondary (outlined) button exactly as SECONDARY_BUTTON specifies (D-069)", () => {
+    const { hover, ...base } = SECONDARY_BUTTON;
+    const css = "components/terminal/terminal.module.css";
+    expect(declarations(css, ".secondary")).toMatchObject(base);
+    expect(declarations(css, ".secondary:hover")).toMatchObject(hover);
+  });
+
+  it("has no filled white button: nothing uses the data color as a background (D-069)", () => {
+    const filled = UI.filter((p) => p.endsWith(".css")).flatMap((p) =>
+      rules(readFileSync(p, "utf8"))
+        .filter(([, body]) => /background(-color)?\s*:\s*var\(--data\)/.test(body))
+        .map(([sel]) => `${rel(p)} ${sel}`),
+    );
+    expect(filled).toEqual([]);
   });
 });

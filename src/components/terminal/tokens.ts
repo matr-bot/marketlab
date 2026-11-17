@@ -40,6 +40,20 @@ export const TOKENS = {
 
 export type Token = keyof typeof TOKENS;
 
+/**
+ * Button tiers (D-069). Primary: the accent fill, one per screen (TKT SEND, START SESSION).
+ * Secondary: outlined, for every other action that matters (STRAT START, BACKTEST, the launcher's
+ * secondary actions). There is no filled white button. `terminal.module.css` `.secondary` implements
+ * this exactly; `tokens.test.ts` compares the two.
+ */
+export const SECONDARY_BUTTON = {
+  background: "transparent",
+  border: "1px solid var(--data)",
+  color: "var(--data)",
+  "border-radius": "0",
+  hover: { background: "var(--border)" },
+} as const;
+
 /** camelCase token → CSS custom property name: `panelBg` → `--panel-bg`. */
 export function cssVar(token: Token): string {
   return `--${token.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;

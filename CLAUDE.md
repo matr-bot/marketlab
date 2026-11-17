@@ -65,7 +65,7 @@ screen must be true to what the engine actually did.
 2. MARKET — a judge types any headline live; the crowd reacts; the strategy trades through it.
 3. REALITY CHECK — execution report: intended price (the arrival mid) vs actual average fill
    (slippage, split into spread cost and impact cost) and P&L.
-4. REVEAL — "Show me what I built": English → rules → formulas with real numbers → Python.
+4. REVEAL — BACKTEST in STRAT: English → rules → formulas with real numbers → Python.
 
 ## Non-goals (do not build unless explicitly asked)
 - Real-money trading, brokerage connections, live market data dependencies
@@ -103,6 +103,9 @@ never uses a real company's name, logo or exact screens.
 - Accent amber `#F5A623`: ONLY the active panel's border, the one primary action on a screen (TKT
   SEND; START SESSION on the launcher) and the command-line cursor. `tokens.test.ts` enforces it.
 - PAUSED: a white-on-red `● PAUSED` badge (`alert`), never amber and never the price-down red.
+- Buttons (D-069): primary = amber fill, one per screen; secondary = outlined (transparent, 1px
+  `#E6E6E6` border and text, square, `#1F1F1F` hover) for STRAT START, BACKTEST and the launcher's
+  secondary actions; everything else a quiet gray chip. No filled white buttons.
 - Focus ring white; text selection gray; hover rows `#141414`.
 
 ### Look

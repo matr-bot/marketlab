@@ -1807,3 +1807,18 @@ nothing stood out. Now every color comes from one file and amber means one thing
   professional depth ladders: the side of the book, not a price move. The TKT BUY/SELL toggle fills
   green or red when selected. D-067's steel-blue and mauve hues are retired. Everywhere else green
   and red remain price direction only.
+
+## D-069 · Two button tiers: amber primary, outlined secondary; "BACKTEST"
+
+**Date:** 2026-11-17 · **Status:** Accepted
+
+A filled white or gray "selected" button for STRAT's actions read as a component-library template.
+- **Primary:** the accent fill, exactly one per screen: TKT SEND in the terminal, START SESSION on the
+  launcher (D-068).
+- **Secondary:** outlined: transparent background, 1px `#E6E6E6` border, `#E6E6E6` text, square
+  corners, `#1F1F1F` on hover. Used for STRAT START, BACKTEST and the launcher's secondary actions.
+  The spec is `SECONDARY_BUTTON` in `tokens.ts`; `tokens.test.ts` checks the `.secondary` rule
+  against it and fails on any rule that fills a background with the data color (no filled white
+  buttons).
+- Everything else stays a quiet chip (gray border); a selected segment is white text on `#1F1F1F`.
+- STRAT's "SHOW ME WHAT I BUILT" is renamed **BACKTEST**; it still opens the glass box (D-065).

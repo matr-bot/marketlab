@@ -6,7 +6,7 @@ import type { Attribution } from "@/engine/attribution";
 import type { PresetResult } from "@/engine/feed";
 import { clampShock, type ShockParams } from "@/engine/fundamental";
 import { presetByCode } from "@/engine/presets";
-import { FREE_PLAY, resolveRun, runLink, SCENARIOS, scenarioById, type Scenario } from "@/engine/scenarios";
+import { FREE_PLAY, resolveRun, SCENARIOS, scenarioById, type Scenario } from "@/engine/scenarios";
 import type { UserQueueResult } from "@/engine/simulation";
 import { clampStrategy, type StrategySpec } from "@/engine/strategy";
 import { parseCommand, type FunctionCode } from "@/lib/command";
@@ -16,6 +16,7 @@ import type { RunData } from "@/lib/glassbox/python";
 import { offlineFallback, OFFLINE_HELP } from "@/lib/offlineMatch";
 import { OFFLINE_STRATEGY_HELP, parseStrategyOffline } from "@/lib/offlineStrategy";
 import type { InterpretResponse, StrategyResponse } from "@/lib/schemas";
+import { learnFromQuery, sessionLink } from "@/lib/sessionLink";
 import { formatUserEvent } from "@/lib/userMessages";
 import { BookPanel } from "./BookPanel";
 import { ChatPanel } from "./ChatPanel";
@@ -24,6 +25,7 @@ import { ControlStrip } from "./ControlStrip";
 import { ExecPanel } from "./ExecPanel";
 import { download, GlassBox } from "./GlassBox";
 import { HelpOverlay } from "./HelpOverlay";
+import { LearnContext } from "./Learn";
 import { NewsPanel } from "./NewsPanel";
 import { NewsPreview, type NewsState } from "./NewsPreview";
 import { PriceChart } from "./PriceChart";
@@ -31,7 +33,6 @@ import { StatusBar } from "./StatusBar";
 import { StrategyPanel, type StratSource, type StratState } from "./StrategyPanel";
 import { TapePanel } from "./TapePanel";
 import { TicketPanel } from "./TicketPanel";
-import { TickerTape } from "./TickerTape";
 import styles from "./terminal.module.css";
 import { useMarket, type RunSpec } from "./useMarket";
 import { WhoPanel } from "./WhoPanel";
@@ -54,8 +55,6 @@ const SLOTS: readonly Slot[] = [1, 2, 3, 4, 5, 6, 7, 8];
 const DEFAULT_SLOTS: Readonly<Record<Slot, FunctionCode>> = { 1: "GP", 2: "WHO", 3: "CHAT", 4: "TAPE", 5: "BOOK", 6: "TKT", 7: "STRAT", 8: "EXR" };
 /** The panel a typed code opens in until another is clicked: the chart (D-071). */
 const DEFAULT_ACTIVE: Slot = 1;
-
-const WELCOME = "Type a headline, CPI 3.4, FED, BUY 500, STRAT <your idea> or HELP, and press Enter.";
 
 /** Ask /api/interpret; if the route itself is unreachable (no Wi-Fi), fall back here the same way. */
 async function interpret(headline: string): Promise<InterpretResponse> {
@@ -91,17 +90,17 @@ async function interpretStrategyText(text: string): Promise<StrategyResponse> {
   }
 }
 
-/** The run a link asks for (`?scn=rate-shock&seed=42`); null on the server, where there is no link yet. */
-function runFromLink(): { run: Run; note: string | null } | null {
+/** The run a link asks for (`?scn=rate-shock&seed=42&learn=1`); null on the server, where there is no link yet. */
+function runFromLink(): { run: Run; learn: boolean; note: string | null } | null {
   if (typeof window === "undefined") return null;
   const q = new URLSearchParams(window.location.search);
   const r = resolveRun(q.get("scn"), q.get("seed"));
-  return { run: { scenario: r.scenario, seed: r.seed, runId: 0, strategy: null }, note: r.unknownScenario ? `Unknown scenario "${(q.get("scn") ?? "").slice(0, 30)}": opened free play instead. Type SCN to see them.` : null };
+  return { run: { scenario: r.scenario, seed: r.seed, runId: 0, strategy: null }, learn: learnFromQuery(q), note: r.unknownScenario ? `Unknown scenario "${(q.get("scn") ?? "").slice(0, 30)}": opened free play instead. Type SCN to see them.` : null };
 }
 
-/** Keep the address bar pointing at this exact run, so a refresh or a copy of the link reopens it. */
-function showRunInAddressBar(scenario: Scenario, seed: number) {
-  window.history.replaceState(null, "", runLink(scenario, seed));
+/** Keep the address bar pointing at this exact session, so a refresh or a copy of the link reopens it. */
+function showRunInAddressBar(scenario: Scenario, seed: number, learn: boolean) {
+  window.history.replaceState(null, "", sessionLink(scenario, seed, learn));
 }
 
 /**
@@ -116,7 +115,8 @@ export function Terminal() {
   const [paused, setPaused] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   // What the reply line says. A newer outcome of the student's orders replaces it (`seen`: the last outcome it already knew).
-  const [reply, setReply] = useState({ text: initial?.note ?? WELCOME, seen: -1 });
+  const [reply, setReply] = useState({ text: initial?.note ?? "", seen: -1 });
+  const learn = initial?.learn ?? false;
   const [news, setNews] = useState<NewsState>({ phase: "idle" });
   const [whoWindow, setWhoWindow] = useState<Attribution | null>(null);
   const [selectedCandle, setSelectedCandle] = useState<number | null>(null);
@@ -202,7 +202,7 @@ export function Terminal() {
     sendStrategy(clamped);
     setBuilt({ text: strat.text, source: strat.source, reason: strat.reason });
     setStrat({ phase: "live" });
-    say(paused ? "Strategy queued. The market is paused: it starts when you RUN." : "Strategy starts at the next tick. Watch STRAT, EXR and the tape.");
+    say(paused ? "STRATEGY QUEUED · MARKET PAUSED" : "STRATEGY STARTED");
     return true;
   };
 
@@ -222,7 +222,7 @@ export function Terminal() {
       return;
     }
     setStrat({ phase: "preview", text, source: answer.source, reason: answer.strategy.reason, draft: answer.strategy.spec });
-    say(answer.source === "offline" ? (answer as { message: string }).message : "Check the rules in STRAT. Enter starts the strategy; Tab edits a field first.");
+    say(answer.source === "offline" ? (answer as { message: string }).message : "CHECK STRAT · ↵ START · TAB EDIT");
   };
 
   const restart = (next: Omit<Run, "strategy">, text: string) => {
@@ -236,8 +236,8 @@ export function Terminal() {
     setSelectedCandle(null);
     setWhoWindow(null);
     if (keep === null && strat.phase === "live") setStrat({ phase: "compose", message: null });
-    say(keep === null ? text : `${text} Your strategy starts again at the open.`, -1);
-    showRunInAddressBar(next.scenario, next.seed);
+    say(keep === null ? text : `${text} · STRATEGY RESTARTS AT THE OPEN`, -1);
+    showRunInAddressBar(next.scenario, next.seed, learn);
   };
 
   const onCommand = async (text: string) => {
@@ -271,7 +271,7 @@ export function Terminal() {
         return;
       case "open":
         open(cmd.code);
-        say(`${cmd.code} is in panel ${target}. Click a panel to choose where codes open.`);
+        say("");
         return;
       case "strategy":
         if (cmd.text === "") {
@@ -282,58 +282,58 @@ export function Terminal() {
         return;
       case "stopStrategy":
         if (market?.strategy?.status !== "running") {
-          say("No strategy is running.");
+          say("NO STRATEGY RUNNING");
           return;
         }
         sendStopStrategy();
-        say("Stopping the strategy: its shares are closed at the market.");
+        say("STOPPING STRATEGY · CLOSING AT MARKET");
         return;
       case "order":
         sendOrder(cmd.order);
-        if (paused) say("Order queued. The market is paused: it executes when you RUN.");
+        if (paused) say("ORDER QUEUED · MARKET PAUSED");
         return;
       case "cancelOrders":
         sendCancel();
-        if (paused) say("Cancel queued. The market is paused: it happens when you RUN.");
+        if (paused) say("CANCEL QUEUED · MARKET PAUSED");
         return;
       case "pause":
         setPaused(true);
-        say("Market paused. RUN resumes it.");
+        say("");
         return;
       case "run":
         setPaused(false);
-        say("Market running.");
+        say("");
         return;
       case "speed":
         setSpeed(cmd.speed);
-        say(cmd.speed === 1 ? "Real time." : `Running ${cmd.speed}× real time. The market is the same, just sooner.`);
+        say("");
         return;
       case "scenario": {
         if (cmd.id === null) {
-          say(`Scenarios: ${SCENARIOS.map((s) => s.id).join(", ")}. Open one with SCN <name>.`);
+          say(`SCN · ${SCENARIOS.map((s) => s.id).join(" · ")}`);
           return;
         }
         const scenario = scenarioById(cmd.id) ?? FREE_PLAY;
         // A scenario runs on its own seed, so a whole class sees the same market; say so if it replaces yours (QA #10).
         const seedNote = run !== null && run.seed !== scenario.seed ? ` It runs on its own seed, ${scenario.seed} (yours was ${run.seed}; SEED ${run.seed} reruns it on yours).` : "";
-        restart({ scenario, seed: scenario.seed, runId: (run?.runId ?? 0) + 1 }, `Opening "${scenario.title}". Its brief and task are in NEWS.${seedNote}`);
+        restart({ scenario, seed: scenario.seed, runId: (run?.runId ?? 0) + 1 }, `SCN ${scenario.title.toUpperCase()}${seedNote}`);
         if (scenario.id === "demo") setSlots({ ...DEFAULT_SLOTS, 2: "NEWS" });
         else open("NEWS");
         return;
       }
       case "seed":
-        if (run !== null) restart({ ...run, seed: cmd.seed, runId: run.runId + 1 }, `Seed ${cmd.seed}: a different market, same scenario.`);
+        if (run !== null) restart({ ...run, seed: cmd.seed, runId: run.runId + 1 }, `SEED ${cmd.seed}`);
         return;
       case "rerun":
-        if (run !== null) restart({ ...run, runId: run.runId + 1 }, "Restarted from the open: same scenario, same seed, same market until you act differently.");
+        if (run !== null) restart({ ...run, runId: run.runId + 1 }, "RERUN · SAME SCENARIO, SAME SEED");
         return;
       case "link": {
         if (run === null) return;
-        const url = `${window.location.origin}${runLink(run.scenario, run.seed)}`;
+        const url = `${window.location.origin}${sessionLink(run.scenario, run.seed, learn)}`;
         const copy = typeof navigator !== "undefined" && navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject(new Error("no clipboard"));
         copy.then(
-          () => say(`Link copied: ${url}`),
-          () => say(`Link: ${url}`),
+          () => say(`LINK COPIED · ${url}`),
+          () => say(`LINK · ${url}`),
         );
         return;
       }
@@ -359,7 +359,7 @@ export function Terminal() {
     }
     const source = answer.source === "offline" ? `offline preset ${answer.preset}` : answer.source === "cache" ? "AI (cached)" : "AI";
     setNews({ phase: "preview", headline, source, reason: answer.source === "offline" ? "" : answer.scenario.reason, draft: answer.scenario.shock, edited: false });
-    say(answer.source === "offline" ? answer.message : "The AI chose these parameters. Enter applies them; Tab edits them first.");
+    say(answer.source === "offline" ? answer.message : "AI PARAMETERS · ↵ APPLY · TAB EDIT");
   };
 
   const onEdit = (draft: ShockParams) => setNews((n) => (n.phase === "preview" || n.phase === "applied" ? { ...n, draft, edited: n.phase === "applied" ? true : n.edited } : n));
@@ -395,7 +395,7 @@ export function Terminal() {
   }
 
   const m = status.market;
-  const { frame, candles, tape, frameCount, headlines, chat } = m;
+  const { frame, candles, tape, headlines, chat } = m;
   const who = selectedCandle !== null && whoWindow !== null ? whoWindow : frame.who;
   const scenario = run?.scenario ?? FREE_PLAY;
   const shown = latestEvent !== null && latestEvent.seq > reply.seen ? formatUserEvent(latestEvent) : reply.text;
@@ -445,9 +445,9 @@ export function Terminal() {
   const AREA: Record<Slot, string> = { 1: styles.gp, 2: styles.whoArea, 3: styles.chatArea, 4: styles.tape, 5: styles.book, 6: styles.tkt, 7: styles.newsArea, 8: styles.exr };
 
   return (
+    <LearnContext value={learn}>
     <div className={styles.shell}>
       <StatusBar frame={frame} openPrice={m.openPrice} scenarioTitle={scenario.title} paused={paused} speed={speed} />
-      <TickerTape ticker={frame.ticker} trades={frame.trades} headlines={frame.headlines} frameCount={frameCount} />
       <CommandBar onCommand={onCommand} reply={shown} />
       <NewsPreview news={news} onEdit={onEdit} onApply={apply} onCancel={onCancel} />
       <main className={styles.grid}>
@@ -478,5 +478,6 @@ export function Terminal() {
         />
       )}
     </div>
+    </LearnContext>
   );
 }

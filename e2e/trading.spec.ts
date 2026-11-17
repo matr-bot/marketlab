@@ -29,7 +29,7 @@ test("a market order fills and the execution report splits its cost", async ({ p
   await page.keyboard.type("BUY 500");
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("exr-row").first()).toBeVisible({ timeout: 8_000 });
-  await expect(page.getByTestId("exr-total")).toContainText("TOTAL COST");
+  await expect(page.getByTestId("exr-total")).toContainText("SLIP");
   await expect(page.getByTestId("exr-total")).toContainText("IMPACT");
   await expect(page.getByTestId("ticket-position")).toContainText("500");
   expect(errors).toEqual([]);

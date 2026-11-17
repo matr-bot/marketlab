@@ -1,8 +1,8 @@
 /* ---------- shell ---------- */
 .shell {
   display: grid;
-  /* status, ticker, command bar, NEWS strip (absent when idle), panels, control strip */
-  grid-template-rows: auto auto auto auto 1fr auto;
+  /* status, command bar, NEWS strip (absent when idle), panels, control strip */
+  grid-template-rows: auto auto auto 1fr auto;
   height: 100vh;
   min-height: 560px;
   min-width: 960px;
@@ -23,7 +23,7 @@
     "who chat news tkt"
     "tape tape exr exr";
   /* Fixed rows, so the NEWS strip coming and going never moves the panels into another row. */
-  grid-row: 5;
+  grid-row: 4;
   gap: 2px;
   min-height: 0;
 }
@@ -134,6 +134,13 @@
 }
 
 /* Context, not data: hidden outright when the bar is too narrow, never cut mid-word (QA #6). */
+.explain {
+  color: var(--label);
+  font-size: var(--fs-label);
+  line-height: 1.4;
+  white-space: normal;
+}
+
 .subtitle {
   font-size: var(--fs-label);
   color: var(--label);
@@ -147,22 +154,6 @@
 
 .spacer {
   flex: 1;
-}
-
-/* ---------- ticker tape ---------- */
-.tickerTape {
-  position: relative;
-  height: 20px;
-  border: 1px solid var(--border);
-  overflow: hidden;
-}
-
-.tickerItem {
-  position: absolute;
-  top: 2px;
-  left: 0;
-  white-space: nowrap;
-  will-change: transform;
 }
 
 /* ---------- command bar ---------- */
@@ -832,7 +823,7 @@
 
 /* ---------- control strip ---------- */
 .strip {
-  grid-row: 6;
+  grid-row: 5;
   display: flex;
   align-items: center;
   gap: 4px;

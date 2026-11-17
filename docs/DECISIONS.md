@@ -1859,3 +1859,41 @@ Everything was 12px, so nothing led the eye. Now there are three sizes, as `TYPE
 - **TAPE: no ▲▼.** The price's color alone carries the tick direction.
 - **Status VOL: no flash box** behind the number.
 - **Chart:** an axis price label the last-price tag would cover is not drawn.
+
+## D-072 · Learn mode, data-only default view, abbreviation dictionary
+
+**Date:** 2026-11-17 · **Status:** Accepted
+
+The terminal shows data; explanation lives in HELP, tooltips and Learn mode.
+- **Learn mode** is `?learn=1` (LINK, RERUN, SEED and SCN keep it in the address; `sessionLink`).
+  Every sentence that left the default view is an entry in `src/lib/explain.ts` and shows through
+  `<Explain id>` only in Learn mode; entries whose text is live (the WHO summary, the strategy's rule,
+  the scenario brief) are listed there and get their text as children. Learn mode also shows each
+  panel's description after its code (`WHO WHO MOVED THE PRICE`). Every rendered explanation carries
+  `data-explain`, so e2e checks there are none by default and that they appear with `?learn=1`.
+- **Removed from the default view:** the scrolling ticker crawl (TAPE has every trade; headlines are
+  on the chart and in CHAT/NEWS), the bottom hint text (the strip keeps its buttons until step 4a),
+  "every trade from N agents", the STRAT intro and example chips, WHO's summary sentence, the CHAT,
+  EXR and TKT empty-state sentences, the paused note (now "queued — market paused"), BOOK's "liquidity
+  vacuum", NEWS's brief, TEACHES, adverse-selection and release footnote. Each is in `explain.ts`.
+- **Empty states are a gray "—".** (This applies the step 5.5 rule now: EXR shows "—", not "No fills".)
+- **Short data labels** instead of sentences: TKT `ENTER QTY` / `ENTER PX` / `INVALID QTY` / `INVALID PX`
+  (the full reason is the tooltip), `EST AVG 186.97 · SLIP 0.8 BPS`, `NO LIQUIDITY`, `RESTS @ 186.95`,
+  `CROSSES · EST …`; SEND disabled reads `SEND`. STRAT `INTERPRETING…`, `STARTING`,
+  `RUNNING · FLAT` / `RUNNING · IN POSITION`, `PREV RUNNING · REPLACED ON START`, the rule as one line
+  (`BUY AFTER A DROP 3%/60S · QTY 500 · SL 1%`), `N 123` for Sharpe's sample count. Fill messages drop
+  their sentence tails (`… resting`, `… cancelled · book exhausted`). Instructional reply-line
+  messages are cut or shortened (`STRATEGY STARTED`, `ORDER QUEUED · MARKET PAUSED`, `RERUN · SAME
+  SCENARIO, SAME SEED`); errors and honesty messages (AI unavailable, values capped, a scenario's own
+  seed) keep their words.
+- **Slippage in basis points by default.** TKT's estimate and EXR's SLIP, SPREAD and IMPACT columns
+  are in BPS of the order's value at the arrival mid (`costBps`: the engine's `orderSlippageBps`
+  definition applied to each part, so the parts add up). Cents per share and ARR MID are Learn-mode
+  columns.
+- **One abbreviation dictionary** (`src/lib/abbrev.ts`): QTY, PX, AVG, MID, ARR MID, SLIP, P&L, BPS,
+  ¢/SH, VOL, B/S, SRC, CHG, SL, TP, MAX DD, N, MKT, LMT, FV, each with its meaning; HELP lists it.
+  `abbrev.test.ts` scans every label literal (table headers, `<dt>`, `.label` spans, field labels) and
+  fails on a long form or variant (PRICE, SIZE, SHARES, SLIPPAGE, BP, VOLUME, SIDE, AGGRESSOR, STOP
+  LOSS, …). So TAPE and BOOK headers are `PX` and `QTY`, TAPE's side column is `B/S` with `B`/`S`,
+  the STRAT fields are `SL`, `TP`, `EXIT`, `QTY`, and the NEWS preview's volatility field is
+  `VOLATILITY` (VOL means volume).

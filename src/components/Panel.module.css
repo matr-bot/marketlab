@@ -26,6 +26,10 @@
   flex-shrink: 0;
 }
 
+.learnLabel {
+  flex-shrink: 0;
+}
+
 .meta {
   min-width: 0;
   margin-left: auto;

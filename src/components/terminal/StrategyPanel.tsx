@@ -7,6 +7,7 @@ import { ENTRY_RULES, STRATEGY_LIMITS, type EntryRule, type StrategyDecision, ty
 import { formatDollars, formatQty } from "@/lib/format";
 import { describeRules, RULE_LABELS } from "@/lib/glassbox/english";
 import { dollars } from "@/lib/glassbox/formulas";
+import { Explain } from "./Learn";
 import styles from "./terminal.module.css";
 
 /** What STRAT shows: typing an idea, waiting for the AI, a preview to check and edit, or the live strategy. */
@@ -24,17 +25,27 @@ export const SOURCE_LABELS: Record<StratSource, string> = { ai: "AI", cache: "AI
 export const SHARPE_NOTE =
   "Annualized from one-second returns with the sim's clock: a year is 252 sessions of 23,400 s. Short runs are noisy: a Sharpe from a few minutes of data means little, and a big number here is not a skill signal.";
 
-const EXAMPLES = ["Buy after a quick 3% drop because panic sellers overshoot", "Short after a 1% rally in 30 seconds, stop loss 1%, take profit 0.5%"];
+const PLACEHOLDER = "e.g. buy 500 after a 3% drop, stop 1%";
+
+/** The spec on one line of data (D-072): `BUY AFTER A DROP 3%/60S · QTY 500 · SL 1% · TP 0.5% · EXIT 120S`. */
+export function compactRule(s: StrategySpec): string {
+  const pct = (x: number) => `${Number((x * 100).toFixed(4))}%`;
+  const parts = [`${RULE_LABELS[s.entry.rule]} ${pct(s.entry.pct)}/${s.entry.windowSec}S`, `QTY ${formatQty(s.qty)}`];
+  if (s.stopLossPct !== null) parts.push(`SL ${pct(s.stopLossPct)}`);
+  if (s.takeProfitPct !== null) parts.push(`TP ${pct(s.takeProfitPct)}`);
+  if (s.timeExitSec !== null) parts.push(`EXIT ${s.timeExitSec}S`);
+  return parts.join(" · ");
+}
 
 type NumField = { key: string; label: string; unit: string; get: (s: StrategySpec) => number | null; set: (s: StrategySpec, v: number | null) => StrategySpec; optional: boolean; range: string };
 
 const FIELDS: readonly NumField[] = [
   { key: "pct", label: "MOVE", unit: "%", get: (s) => s.entry.pct * 100, set: (s, v) => ({ ...s, entry: { ...s.entry, pct: (v ?? 0) / 100 } }), optional: false, range: "0.1 to 20 %" },
   { key: "windowSec", label: "WITHIN", unit: "s", get: (s) => s.entry.windowSec, set: (s, v) => ({ ...s, entry: { ...s.entry, windowSec: v ?? 0 } }), optional: false, range: `${STRATEGY_LIMITS.windowSec[0]} to ${STRATEGY_LIMITS.windowSec[1]} s` },
-  { key: "stopLossPct", label: "STOP LOSS", unit: "%", get: (s) => (s.stopLossPct === null ? null : s.stopLossPct * 100), set: (s, v) => ({ ...s, stopLossPct: v === null ? null : v / 100 }), optional: true, range: "0.1 to 20 %, blank = off" },
-  { key: "takeProfitPct", label: "TAKE PROFIT", unit: "%", get: (s) => (s.takeProfitPct === null ? null : s.takeProfitPct * 100), set: (s, v) => ({ ...s, takeProfitPct: v === null ? null : v / 100 }), optional: true, range: "0.1 to 50 %, blank = off" },
-  { key: "timeExitSec", label: "TIME EXIT", unit: "s", get: (s) => s.timeExitSec, set: (s, v) => ({ ...s, timeExitSec: v }), optional: true, range: "5 to 3,600 s, blank = off" },
-  { key: "qty", label: "SHARES", unit: "", get: (s) => s.qty, set: (s, v) => ({ ...s, qty: v ?? 0 }), optional: false, range: "1 to 10,000" },
+  { key: "stopLossPct", label: "SL", unit: "%", get: (s) => (s.stopLossPct === null ? null : s.stopLossPct * 100), set: (s, v) => ({ ...s, stopLossPct: v === null ? null : v / 100 }), optional: true, range: "0.1 to 20 %, blank = off" },
+  { key: "takeProfitPct", label: "TP", unit: "%", get: (s) => (s.takeProfitPct === null ? null : s.takeProfitPct * 100), set: (s, v) => ({ ...s, takeProfitPct: v === null ? null : v / 100 }), optional: true, range: "0.1 to 50 %, blank = off" },
+  { key: "timeExitSec", label: "EXIT", unit: "s", get: (s) => s.timeExitSec, set: (s, v) => ({ ...s, timeExitSec: v }), optional: true, range: "5 to 3,600 s, blank = off" },
+  { key: "qty", label: "QTY", unit: "", get: (s) => s.qty, set: (s, v) => ({ ...s, qty: v ?? 0 }), optional: false, range: "1 to 10,000" },
   { key: "cooldownSec", label: "COOLDOWN", unit: "s", get: (s) => s.cooldownSec, set: (s, v) => ({ ...s, cooldownSec: v ?? 0 }), optional: false, range: "0 to 600 s" },
 ];
 
@@ -80,12 +91,12 @@ export function StrategyPanel({
     const busy = state.phase === "interpreting";
     return (
       <div className={styles.strat} data-testid="strat" data-phase={state.phase}>
-        <p className={styles.dim}>Describe a trading idea in plain English. It becomes rules from a fixed menu (buy or sell after a drop or rise, stop loss, take profit, time exit) that you check before it trades.</p>
+        <Explain id="strat.intro" />
         <textarea
           className={styles.stratInput}
           data-testid="strat-input"
           aria-label="Strategy"
-          placeholder={EXAMPLES[0]}
+          placeholder={PLACEHOLDER}
           value={busy ? state.text : text}
           maxLength={300}
           rows={3}
@@ -99,15 +110,12 @@ export function StrategyPanel({
             }
           }}
         />
-        {busy ? <div className={styles.dim}>Reading your rules…</div> : state.message !== null && <div className={styles.note} data-testid="strat-message">{state.message}</div>}
-        <div className={styles.formRow}>
-          {EXAMPLES.map((ex) => (
-            <button key={ex} type="button" className={styles.chip} disabled={busy} onClick={() => setText(ex)}>
-              {ex.length > 34 ? `${ex.slice(0, 33)}…` : ex}
-            </button>
-          ))}
-        </div>
-        {strategy !== null && <div className={styles.dim}>Your last strategy is {strategy.status === "running" ? "still running: starting a new one replaces it" : "stopped"}.</div>}
+        {busy ? <div className={styles.dim}>INTERPRETING…</div> : state.message !== null && <div className={styles.note} data-testid="strat-message">{state.message}</div>}
+        {strategy !== null && (
+          <div className={styles.dim} title={strategy.status === "running" ? "Your last strategy is still running: starting a new one replaces it." : "Your last strategy is stopped."}>
+            {strategy.status === "running" ? "PREV RUNNING · REPLACED ON START" : "PREV STOPPED"}
+          </div>
+        )}
       </div>
     );
   }
@@ -119,7 +127,7 @@ export function StrategyPanel({
     return (
       <div className={styles.strat} data-testid="strat" data-phase="preview">
         <div className={styles.stratSource}>
-          <span className={styles.label}>{SOURCE_LABELS[state.source]}</span> <span className={styles.dimText}>read “{state.text}” as:</span>
+          <span className={styles.label}>{SOURCE_LABELS[state.source]}</span> <span className={styles.dimText}>“{state.text}”</span>
         </div>
         <label className={styles.stratField}>
           <span className={styles.label}>RULE</span>
@@ -154,17 +162,21 @@ export function StrategyPanel({
             <li key={l.key}>{l.text}</li>
           ))}
         </ul>
-        {state.reason && <div className={styles.newsReason}>AI&apos;s reason: “{state.reason}”</div>}
+        {state.reason && (
+          <Explain id="strat.reason">
+            <span className={styles.newsReason}>AI&apos;s reason: “{state.reason}”</span>
+          </Explain>
+        )}
       </div>
     );
   }
 
   // Live: the strategy as the engine runs it.
-  if (strategy === null) return <div className={styles.strat} data-testid="strat" data-phase="starting">Starting at the next tick…</div>;
+  if (strategy === null) return <div className={styles.strat} data-testid="strat" data-phase="starting">STARTING</div>;
   const sh = strategy.sharpe;
   const dd = strategy.drawdown;
   const lastDecision = decisions.at(-1) ?? null;
-  const status = strategy.status === "running" ? (strategy.inPosition ? "RUNNING · IN A POSITION" : "RUNNING · WAITING FOR THE ENTRY") : strategy.status === "closing" ? "STOPPED · CLOSING LEFTOVER SHARES" : "STOPPED";
+  const status = strategy.status === "running" ? (strategy.inPosition ? "RUNNING · IN POSITION" : "RUNNING · FLAT") : strategy.status === "closing" ? "STOPPED · CLOSING" : "STOPPED";
   return (
     <div className={styles.strat} data-testid="strat" data-phase="live" data-status={strategy.status}>
       <div className={styles.stratHead}>
@@ -185,7 +197,10 @@ export function StrategyPanel({
           NEW
         </button>
       </div>
-      <div className={styles.dim}>{describeRules(strategy.spec)[0].text}</div>
+      <div className={styles.dim} data-testid="strat-rule">
+        {compactRule(strategy.spec)}
+      </div>
+      <Explain id="strat.rule">{describeRules(strategy.spec)[0].text}</Explain>
       <dl className={styles.stratStats}>
         <div title="Shares the strategy holds: positive is long, negative is short. Separate from your manual trades.">
           <dt>POSITION</dt>
@@ -211,12 +226,14 @@ export function StrategyPanel({
           <dd>{dd === null ? "—" : formatDollars(-Math.round(dd.drawdown))}</dd>
         </div>
       </dl>
-      <div className={styles.dim} title={SHARPE_NOTE} data-testid="strat-samples">
-        {sh === null ? "Sharpe needs at least two one-second returns." : `Sharpe from ${formatQty(sh.n)} one-second returns · short runs are noisy`}
+      <div className={styles.dim} title={`${sh === null ? "Sharpe needs at least two one-second returns. " : `Sharpe from ${formatQty(sh.n)} one-second returns. `}${SHARPE_NOTE}`} data-testid="strat-samples">
+        <span className={styles.label}>N</span> {sh === null ? "—" : formatQty(sh.n)}
       </div>
+      <Explain id="strat.sharpe" />
       <div className={styles.lastMessage} data-testid="strat-last">
-        {lastDecision === null ? "No decision yet: waiting for the entry rule." : decisionLine(lastDecision)}
+        {lastDecision === null ? "—" : decisionLine(lastDecision)}
       </div>
+      {lastDecision === null && <Explain id="strat.waiting" />}
     </div>
   );
 }

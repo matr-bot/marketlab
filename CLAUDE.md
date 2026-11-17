@@ -80,7 +80,8 @@ This section is the spec. It replaces the earlier amber-label design. The overha
 | --- | --- |
 | 1 ✅ | Color tokens (one file), amber in three places only, PAUSED badge (D-068) |
 | 2 ✅ | Type hierarchy; panel numbers dropped (D-070) |
-| 3 | Learn mode (`?learn=1`); ticker crawl, bottom strip and default-view sentences removed |
+| 2b ✅ | Code-only panel titles, no panel scrollbars or fades, BOOK without SIDE, GP active (D-071) |
+| 3 ✅ | Learn mode (`?learn=1`), abbreviation dictionary; ticker crawl, hint text and default-view sentences removed (D-072) |
 | 4a / 4b / 4c | Status strip + playback + SESSION popover / 65-35 grid + drawer / ticket tabs + code routing |
 | 5 | Panel content (WHO table, TAPE B/S, BOOK tints, ticket one-line estimate) |
 | 5.5 | Detail pass (self-hosted mono font, decimal alignment, chart crosshair, keymap) |

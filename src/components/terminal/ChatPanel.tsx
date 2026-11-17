@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { ChatMessage } from "@/engine/narrator";
 import { formatSimTime } from "@/engine/simClock";
+import { Explain } from "./Learn";
 import styles from "./terminal.module.css";
 
 /** Desk chat: the narrator's messages (D-055), newest at the bottom, every number from the engine. */
@@ -14,7 +15,12 @@ export function ChatPanel({ chat }: { chat: readonly ChatMessage[] }) {
   }, [last]);
   return (
     <div ref={boxRef} className={styles.chat} data-testid="chat">
-      {chat.length === 0 && <div className={styles.chatEmpty}>The desk is watching the market…</div>}
+      {chat.length === 0 && (
+        <>
+          <div className={styles.chatEmpty}>—</div>
+          <Explain id="chat.empty" />
+        </>
+      )}
       {chat.map((m) => (
         <div key={m.seq} className={styles.chatRow} data-kind={m.kind}>
           <span className={styles.chatTime}>{formatSimTime(m.time).slice(0, 8)}</span>

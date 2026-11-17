@@ -7,6 +7,7 @@ import { formatDollars, formatElapsed, formatPercent, formatPrice, formatQty, fo
 import { fairValueChange, releaseLine, releaseValue } from "@/engine/economicReleases";
 import { formatSimTime } from "@/engine/simClock";
 import { scenarioProgress, type HeadlineState, type MarketState } from "@/lib/marketState";
+import { Explain } from "./Learn";
 import styles from "./terminal.module.css";
 
 const TYPE_LABELS: Partial<Record<AgentType, string>> = {
@@ -68,7 +69,7 @@ export function NewsPanel({ scenario, market, onCommand }: { scenario: Scenario;
               <span className={styles.label}>LEFT</span> {formatQty(p.target.remaining)}
             </span>
             <span title="Your slippage across all your orders, in basis points of their value.">
-              <span className={styles.label}>SLIPPAGE</span> {formatBps(p.target.slippageBps)} bp
+              <span className={styles.label}>SLIP</span> {formatBps(p.target.slippageBps)} <span className={styles.label}>BPS</span>
             </span>
           </div>
         )}
@@ -78,11 +79,13 @@ export function NewsPanel({ scenario, market, onCommand }: { scenario: Scenario;
           <span className={styles.label}>TASK </span>
           {scenario.task}
         </p>
-        <p className={styles.para}>{scenario.brief}</p>
-        <p className={styles.dim}>
+        <Explain id="news.brief">
+          <p className={styles.para}>{scenario.brief}</p>
+        </Explain>
+        <Explain id="news.teaches">
           <span className={styles.label}>TEACHES </span>
           {scenario.teaches}
-        </p>
+        </Explain>
 
         <div className={styles.statRow} data-testid="scenario-stats">
           <span title="The last trade price when the scenario opened.">
@@ -121,13 +124,16 @@ export function NewsPanel({ scenario, market, onCommand }: { scenario: Scenario;
           <p>{releaseLine(releaseHeadline.release)}</p>
           <p>FAIR VALUE {fairValueChange(releaseHeadline.fairValuePct)} · {releaseHeadline.reaction === null ? "30 s reaction pending" : releaseHeadline.reaction.pricePct === null ? "no post-release trades in 30 s" : `PEAK ${releaseHeadline.reaction.peakPct! > 0 ? "+" : ""}${releaseHeadline.reaction.peakPct!.toFixed(2)}% · AT 30 S ${releaseHeadline.reaction.pricePct > 0 ? "+" : ""}${releaseHeadline.reaction.pricePct.toFixed(2)}%${releaseHeadline.reaction.overshoot ? " (OVERSHOOT)" : ""}`}</p>
           <p>PANIC {releaseHeadline.release.shock.panicSensitivity.toFixed(2)}× · VOLATILITY {releaseHeadline.release.shock.volatilityMultiplier.toFixed(2)}× · LIQUIDITY {releaseHeadline.release.shock.liquidityMultiplier.toFixed(2)}×</p>
-          <p className={styles.dim}>Executed trades versus the last trade before release. Peak is the furthest move toward fair value; overshoot requires more than 0.3 percentage points beyond it.</p>
+          <Explain id="news.release" />
         </div>}
 
 
         <div className={styles.sectionHead}>HEADLINES</div>
         {headlines.length === 0 ? (
-          <p className={styles.dim}>{scenario.shocks.length > 0 ? "Nothing has hit the market yet." : "None yet. Type a headline in your own words, FED, or SHOCK -3 to send one."}</p>
+          <>
+            <p className={styles.dim}>—</p>
+            {scenario.shocks.length === 0 && <Explain id="news.noHeadlines" />}
+          </>
         ) : (
           headlines.map((h) => (
             <div key={h.seq} className={styles.headlineRow} data-testid="headline-row">
@@ -151,7 +157,7 @@ export function NewsPanel({ scenario, market, onCommand }: { scenario: Scenario;
               </div>
             ))}
             {mm !== undefined && informed !== undefined && mm < 0 && informed > 0 && (
-              <p className={styles.dim}>Market makers lost while value traders gained: the makers were trading against people who knew the news (adverse selection).</p>
+              <Explain id="news.adverse" />
             )}
           </div>
         )}

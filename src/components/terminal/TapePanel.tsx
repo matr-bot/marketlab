@@ -19,9 +19,9 @@ export function TapePanel({ tape }: { tape: readonly FrameTrade[] }) {
         <thead>
           <tr>
             <th>TIME</th>
-            <th>PRICE</th>
-            <th>SIZE</th>
-            <th>AGGRESSOR</th>
+            <th>PX</th>
+            <th>QTY</th>
+            <th title="The side that crossed the spread: B a buyer lifted the ask, S a seller hit the bid.">B/S</th>
           </tr>
         </thead>
         <tbody>
@@ -37,7 +37,7 @@ export function TapePanel({ tape }: { tape: readonly FrameTrade[] }) {
                   {formatPrice(t.price)}
                 </td>
                 <td>{formatQty(t.qty)}</td>
-                <td className={buyer ? styles.sideBuy : styles.sideSell}>{buyer ? "BUYER" : "SELLER"}</td>
+                <td className={buyer ? styles.sideBuy : styles.sideSell}>{buyer ? "B" : "S"}</td>
               </tr>
             );
           })}

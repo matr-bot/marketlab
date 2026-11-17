@@ -14,19 +14,19 @@ describe("formatUserEvent", () => {
 
   it("a limit order says its price; a resting one explains what resting means", () => {
     expect(formatUserEvent({ ...base, orderType: "limit", limitPrice: 18_650, status: "resting", filledQty: 0, avgPrice: null, restingQty: 500 })).toBe(
-      "BUY 500 @ 186.50 is resting in the book until the market trades at your price.",
+      "BUY 500 @ 186.50 resting",
     );
   });
 
   it("a market order the book could only part-fill says the rest was cancelled and why", () => {
     expect(formatUserEvent({ ...base, requestedQty: 50_000, status: "partial", filledQty: 17_512, avgPrice: 18_713.5, cancelledQty: 32_488 })).toBe(
-      "BUY 17,512 of 50,000 filled @ 187.14; 32,488 cancelled: the book ran out of shares to trade against.",
+      "BUY 17,512 of 50,000 filled @ 187.14; 32,488 cancelled · book exhausted",
     );
   });
 
   it("a limit order that part-filled and rested", () => {
     expect(formatUserEvent({ ...base, side: "sell", orderType: "limit", limitPrice: 18_700, requestedQty: 1_000, status: "partial", filledQty: 400, avgPrice: 18_700, restingQty: 600 })).toBe(
-      "SELL 400 of 1,000 filled @ 187.00; 600 resting in the book.",
+      "SELL 400 of 1,000 filled @ 187.00; 600 resting",
     );
   });
 
@@ -56,6 +56,6 @@ describe("formatUserEvent: a resting order filled later (QA #2)", () => {
     expect(formatUserEvent({ ...rest, status: "filled", filledQty: 100, restingQty: 0 })).toBe("SELL 100 @ 186.96 filled");
   });
   it("in part: how much filled and how much still rests", () => {
-    expect(formatUserEvent({ ...rest, status: "partial", filledQty: 40, restingQty: 60 })).toBe("SELL 100 @ 186.96: 40 filled, 60 still resting");
+    expect(formatUserEvent({ ...rest, status: "partial", filledQty: 40, restingQty: 60 })).toBe("SELL 100 @ 186.96: 40 filled, 60 resting");
   });
 });

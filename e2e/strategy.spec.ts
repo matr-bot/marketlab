@@ -36,7 +36,7 @@ test("the demo: a strategy in plain English trades through FED, shows in EXR, an
   await expect(page.getByTestId("strat-rules")).toContainText("Buy 500 shares when the mid is 3% below its highest point of the last 60 s.");
   await page.getByTestId("strat-start").click();
   await expect(strat).toHaveAttribute("data-phase", "live");
-  await expect(page.getByTestId("strat-status")).toContainText("WAITING FOR THE ENTRY");
+  await expect(page.getByTestId("strat-status")).toContainText("RUNNING · FLAT");
 
   // 2. MARKET: a headline hits; the strategy buys the drop.
   await page.keyboard.type("FED");

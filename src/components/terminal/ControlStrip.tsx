@@ -29,8 +29,6 @@ export function ControlStrip({ paused, speed, onCommand }: { paused: boolean; sp
       <button type="button" className={styles.chip} data-testid="strip-link" onClick={() => onCommand("LINK")} title="Copy a link that reopens this exact scenario and seed">
         LINK
       </button>
-      <span className={styles.spacer} />
-      <span className={styles.dim}>Type a headline or a command anywhere · FED · SHOCK -3 · BUY 500 · SELL 500 @ 187.25 · SCN · HELP</span>
     </footer>
   );
 }

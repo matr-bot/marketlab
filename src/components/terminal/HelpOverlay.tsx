@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { SCENARIOS } from "@/engine/scenarios";
+import { ABBREV } from "@/lib/abbrev";
 import { HELP_LINES } from "@/lib/command";
 import styles from "./terminal.module.css";
 
@@ -37,6 +38,17 @@ export function HelpOverlay({ onClose }: { onClose: () => void }) {
                 <tr key={cmd}>
                   <td className={styles.helpCmd}>{cmd}</td>
                   <td>{what}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className={styles.sectionHead}>ABBREVIATIONS</div>
+          <table className={styles.helpTable} data-testid="help-abbrev">
+            <tbody>
+              {Object.entries(ABBREV).map(([term, meaning]) => (
+                <tr key={term}>
+                  <td className={styles.helpCmd}>{term}</td>
+                  <td>{meaning}</td>
                 </tr>
               ))}
             </tbody>

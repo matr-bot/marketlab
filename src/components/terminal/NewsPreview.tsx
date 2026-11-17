@@ -14,7 +14,7 @@ type Field = { key: keyof ShockParams; label: string; unit: string; toView: (x: 
 const FIELDS: readonly Field[] = [
   { key: "fairValuePct", label: "FAIR VALUE", unit: "%", toView: (x) => Math.round(x * 1000) / 10, fromView: (x) => x / 100, step: 0.5 },
   { key: "panicSensitivity", label: "PANIC", unit: "×", toView: (x) => x, fromView: (x) => x, step: 0.1 },
-  { key: "volatilityMultiplier", label: "VOL", unit: "×", toView: (x) => x, fromView: (x) => x, step: 0.1 },
+  { key: "volatilityMultiplier", label: "VOLATILITY", unit: "×", toView: (x) => x, fromView: (x) => x, step: 0.1 },
   { key: "liquidityMultiplier", label: "LIQUIDITY", unit: "×", toView: (x) => x, fromView: (x) => x, step: 0.05 },
   { key: "durationSec", label: "FOR", unit: "s", toView: (x) => x, fromView: (x) => x, step: 10 },
 ];
@@ -31,11 +31,11 @@ export function NewsPreview({ news, onEdit, onApply, onCancel }: { news: NewsSta
   if (news.phase === "interpreting") {
     return (
       <div className={styles.news} data-testid="news" data-phase="interpreting">
-        <span className={styles.label}>NEWS</span> <span className={styles.newsHeadline}>“{news.headline}”</span> <span className={styles.dimText}>interpreting…</span>
+        <span className={styles.label}>NEWS</span> <span className={styles.newsHeadline}>“{news.headline}”</span> <span className={styles.dimText}>INTERPRETING…</span>
       </div>
     );
   }
-  const state = news.phase === "applied" ? (news.edited ? "EDITED · Enter applies it as a new headline" : "APPLIED") : "Enter apply · Tab edit · Esc cancel";
+  const state = news.phase === "applied" ? (news.edited ? "EDITED · ↵ APPLY" : "APPLIED") : "↵ APPLY · TAB EDIT · ESC CANCEL";
   return (
     <div className={styles.news} data-testid="news" data-phase={news.phase}>
       <span className={styles.label}>NEWS</span>

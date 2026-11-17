@@ -7,8 +7,8 @@ async function command(page: Page, text: string) {
 }
 
 async function quote(page: Page) {
-  return page.getByTestId("ticket").evaluate((ticket) => {
-    const spans = [...ticket.firstElementChild!.children];
+  return page.getByTestId("ticket-quote").evaluate((row) => {
+    const spans = [...row.children];
     return { bid: spans[1].textContent!.trim(), ask: spans[4].textContent!.trim(), mid: spans[7].textContent!.trim() };
   });
 }
@@ -37,7 +37,7 @@ test("QA #2 and #8: a student's resting order is marked in BOOK and its later fi
   const { ask } = await quote(page);
   await command(page, `SELL 100 @ ${ask}`);
   await command(page, "RUN");
-  await expect(page.getByTestId("ticket-message")).toContainText("is resting in the book");
+  await expect(page.getByTestId("ticket-message")).toContainText(" resting");
   // No SIDE column (D-071): the student's level is outlined, data-side says which side, and the tooltip says it is theirs.
   const mine = page.getByTestId("book").locator("[data-mine=true]");
   await expect(mine).toHaveAttribute("data-side", "ASK");
@@ -77,7 +77,7 @@ test("QA #4: HELP explains offline scope; a CEO mention alone does not become fr
 });
 
 test("QA #7: a half-cent mid is identical in BOOK, TKT and an executed order's EXR", async ({ page }) => {
-  await page.goto("/?seed=187");
+  await page.goto("/?seed=187&learn=1"); // ARR MID is a Learn-mode column (D-072)
   await expect(page.getByTestId("last-price")).toBeVisible();
   await command(page, "SPEED 8");
   await expect.poll(async () => (await quote(page)).mid, { timeout: 8_000 }).toMatch(/\.\d{3}$/);
@@ -117,7 +117,9 @@ test("QA #10: the ticket explains blocked SEND, and SCN explains its seed change
   await expect(page.getByTestId("last-price")).toBeVisible();
   await page.getByTestId("ticket-qty").fill("abc");
   await expect(page.getByTestId("ticket-send")).toBeDisabled();
-  await expect(page.getByTestId("ticket-preview")).toContainText('"abc" is not a number of shares');
+  // A short label on screen, the full reason as the tooltip (D-072).
+  await expect(page.getByTestId("ticket-preview")).toHaveText("INVALID QTY");
+  await expect(page.getByTestId("ticket-preview")).toHaveAttribute("title", /"abc" is not a number of shares/);
   await command(page, "SCN quiet-buy");
   await expect(page.getByTestId("command-reply")).toContainText("It runs on its own seed, 4105 (yours was 187");
   await command(page, "");

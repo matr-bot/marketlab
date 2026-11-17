@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { Frame } from "@/engine/feed";
 import type { UserEvent } from "@/engine/simulation";
 import { parseCommand } from "@/lib/command";
 import { estimateMarketFill } from "@/lib/estimate";
-import { formatAvgPrice, formatCentsPerShare, formatDollars, formatMid, formatMidX2, formatPrice, formatQty } from "@/lib/format";
+import { formatAvgPrice, formatBps, formatCentsPerShare, formatDollars, formatMid, formatMidX2, formatPrice, formatQty } from "@/lib/format";
 import { formatUserEvent } from "@/lib/userMessages";
+import { Explain } from "./Learn";
 import styles from "./terminal.module.css";
 
 const QUICK_SIZES: readonly (readonly [string, string])[] = [
@@ -32,18 +33,18 @@ export function TicketPanel({ frame, lastEvent, paused, onCommand }: { frame: Fr
   const text = `${side.toUpperCase()} ${qty.trim()}${type === "limit" ? ` @ ${price.trim()}` : ""}`;
   const cmd = qty.trim() === "" || (type === "limit" && price.trim() === "") ? null : parseCommand(text);
   const order = cmd !== null && cmd.kind === "order" ? cmd.order : null;
-  // Why SEND is disabled, in words (QA #10). Text that is not a number parses as a headline (D-061), so
-  // the ticket says what it needs itself.
-  const blocked: string | null =
+  // Why SEND is disabled (QA #10), as a short label (D-072); the full reason is the tooltip. Text that
+  // is not a number parses as a headline (D-061), so the ticket says what it needs itself.
+  const blocked: { label: string; reason: string } | null =
     order !== null
       ? null
       : qty.trim() === ""
-        ? "Enter a number of shares."
+        ? { label: "ENTER QTY", reason: "Enter a number of shares." }
         : cmd === null
-          ? "Enter a limit price."
+          ? { label: "ENTER PX", reason: "Enter a limit price." }
           : cmd.kind === "error"
-            ? cmd.message
-            : `"${qty.trim().slice(0, 12)}" is not a number of shares: use a whole number, like 500 or 5K.`;
+            ? { label: cmd.message.includes("is not a price") ? "INVALID PX" : "INVALID QTY", reason: cmd.message }
+            : { label: "INVALID QTY", reason: `"${qty.trim().slice(0, 12)}" is not a number of shares: use a whole number, like 500 or 5K.` };
   const mid = frame.bid !== null && frame.ask !== null ? (frame.bid + frame.ask) / 2 : null;
 
   const send = () => {
@@ -58,25 +59,33 @@ export function TicketPanel({ frame, lastEvent, paused, onCommand }: { frame: Fr
     if (cents !== null) setPrice(formatPrice(cents).replace(/,/g, ""));
   };
 
-  // What the order would do, from the book on screen.
+  // What the order would do, from the book on screen: one line of data (D-072); slippage in basis
+  // points of the mid. Learn mode adds the words and cents per share.
   let preview: string;
+  let explain: ReactNode = null;
   if (order === null) {
-    preview = blocked!;
+    preview = blocked!.label;
   } else if (order.type === "market") {
     const e = estimateMarketFill(side === "buy" ? frame.asks : frame.bids, order.qty, side, mid);
-    if (e.avgPrice === null) preview = "Nothing to trade against: this order would be cancelled.";
-    else {
-      const cost = e.slippageCents === null ? "" : ` · ${formatCentsPerShare(e.slippageCents)}¢/sh vs mid`;
-      const short = e.shortBy === 0 ? "" : e.bookExhausted ? ` · only ${formatQty(e.filledQty)} of ${formatQty(order.qty)} available` : ` · ${formatQty(e.shortBy)} may fill beyond the levels shown`;
-      preview = `EST. AVG ${formatAvgPrice(e.avgPrice)}${cost}${short}`;
+    if (e.avgPrice === null) {
+      preview = "NO LIQUIDITY";
+      explain = <Explain id="tkt.empty" />;
+    } else {
+      const bps = e.slippageCents === null || mid === null ? null : (e.slippageCents / mid) * 10_000;
+      const cost = bps === null ? "" : ` · SLIP ${formatBps(bps)} BPS`;
+      const short = e.shortBy === 0 ? "" : e.bookExhausted ? ` · ${formatQty(e.filledQty)}/${formatQty(order.qty)} AVAILABLE` : ` · ${formatQty(e.shortBy)} BEYOND BOOK SHOWN`;
+      preview = `EST AVG ${formatAvgPrice(e.avgPrice)}${cost}${short}`;
+      if (e.slippageCents !== null) explain = <Explain id="tkt.estimate">Estimated cost {formatCentsPerShare(e.slippageCents)}¢ per share versus the mid, walking the book on screen the way the matching engine will.</Explain>;
     }
   } else {
     const crosses = side === "buy" ? frame.ask !== null && order.price >= frame.ask : frame.bid !== null && order.price <= frame.bid;
-    if (!crosses) preview = `Rests in the book at ${formatPrice(order.price)} and fills only if the market trades to it.`;
-    else {
+    if (!crosses) {
+      preview = `RESTS @ ${formatPrice(order.price)}`;
+      explain = <Explain id="tkt.rests">Rests in the book at {formatPrice(order.price)} and fills only if the market trades to it.</Explain>;
+    } else {
       const levels = (side === "buy" ? frame.asks : frame.bids).filter((l) => (side === "buy" ? l.price <= order.price : l.price >= order.price));
       const e = estimateMarketFill(levels, order.qty, side, mid);
-      preview = `Crosses the spread: EST. ${formatQty(e.filledQty)} fill @ ${e.avgPrice === null ? "—" : formatAvgPrice(e.avgPrice)}${e.shortBy > 0 ? `, ${formatQty(e.shortBy)} rest at ${formatPrice(order.price)}` : ""}`;
+      preview = `CROSSES · EST ${formatQty(e.filledQty)} @ ${e.avgPrice === null ? "—" : formatAvgPrice(e.avgPrice)}${e.shortBy > 0 ? ` · ${formatQty(e.shortBy)} RESTS @ ${formatPrice(order.price)}` : ""}`;
     }
   }
 
@@ -84,7 +93,8 @@ export function TicketPanel({ frame, lastEvent, paused, onCommand }: { frame: Fr
   const open = desk.openOrders;
   return (
     <div className={styles.ticket} data-testid="ticket">
-      <div className={styles.quoteRow}>
+      <Explain id="tkt.simulated" />
+      <div className={styles.quoteRow} data-testid="ticket-quote">
         <span className={styles.label}>BID</span>
         <span className={styles.num}>{frame.bid === null ? "—" : formatPrice(frame.bid)}</span>
         <span className={styles.dim}>×{frame.bids.length > 0 ? formatQty(frame.bids[0].qty) : "—"}</span>
@@ -170,7 +180,7 @@ export function TicketPanel({ frame, lastEvent, paused, onCommand }: { frame: Fr
       {type === "limit" && (
         <div className={styles.formRow}>
           <label className={styles.field}>
-            <span className={styles.label}>PRICE</span>
+            <span className={styles.label}>PX</span>
             <input
               className={styles.input}
               data-testid="ticket-price"
@@ -192,14 +202,20 @@ export function TicketPanel({ frame, lastEvent, paused, onCommand }: { frame: Fr
         </div>
       )}
 
-      <div className={styles.preview} data-testid="ticket-preview">
+      <div className={styles.preview} data-testid="ticket-preview" title={blocked?.reason}>
         {preview}
+        {explain}
       </div>
 
-      <button type="button" className={styles.sendBtn} disabled={order === null} data-testid="ticket-send" title={blocked ?? undefined} onClick={send}>
-        {order === null ? "CAN'T SEND · SEE THE NOTE ABOVE" : `SEND ${side.toUpperCase()} ${formatQty(order.qty)} ${order.type === "market" ? "MKT" : `@ ${formatPrice(order.price)}`}`}
+      <button type="button" className={styles.sendBtn} disabled={order === null} data-testid="ticket-send" title={blocked?.reason} onClick={send}>
+        {order === null ? "SEND" : `SEND ${side.toUpperCase()} ${formatQty(order.qty)} ${order.type === "market" ? "MKT" : `@ ${formatPrice(order.price)}`}`}
       </button>
-      {paused && <div className={styles.note}>PAUSED: orders wait and execute when the market resumes (RUN).</div>}
+      {paused && (
+        <div className={styles.note} data-testid="ticket-paused">
+          queued — market paused
+          <Explain id="tkt.paused" />
+        </div>
+      )}
 
       <div className={styles.openOrders}>
         <div className={styles.openHead}>
@@ -219,7 +235,8 @@ export function TicketPanel({ frame, lastEvent, paused, onCommand }: { frame: Fr
       </div>
 
       <div className={styles.lastMessage} data-testid="ticket-message">
-        {lastEvent === null ? "Orders you send show here and in EXR with their exact cost." : formatUserEvent(lastEvent)}
+        {lastEvent === null ? "—" : formatUserEvent(lastEvent)}
+        {lastEvent === null && <Explain id="tkt.messages" />}
       </div>
     </div>
   );

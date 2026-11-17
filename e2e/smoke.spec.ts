@@ -29,7 +29,7 @@ test("the market is alive on load: prices change within 5 seconds, with no conso
     (trs as HTMLTableRowElement[]).map((r) => ({ aggressor: r.getAttribute("data-aggressor"), tick: r.getAttribute("data-tick"), price: getComputedStyle(r.cells[1]).color, labelColor: getComputedStyle(r.cells[3]).color, label: r.cells[3].textContent })),
   );
   for (const r of rows) {
-    expect(r.label).toBe(r.aggressor === "buy" ? "BUYER" : "SELLER");
+    expect(r.label).toBe(r.aggressor === "buy" ? "B" : "S");
     expect(r.price).toBe(r.tick === "up" ? GREEN : RED);
     expect(r.labelColor).toBe(LABEL);
   }
@@ -48,10 +48,10 @@ test("the market is alive on load: prices change within 5 seconds, with no conso
   const bars = await page.locator("[data-testid=book] [data-side] > [aria-hidden]").evaluateAll((els) => els.map((e) => (e as HTMLElement).style.width));
   expect(bars.length).toBeGreaterThan(0);
   expect(bars).toContain("50%");
-  await expect(page.getByTestId("ticker").locator("span").first()).toBeVisible();
   await expect(page.getByTestId("status-bar")).toContainText("MLAB");
   await expect(page.getByTestId("status-bar").getByText("SIMULATED", { exact: true })).toBeVisible();
-  await expect(page.getByTestId("status-bar")).toContainText("every trade from 77 agents");
+  // Data only by default (D-072): no explanations until Learn mode.
+  await expect(page.locator("[data-explain]")).toHaveCount(0);
   await expect(page.locator("[data-panel=GP] header")).toHaveText(/^GP\s*MLAB · 10S$/); // code + right-aligned detail (D-071)
   await expect(page.getByText(/not running/i)).toHaveCount(0);
 
@@ -76,7 +76,6 @@ test("the offline headline FED, typed into the command bar, moves the market wit
   await page.keyboard.press("Enter");
 
   await expect(page.getByTestId("command-reply")).toHaveText("FED · Fed surprise hike 75bps");
-  await expect(page.getByTestId("ticker").locator("[data-headline=FED]")).toHaveCount(1);
   await expect(page.getByTestId("chart")).toHaveAttribute("data-markers", "FED");
   await expect.poll(price, { timeout: 10_000, intervals: [250] }).toBeLessThanOrEqual(before * 0.99);
   // In the crash, BOOK is never blank: levels on at least one side (an empty side says NO BIDS / NO ASKS).
@@ -117,11 +116,10 @@ test("typing FED 30 times quickly never freezes the page (D-051)", async ({ page
   const price = await page.getByTestId("last-price").textContent();
   await expect.poll(() => page.getByTestId("last-price").textContent(), { timeout: 5_000 }).not.toBe(price);
 
-  // Bounded work: one marker per accepted headline, a capped ticker.
+  // Bounded work: one marker per accepted headline.
   const markers = (await page.getByTestId("chart").getAttribute("data-markers"))!.split("|").filter(Boolean);
   expect(markers.length).toBeGreaterThanOrEqual(1);
   expect(markers.length).toBeLessThanOrEqual(3);
-  expect(await page.getByTestId("ticker").locator("span").count()).toBeLessThanOrEqual(20);
   expect(errors).toEqual([]);
 });
 
@@ -142,7 +140,7 @@ test("a custom headline: the AI's params preview, Enter applies, the price react
       },
     }),
   );
-  await page.goto("/");
+  await page.goto("/?learn=1"); // Learn mode: WHO says in words who moved the price (D-072)
   const last = page.getByTestId("last-price");
   await expect(last).toBeVisible({ timeout: 5_000 });
   const price = async () => Number((await last.textContent())!.replace(/,/g, ""));

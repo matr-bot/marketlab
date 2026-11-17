@@ -2,6 +2,7 @@
 
 import { topType, type Attribution, type SideAttribution } from "@/engine/attribution";
 import { formatQty, traderName } from "@/lib/format";
+import { Explain } from "./Learn";
 import styles from "./terminal.module.css";
 
 function Side({ label, side }: { label: string; side: SideAttribution }) {
@@ -34,13 +35,16 @@ export function WhoPanel({ who }: { who: Attribution }) {
   const top = topType(main.side);
   return (
     <div className={styles.who} data-testid="who">
+      <Explain id="who.window" />
       {who.trades === 0 || top === null ? (
-        <div className={styles.chatEmpty}>No trades in this window.</div>
+        <div className={styles.chatEmpty}>—</div>
       ) : (
         <>
-          <div className={styles.whoSummary} data-testid="who-summary">
-            {top.pct}% of {main.word} came from {traderName(top.type)}.
-          </div>
+          <Explain id="who.summary">
+            <span className={styles.whoSummary} data-testid="who-summary">
+              {top.pct}% of {main.word} came from {traderName(top.type)}.
+            </span>
+          </Explain>
           <Side label="SELLING (hit bids)" side={who.selling} />
           <Side label="BUYING (lifted asks)" side={who.buying} />
         </>

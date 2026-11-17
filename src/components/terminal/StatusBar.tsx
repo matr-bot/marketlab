@@ -4,6 +4,7 @@ import { formatSimTime } from "@/engine/simClock";
 import type { Frame } from "@/engine/feed";
 import { formatChange, formatPercent, formatPrice, formatQty } from "@/lib/format";
 import styles from "./terminal.module.css";
+import { Explain } from "./Learn";
 import { useFlash } from "./useFlash";
 
 /**
@@ -53,7 +54,9 @@ export function StatusBar({ frame, openPrice, scenarioTitle, paused, speed }: { 
         <span className={styles.label}>ASK</span>
         <span className={styles.num}>{frame.ask === null ? "—" : formatPrice(frame.ask)}</span>
       </span>
-      <span className={styles.subtitle}>every trade from {formatQty(frame.agents)} agents</span>
+      <Explain id="status.agents" inline>
+        every trade from {formatQty(frame.agents)} agents
+      </Explain>
       <span className={styles.spacer} />
       <span className={styles.num} data-testid="sim-clock">
         {formatSimTime(frame.time)}

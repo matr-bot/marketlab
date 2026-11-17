@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Frame } from "@/engine/feed";
 import type { DepthLevel } from "@/engine/types";
 import { formatMid, formatPrice, formatQty } from "@/lib/format";
+import { Explain } from "./Learn";
 import styles from "./terminal.module.css";
 
 /** Minimum row height in px; rows stretch to fill the panel exactly. */
@@ -79,12 +80,12 @@ export function BookPanel({ frame }: { frame: Frame }) {
   return (
     <div ref={boxRef} className={styles.bookPanel} data-testid="book" data-levels={Math.min(n.asks, n.bids)}>
       <div className={`${styles.bookRow} ${styles.bookHead}`}>
-        <span>ORDERS</span>
-        <span>SIZE</span>
-        <span>PRICE</span>
+        <span className={styles.label}>ORDERS</span>
+        <span className={styles.label}>QTY</span>
+        <span className={styles.label}>PX</span>
       </div>
       <div className={styles.bookAsks}>
-        {frame.asks.length === 0 && height > 0 && <div className={`${styles.bookRow} ${styles.bookEmpty}`}>NO ASKS · liquidity vacuum</div>}
+        {frame.asks.length === 0 && height > 0 && <div className={`${styles.bookRow} ${styles.bookEmpty}`}>NO ASKS <Explain id="book.vacuum" inline /></div>}
         {asks.map((l) => (
           <Level key={`a${l.price}`} level={l} side="ASK" maxQty={maxQty} mine={mineAt("sell", l.price)} />
         ))}
@@ -95,7 +96,7 @@ export function BookPanel({ frame }: { frame: Frame }) {
         <span>{frame.bid === null || frame.ask === null ? "" : `MID ${formatMid(frame.bid, frame.ask)}`}</span>
       </div>
       <div className={styles.bookBids}>
-        {frame.bids.length === 0 && height > 0 && <div className={`${styles.bookRow} ${styles.bookEmpty}`}>NO BIDS · liquidity vacuum</div>}
+        {frame.bids.length === 0 && height > 0 && <div className={`${styles.bookRow} ${styles.bookEmpty}`}>NO BIDS <Explain id="book.vacuum" inline /></div>}
         {bids.map((l) => (
           <Level key={`b${l.price}`} level={l} side="BID" maxQty={maxQty} mine={mineAt("buy", l.price)} />
         ))}

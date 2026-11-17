@@ -56,7 +56,7 @@ const ORDER_USAGE = "Orders look like BUY 500, SELL 5K, or BUY 500 @ 187.25 for 
 
 /** Command reference for HELP: [what you type, what it does]. */
 export const HELP_LINES: readonly (readonly [string, string])[] = [
-  ["GP · BOOK · TAPE · TKT · EXR · STRAT · NEWS · WHO · CHAT", "Open that function in the active panel (click a panel's header to make it active; panel 7 by default)."],
+  ["GP · BOOK · TAPE · TKT · EXR · STRAT · NEWS · WHO · CHAT", "Open that function in the active panel (click a panel to make it active). While GP is active, codes open in panel 7, so the chart stays."],
   ["STRAT buy after a 3% drop", "Describe a strategy in plain English. Check its rules, then Enter starts it trading. STOP stops it."],
   ["FED · CEO · BEAT · DOWNGRADE", "Send a ready-made headline. The crowd reacts; fair value jumps and panic sellers may cascade."],
   ["CPI 3.4 · JOBS 150K · GDP 2.3 · RATES +0.75", "Hypothetical MLAB releases. A code alone uses an authored example; an optional number sets the actual. JOBS 150 and 150K mean the same thing. FED is the default RATES release."],
@@ -69,6 +69,7 @@ export const HELP_LINES: readonly (readonly [string, string])[] = [
   ["SCN · SCN rate-shock", "List the scenarios, or open one. Each is a market situation with a brief and a task."],
   ["LINK", "Copy a link that reopens this exact scenario and seed, to assign it or share it."],
   ["SEED 42 · RERUN", "Run again with another seed, or the same seed from the start, to ask: what if I had done it differently?"],
+  ["?learn=1", "Learn mode: add it to the address (LINK keeps it) and every panel explains itself in plain English. Without it the terminal shows data only."],
 ];
 
 const PERCENT = /^[+-]?\d+(\.\d+)?%?$/;

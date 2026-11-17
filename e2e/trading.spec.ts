@@ -29,7 +29,7 @@ test("a market order fills and the execution report splits its cost", async ({ p
   const errors = watchErrors(page);
   await page.goto("/");
   await expect(page.getByTestId("last-price")).toBeVisible({ timeout: 8_000 });
-  await expect(page.getByTestId("exr-empty")).toBeVisible();
+  await expect(page.locator("[data-panel=EXR]")).toHaveCount(0); // no fills, no EXR panel (D-074)
 
   await page.keyboard.type("BUY 500");
   await page.keyboard.press("Enter");
@@ -84,15 +84,15 @@ test("a headline that starts with a command word goes to the AI preview, and NEW
   await page.keyboard.type("Buy now, pay later lender collapses");
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("news")).toHaveAttribute("data-phase", "preview"); // not parsed as an order
-  await expect(page.getByTestId("exr-empty")).toBeVisible();
+  await expect(page.locator("[data-panel=EXR]")).toHaveCount(0);
 
   await page.keyboard.press("Enter"); // the empty bar applies the preview
   await expect(page.getByTestId("news")).toHaveAttribute("data-phase", "applied");
-  // In free play panel 7 holds STRAT; the NEWS code opens the headline list there (D-066).
+  // In free play the drawer opens on DESK for a headline; the NEWS code shows the headline list (D-074).
   await expect(page.getByTestId("news-panel")).toHaveCount(0);
   await page.keyboard.type("NEWS");
   await page.keyboard.press("Enter");
-  await expect(page.locator("[data-slot='7']")).toHaveAttribute("data-panel", "NEWS");
+  await expect(page.getByTestId("drawer").locator("[data-pane=NEWS]")).toBeVisible();
   await expect(page.getByTestId("news-panel").getByTestId("headline-row")).toContainText("Buy now, pay later lender collapses");
   await expect(page.getByTestId("news-panel").getByTestId("headline-row")).toContainText("FV -2.0%");
   expect(errors).toEqual([]);

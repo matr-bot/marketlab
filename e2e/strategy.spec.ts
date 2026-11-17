@@ -23,8 +23,10 @@ test("the demo: a strategy in plain English trades through FED, shows in EXR, an
   await page.goto("/");
   await expect(page.getByTestId("last-price")).toBeVisible({ timeout: 8_000 });
 
-  // 1. IDEA: STRAT is panel 7 by default.
-  await expect(page.locator("[data-slot='7']")).toHaveAttribute("data-panel", "STRAT");
+  // 1. IDEA: the drawer is collapsed in free play; its STRATEGY tab opens the strategy pane (D-074).
+  await expect(page.getByTestId("strat")).toHaveCount(0);
+  await page.getByTestId("drawer-tab-STRAT").click();
+  await expect(page.getByTestId("drawer")).toHaveAttribute("data-open", "true");
   await page.getByTestId("strat-input").click();
   await page.keyboard.type(IDEA);
   await page.keyboard.press("Enter");

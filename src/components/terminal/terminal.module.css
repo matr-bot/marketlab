@@ -1,8 +1,8 @@
 /* ---------- shell ---------- */
 .shell {
   display: grid;
-  /* status, command bar, NEWS strip (absent when idle), panels */
-  grid-template-rows: auto auto auto 1fr;
+  /* status, command bar, NEWS strip (absent when idle), panels, drawer */
+  grid-template-rows: auto auto auto 1fr auto;
   height: 100vh;
   min-height: 560px;
   min-width: 960px;
@@ -11,53 +11,133 @@
 }
 
 .grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(340px, 1.1fr);
-  grid-template-rows: minmax(0, 3fr) minmax(0, 1.5fr) minmax(0, 2.3fr) minmax(0, 2fr);
-  /* CLAUDE.md default layout: cause and reaction on the left, the market and your desk on the right.
-     2 holds WHO (CROWD is cut), 7 holds NEWS until STRAT ships, and EXR is two columns wide so its
-     table fits (D-059). */
-  grid-template-areas:
-    "gp gp gp book"
-    "gp gp gp tkt"
-    "who chat news tkt"
-    "tape tape exr exr";
-  /* Fixed rows, so the NEWS strip coming and going never moves the panels into another row. */
+  /* D-074: left ~65% (chart over TAPE | WHO), right ~35% (BOOK, TKT, EXR once there is a fill). */
   grid-row: 4;
+  display: grid;
+  grid-template-columns: minmax(0, 65fr) minmax(340px, 35fr);
   gap: 2px;
   min-height: 0;
 }
 
-.whoArea {
-  grid-area: who;
-}
-
-.chatArea {
-  grid-area: chat;
+.leftCol,
+.rightCol {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  min-width: 0;
 }
 
 .gp {
-  grid-area: gp;
+  flex: 60 1 0;
 }
 
-.newsArea {
-  grid-area: news;
+.lowRow {
+  flex: 40 1 0;
+  display: grid;
+  grid-template-columns: minmax(0, 55fr) minmax(0, 45fr);
+  gap: 2px;
+  min-height: 0;
+}
+
+/* `.rightCol >` outranks Panel's own `min-height: 0`. */
+.rightCol > .book {
+  flex: 1 1 0;
+  /* Header row, column heads, spread and a level on each side. */
+  min-height: 110px;
+}
+
+/* The ticket's form is about 300px; on a short screen it shrinks and scrolls, SEND pinned to its bottom. */
+.rightCol > .tkt {
+  flex: 0 1 300px;
+  min-height: 200px;
 }
 
 .exr {
-  grid-area: exr;
+  flex: 0 0 30%;
 }
 
-.tkt {
-  grid-area: tkt;
+.tape,
+.whoArea {
+  min-height: 0;
 }
 
-.tape {
-  grid-area: tape;
+/* ---------- drawer (D-074) ---------- */
+.drawer {
+  grid-row: 5;
 }
 
-.book {
-  grid-area: book;
+.drawerHead {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.drawer:not([data-open]) .drawerHead {
+  border-bottom: none;
+}
+
+.drawerTab {
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--border);
+  color: var(--label);
+  font-size: var(--fs-label);
+  letter-spacing: 0.08em;
+  padding: 3px 10px;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 6px;
+  align-items: baseline;
+}
+
+.drawerTab:hover {
+  background: var(--hover);
+}
+
+.drawerTabOn {
+  color: var(--data);
+}
+
+.drawerCount {
+  color: var(--data);
+}
+
+.drawerSep {
+  width: 6px;
+  border-right: 1px solid var(--border);
+}
+
+.drawerToggle {
+  background: transparent;
+  border: none;
+  border-left: 1px solid var(--border);
+  color: var(--label);
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.drawerToggle:hover {
+  background: var(--hover);
+  color: var(--data);
+}
+
+.drawerBody {
+  height: clamp(150px, 30vh, 330px);
+  display: grid;
+  grid-template-columns: minmax(320px, 40fr) minmax(0, 60fr);
+}
+
+.drawerPane {
+  position: relative;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.drawerPane + .drawerPane {
+  border-left: 1px solid var(--border);
 }
 
 /* ---------- status bar ---------- */
@@ -136,9 +216,15 @@
   padding: 1px 8px;
 }
 
-.playback > .segBtn + .segBtn,
-.playback > .segBtn + .segment,
-.playback > .segment + .segBtn {
+.playback > .segBtn + .segment {
+  margin-left: -1px;
+}
+
+.playback > .statusSep {
+  margin: 3px 8px;
+}
+
+.playback > .statusSep + .segBtn + .segBtn {
   margin-left: -1px;
 }
 
@@ -471,7 +557,7 @@
 .bookHead,
 .bookSpread {
   font-size: var(--fs-label);
-  flex: 0 0 16px;
+  flex: 0 0 18px;
   align-items: center;
 }
 
@@ -496,7 +582,7 @@
 .bookAsks > .bookRow,
 .bookBids > .bookRow {
   flex: 1 1 0;
-  min-height: 16px;
+  min-height: 18px;
   align-items: center;
 }
 
@@ -509,7 +595,7 @@
 .bookAsks > .bookEmpty,
 .bookBids > .bookEmpty {
   display: block;
-  flex: 0 0 16px;
+  flex: 0 0 18px;
   color: var(--label);
   text-align: center;
 }

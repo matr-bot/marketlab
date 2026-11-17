@@ -5,8 +5,6 @@ import { useLearn } from "./terminal/Learn";
 import styles from "./Panel.module.css";
 
 type PanelProps = {
-  /** Slot in the default layout; kept as `data-slot` for tests, no longer drawn (D-070). */
-  number: number;
   /** Function code, e.g. "GP". */
   code: string;
   /** What the panel is ("WHO MOVED THE PRICE"): the screen-reader label, drawn after the code in Learn mode only (D-071, D-072). */
@@ -22,14 +20,13 @@ type PanelProps = {
 };
 
 /** A terminal panel: an 11px gray header with the function code and a right-aligned detail (`GP … MLAB · 10S`), then its body. */
-export function Panel({ number, code, label, meta, className, active = false, onActivate, children }: PanelProps) {
+export function Panel({ code, label, meta, className, active = false, onActivate, children }: PanelProps) {
   const learn = useLearn();
   return (
     <section
       className={`${styles.panel} ${active ? styles.active : ""} ${className ?? ""}`}
       aria-label={`${code} ${label}`}
       data-panel={code}
-      data-slot={number}
       data-active={active || undefined}
       onMouseDown={onActivate}
     >

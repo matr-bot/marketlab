@@ -1920,3 +1920,32 @@ The terminal shows data; explanation lives in HELP, tooltips and Learn mode.
   stays one row at 1280px (BOOK's first rows show the same sizes).
 - **TKT:** the last-order line is not drawn until there is an order (no orphan "—" or empty border
   under OPEN ORDERS).
+
+## D-074 · Step 4b: fixed 65/35 grid and a two-pane bottom drawer
+
+**Date:** 2026-11-17 · **Status:** Accepted (replaces D-066's numbered slots and panel swapping)
+
+With the sentences gone, CHAT, STRAT and EXR were empty boxes holding about 40% of the screen. The
+layout now gives the space to data and shows the rest on demand.
+- **Grid (fixed):** left ~65%: the chart (~60% of the height) over TAPE | WHO; right ~35%: BOOK, then
+  TKT (300px, shrinking to 200px on short screens, SEND pinned), then EXR **only once there is a fill**.
+  The numbered slots, `data-slot` and code-driven panel swapping are gone.
+- **Drawer** (`Drawer.tsx`): STRAT, CHAT and NEWS share one bottom drawer. Collapsed (the default in
+  free play) it is a single tab row: `STRATEGY │ DESK NEWS … ▴`. Open, it has **two panes**: the
+  strategy on the left (~40%), and DESK or NEWS on the right (the tab picks which), so a strategy and
+  the market's reaction (or the macro demo's release calendar) are on screen together. Chosen over one
+  tab at a time because the 90-second demo and the macro demo both need the strategy next to the
+  commentary or the calendar.
+- **When it opens by itself:** a strategy is typed or started; a desk message of kind headline, panic
+  or liquidity vacuum arrives while it is collapsed (it opens on DESK; messages already there when the
+  market opens only prime the count); a scenario other than free play loads (on NEWS). If the student
+  collapses it, panic and vacuum messages no longer reopen it; the next headline does. It never
+  switches the side the student is reading: the other side shows an unread count instead (`NEWS 1`),
+  and a side counts as read when the student leaves it. STRATEGY shows `RUN` while a strategy runs.
+- **Function codes:** STRAT, CHAT and NEWS open the drawer (CHAT on DESK, NEWS on NEWS); GP, TAPE, WHO,
+  BOOK and TKT take the amber border; EXR does too once there is a fill, and before that the reply is
+  `EXR · NO FILLS YET` (no empty panel). Step 4c turns TKT/EXR into ticket tabs.
+- **Strip (folded in from the 4a review):** `PAUSE 1X 2X 4X 8X │ SESSION HELP`. RERUN and LINK live in
+  the SESSION popover and still work typed.
+- **BOOK row height is 18px** (one 13px data line, D-070); at 16px the rows overflowed the panel on
+  short screens. BOOK keeps room for at least one level a side.

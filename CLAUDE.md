@@ -83,7 +83,8 @@ This section is the spec. It replaces the earlier amber-label design. The overha
 | 2b ✅ | Code-only panel titles, no panel scrollbars or fades, BOOK without SIDE, GP active (D-071) |
 | 3 ✅ | Learn mode (`?learn=1`), abbreviation dictionary; ticker crawl, hint text and default-view sentences removed (D-072) |
 | 4a ✅ | Status strip + playback + SESSION popover (D-073) |
-| 4b / 4c | 65-35 grid + drawer / ticket tabs + code routing |
+| 4b ✅ | 65-35 grid + two-pane drawer, auto-open rules, playback trimmed (D-074) |
+| 4c | Ticket tabs (ORDER / FILLS / OPEN) + remaining code routing |
 | 5 | Panel content (WHO table, TAPE B/S, BOOK tints, ticket one-line estimate) |
 | 5.5 | Detail pass (self-hosted mono font, decimal alignment, chart crosshair, keymap) |
 | 6 | Session launcher at `/`; the terminal at `/terminal` |
@@ -122,23 +123,25 @@ never uses a real company's name, logo or exact screens.
 
 ### Layout (target, D-068 onward)
 ```
-┌ MLAB 186.93 −0.02 (−0.01%) │ BID 186.93 × 6,342  ASK 186.94 × 113 │ VOL 221.5K │ 09:40:20 │ ● PAUSED │ SIMULATED │ RUN 1X 2X 4X 8X RERUN LINK SESSION HELP ┐
+┌ MLAB 186.93 −0.02 (−0.01%) │ BID 186.93 × 6,342  ASK 186.94 × 113 │ VOL 221.5K │ 09:40:20 │ ● PAUSED │ SIMULATED │ PAUSE 1X 2X 4X 8X │ SESSION HELP ┐
 ├ > command line ───────────────────────────────────────────────────────────────────────────────────────────┤
 │ CHART (~65% width, ~60% height)                                  │ BOOK                                   │
 │                                                                  │                                        │
 ├──────────────────────────────┬───────────────────────────────────┼────────────────────────────────────────┤
 │ TAPE                         │ WHO                               │ TICKET  [ORDER | FILLS | OPEN]          │
 ├──────────────────────────────┴───────────────────────────────────┴────────────────────────────────────────┤
-│ drawer [STRATEGY | DESK | NEWS]  (collapsed by default)                                                  │
+│ drawer STRATEGY │ DESK NEWS (collapsed by default; open = strategy pane | DESK or NEWS pane)             │
 └──────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 - Panel titles are 11px gray uppercase (`TAPE`, `WHO · 60S`); no numbered boxes.
-- EXR is the ticket's FILLS tab. STRAT, CHAT and NEWS share the bottom drawer: it opens on its code
-  or a click, when a strategy starts, on a headline / panic / vacuum desk message, and (NEWS) when a
-  non-free-play scenario loads. Once collapsed it stays shut until the next headline.
+- EXR is the ticket's FILLS tab (step 4c; until then a panel shown only once there is a fill). STRAT,
+  CHAT and NEWS share the bottom drawer (D-074): open, it shows the strategy pane beside DESK or NEWS.
+  It opens on its code or a click, when a strategy starts, on a headline / panic / vacuum desk
+  message, and (NEWS) when a non-free-play scenario loads. Once collapsed it stays shut until the next
+  headline; the side not showing carries an unread count.
 - Function codes: `GP`, `BOOK`, `TAPE`, `WHO` focus their panel; `TKT`, `EXR` select the ticket tab;
   `STRAT`, `CHAT`, `NEWS` open their drawer tab (replaces D-066's panel swapping).
-- Playback (RUN / 1X 2X 4X 8X / RERUN / LINK) is a compact segmented control on the status strip;
+- Playback (PAUSE / 1X 2X 4X 8X │ SESSION HELP) is a compact segmented control on the status strip;
   the selected speed is white on `#1F1F1F`. Scenario and seed are in the SESSION popover and on the
   launcher, so any run can still be reproduced.
 - The GLASS BOX is a full-screen reveal opened from STRAT (`BACKTEST`), not a permanent panel.

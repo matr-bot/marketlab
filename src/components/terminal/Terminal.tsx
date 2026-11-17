@@ -22,6 +22,7 @@ import { BookPanel } from "./BookPanel";
 import { ChatPanel } from "./ChatPanel";
 import { CommandBar } from "./CommandBar";
 import { ExecPanel } from "./ExecPanel";
+import { Drawer, type DrawerSide } from "./Drawer";
 import { download, GlassBox } from "./GlassBox";
 import { HelpOverlay } from "./HelpOverlay";
 import { LearnContext } from "./Learn";
@@ -49,13 +50,11 @@ interface Run {
   readonly strategy: StrategySpec | null;
 }
 
-type Slot = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
-const SLOTS: readonly Slot[] = [1, 2, 3, 4, 5, 6, 7, 8];
+/** The panels on the fixed grid, plus the drawer (D-074). The active one has the amber border. */
+type PanelId = "GP" | "TAPE" | "WHO" | "BOOK" | "TKT" | "EXR" | "DRAWER";
+/** Desk messages that open a collapsed drawer: a headline always, panic and vacuum unless the student collapsed it since (D-074). */
+const DRAWER_KINDS: ReadonlySet<string> = new Set(["headline", "panic", "vacuum"]);
 
-/** The default layout (CLAUDE.md): 2 holds WHO (CROWD is cut) and 7 STRAT; NEWS opens by its code (D-066). */
-const DEFAULT_SLOTS: Readonly<Record<Slot, FunctionCode>> = { 1: "GP", 2: "WHO", 3: "CHAT", 4: "TAPE", 5: "BOOK", 6: "TKT", 7: "STRAT", 8: "EXR" };
-/** The panel a typed code opens in until another is clicked: the chart (D-071). */
-const DEFAULT_ACTIVE: Slot = 1;
 
 /** Ask /api/interpret; if the route itself is unreachable (no Wi-Fi), fall back here the same way. */
 async function interpret(headline: string): Promise<InterpretResponse> {
@@ -105,8 +104,9 @@ function showRunInAddressBar(scenario: Scenario, seed: number, learn: boolean) {
 }
 
 /**
- * The terminal. Panels keep their default-layout numbers (CLAUDE.md); a typed function code opens in
- * the active panel (D-066), and functions that have not shipped are simply not drawn.
+ * The terminal (D-074): a fixed grid, chart, TAPE and WHO on the left, BOOK, TKT and EXR (once there is
+ * a fill) on the right, and a bottom drawer for STRAT, CHAT and NEWS. A typed function code focuses its
+ * panel or opens its drawer pane; nothing sits on screen as an empty box.
  */
 export function Terminal() {
   // Read once, on the client. The first render is the same "opening" screen as the server's either way.
@@ -123,9 +123,17 @@ export function Terminal() {
   const [news, setNews] = useState<NewsState>({ phase: "idle" });
   const [whoWindow, setWhoWindow] = useState<Attribution | null>(null);
   const [selectedCandle, setSelectedCandle] = useState<number | null>(null);
-  // Demo keeps STRAT in panel 7 and puts the release calendar in panel 2.
-  const [slots, setSlots] = useState<Record<Slot, FunctionCode>>(() => initial?.run.scenario.id === "demo" ? { ...DEFAULT_SLOTS, 2: "NEWS" } : initial !== null && initial.run.scenario.id !== FREE_PLAY.id ? { ...DEFAULT_SLOTS, 7: "NEWS" } : { ...DEFAULT_SLOTS });
-  const [active, setActive] = useState<Slot>(DEFAULT_ACTIVE);
+  const [active, setActive] = useState<PanelId>("GP");
+  // The drawer: collapsed in free play; open on NEWS when a scenario opens (its brief, task and calendar).
+  const scenarioOnLoad = initial !== null && initial.run.scenario.id !== FREE_PLAY.id;
+  const [drawerOpen, setDrawerOpen] = useState(scenarioOnLoad);
+  const [drawerSide, setDrawerSide] = useState<DrawerSide>(scenarioOnLoad ? "NEWS" : "DESK");
+  /** The student collapsed the drawer: only a headline reopens it (D-074). */
+  const dismissed = useRef(false);
+  /** Unread on the side tab not showing: the last desk message seq and headline count already seen. */
+  const [seen, setSeen] = useState({ desk: -1, news: 0 });
+  /** The newest desk message already considered for opening the drawer; null until the market's first frame. */
+  const handledChat = useRef<number | null>(null);
   const [strat, setStrat] = useState<StratState>({ phase: "compose", message: null });
   /** The English behind the strategy that was started: what the glass box quotes. */
   const [built, setBuilt] = useState<{ text: string; source: StratSource; reason: string } | null>(null);
@@ -167,23 +175,43 @@ export function Terminal() {
     latestSeqRef.current = latestEvent?.seq ?? -1;
   });
 
-  /**
-   * Where a typed code opens: the active panel, except that the chart is never replaced by a code
-   * while it is active (it is by default, D-071); then panel 7. Step 4c replaces this routing.
-   */
-  const target: Slot = active === 1 ? 7 : active;
-  /** Open a function in the target panel; if it is already on screen, the two panels swap. */
-  const open = useCallback(
-    (code: FunctionCode) => {
-      setSlots((s) => {
-        if (s[target] === code) return s;
-        const at = SLOTS.find((n) => s[n] === code);
-        return at === undefined ? { ...s, [target]: code } : { ...s, [at]: s[target], [target]: code };
-      });
+  // Unread counts: a side is read up to the moment the student leaves it (switches side or collapses).
+  const lastChatSeq = market?.chat.at(-1)?.seq ?? -1;
+  const headlineCount = market?.headlines.length ?? 0;
+  const markSeen = useCallback((side: DrawerSide) => setSeen((s) => (side === "DESK" ? { ...s, desk: lastChatSeq } : { ...s, news: headlineCount })), [lastChatSeq, headlineCount]);
+  const openDrawer = useCallback(
+    (side?: DrawerSide) => {
+      if (drawerOpen && side !== undefined && side !== drawerSide) markSeen(drawerSide);
+      setDrawerOpen(true);
+      if (side !== undefined) setDrawerSide(side);
     },
-    [target],
+    [drawerOpen, drawerSide, markSeen],
   );
-  const visible = (code: FunctionCode) => SLOTS.some((n) => slots[n] === code);
+  const toggleDrawer = () => {
+    if (drawerOpen) {
+      dismissed.current = true;
+      markSeen(drawerSide);
+    }
+    setDrawerOpen((o) => !o);
+  };
+
+  /**
+   * A function code (D-074): STRAT, CHAT and NEWS open the drawer (CHAT on the DESK side); the panels on
+   * the grid take the amber border. False if there is nothing to show (EXR before any fill).
+   */
+  const open = useCallback(
+    (code: FunctionCode): boolean => {
+      if (code === "STRAT" || code === "CHAT" || code === "NEWS") {
+        openDrawer(code === "STRAT" ? undefined : code === "CHAT" ? "DESK" : "NEWS");
+        setActive("DRAWER");
+        return true;
+      }
+      if (code === "EXR" && (market?.exr?.orders.length ?? 0) === 0) return false;
+      setActive(code);
+      return true;
+    },
+    [openDrawer, market],
+  );
 
   const apply = useCallback(() => {
     if (news.phase !== "preview" && !(news.phase === "applied" && news.edited)) return false;
@@ -203,6 +231,7 @@ export function Terminal() {
       return true;
     }
     sendStrategy(clamped);
+    openDrawer();
     setBuilt({ text: strat.text, source: strat.source, reason: strat.reason });
     setStrat({ phase: "live" });
     say(paused ? "STRATEGY QUEUED · MARKET PAUSED" : "STRATEGY STARTED");
@@ -210,7 +239,7 @@ export function Terminal() {
   };
 
   const submitStrategy = async (text: string) => {
-    if (!visible("STRAT")) open("STRAT");
+    openDrawer();
     setStrat({ phase: "interpreting", text });
     const answer = await interpretStrategyText(text);
     if (!answer.ok) {
@@ -240,6 +269,9 @@ export function Terminal() {
     setWhoWindow(null);
     if (keep === null && strat.phase === "live") setStrat({ phase: "compose", message: null });
     say(keep === null ? text : `${text} · STRATEGY RESTARTS AT THE OPEN`, -1);
+    // The new market's desk messages and headlines start again from zero.
+    handledChat.current = null;
+    setSeen({ desk: -1, news: 0 });
     showRunInAddressBar(next.scenario, next.seed, learn);
   };
 
@@ -273,8 +305,7 @@ export function Terminal() {
         await interpretHeadline(cmd.headline);
         return;
       case "open":
-        open(cmd.code);
-        say("");
+        say(open(cmd.code) ? "" : `${cmd.code} · NO FILLS YET`);
         return;
       case "strategy":
         if (cmd.text === "") {
@@ -320,8 +351,7 @@ export function Terminal() {
         // A scenario runs on its own seed, so a whole class sees the same market; say so if it replaces yours (QA #10).
         const seedNote = run !== null && run.seed !== scenario.seed ? ` It runs on its own seed, ${scenario.seed} (yours was ${run.seed}; SEED ${run.seed} reruns it on yours).` : "";
         restart({ scenario, seed: scenario.seed, runId: (run?.runId ?? 0) + 1 }, `SCN ${scenario.title.toUpperCase()}${seedNote}`);
-        if (scenario.id === "demo") setSlots({ ...DEFAULT_SLOTS, 2: "NEWS" });
-        else open("NEWS");
+        if (scenario.id !== FREE_PLAY.id) openDrawer("NEWS");
         return;
       }
       case "seed":
@@ -391,6 +421,25 @@ export function Terminal() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // Desk messages open a collapsed drawer on its DESK side: a headline always, panic or a liquidity vacuum
+  // unless the student collapsed the drawer since the last headline (D-074). Messages already there when
+  // the market opens (the warm-up) only prime the count.
+  const chatLog = market?.chat;
+  useEffect(() => {
+    if (chatLog === undefined || chatLog.length === 0) return;
+    const last = chatLog[chatLog.length - 1].seq;
+    const from = handledChat.current;
+    handledChat.current = last;
+    if (from === null || last <= from) return;
+    const fresh = chatLog.filter((c) => c.seq > from);
+    const headline = fresh.some((c) => c.kind === "headline");
+    if (headline) dismissed.current = false;
+    if (!drawerOpen && fresh.some((c) => DRAWER_KINDS.has(c.kind)) && !dismissed.current) {
+      setDrawerOpen(true);
+      setDrawerSide("DESK");
+    }
+  }, [chatLog, drawerOpen]);
+
   if (status.kind === "opening") return <div className={styles.opening}>OPENING MARKET</div>;
   if (status.kind === "error") {
     return (
@@ -447,8 +496,17 @@ export function Terminal() {
     }
   };
 
-  // Grid areas belong to slots (positions), not functions: a function opened in panel 7 takes panel 7's place.
-  const AREA: Record<Slot, string> = { 1: styles.gp, 2: styles.whoArea, 3: styles.chatArea, 4: styles.tape, 5: styles.book, 6: styles.tkt, 7: styles.newsArea, 8: styles.exr };
+  /** One grid panel: the function's header and body, the amber border when active. */
+  const panelFor = (code: Exclude<PanelId, "DRAWER">, className: string) => {
+    const f = fn(code);
+    return (
+      <Panel code={code} label={f.label} meta={f.meta} className={className} active={active === code} onActivate={() => setActive(code)}>
+        {f.body}
+      </Panel>
+    );
+  };
+  const exrShown = (m.exr?.orders.length ?? 0) > 0;
+  const unread = { DESK: chat.filter((c) => c.seq > seen.desk).length, NEWS: Math.max(0, headlines.length - seen.news) };
 
   return (
     <LearnContext value={learn}>
@@ -460,15 +518,33 @@ export function Terminal() {
       <CommandBar onCommand={onCommand} reply={shown} />
       <NewsPreview news={news} onEdit={onEdit} onApply={apply} onCancel={onCancel} />
       <main className={styles.grid}>
-        {SLOTS.map((n) => {
-          const f = fn(slots[n]);
-          return (
-            <Panel key={n} number={n} code={slots[n]} label={f.label} meta={f.meta} className={AREA[n]} active={n === active} onActivate={() => setActive(n)}>
-              {f.body}
-            </Panel>
-          );
-        })}
+        <div className={styles.leftCol}>
+          {panelFor("GP", styles.gp)}
+          <div className={styles.lowRow}>
+            {panelFor("TAPE", styles.tape)}
+            {panelFor("WHO", styles.whoArea)}
+          </div>
+        </div>
+        <div className={styles.rightCol}>
+          {panelFor("BOOK", styles.book)}
+          {panelFor("TKT", styles.tkt)}
+          {exrShown && panelFor("EXR", styles.exr)}
+        </div>
       </main>
+      <Drawer
+        open={drawerOpen}
+        side={drawerSide}
+        unread={unread}
+        strategyRunning={m.strategy?.status === "running"}
+        active={active === "DRAWER"}
+        onActivate={() => setActive("DRAWER")}
+        onToggle={toggleDrawer}
+        onOpenStrategy={() => openDrawer()}
+        onSide={(side) => openDrawer(side)}
+        strategy={fn("STRAT").body}
+        desk={fn("CHAT").body}
+        news={fn("NEWS").body}
+      />
       {helpOpen && <HelpOverlay onClose={() => setHelpOpen(false)} />}
       {glassOpen && m.strategy !== null && built !== null && (
         <GlassBox

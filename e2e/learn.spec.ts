@@ -22,7 +22,8 @@ test("Learn mode shows the explanations removed from the default view, and keeps
   await expect(page.getByTestId("status-bar")).toContainText("every trade from 77 agents");
   await expect(page.locator("[data-panel=WHO] header")).toContainText("WHO MOVED THE PRICE");
   await expect(page.locator("[data-panel=TKT] header")).toContainText("ORDER TICKET");
-  for (const id of ["who.window", "tkt.simulated", "tkt.messages", "exr.empty", "strat.intro"]) {
+  await page.getByTestId("drawer-tab-STRAT").click(); // STRAT lives in the drawer (D-074)
+  for (const id of ["who.window", "tkt.simulated", "tkt.messages", "strat.intro"]) {
     await expect(page.locator(`[data-explain="${id}"]`).first()).toBeVisible();
   }
   await expect(page.locator('[data-explain="strat.intro"]')).toContainText("rules from a fixed menu");

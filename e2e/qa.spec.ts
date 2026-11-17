@@ -59,6 +59,7 @@ test("QA #3: CHAT does not invent a quiet-market rate at the open", async ({ pag
   await page.goto("/?seed=187");
   await expect(page.getByTestId("last-price")).toBeVisible();
   await expect.poll(async () => page.getByTestId("sim-clock").innerText()).not.toBe("09:40:00");
+  await command(page, "CHAT"); // the desk chat is in the drawer (D-074)
   await expect(page.getByTestId("chat").locator("[data-kind=quiet]")).toHaveCount(0);
   await expect(page.getByTestId("chat")).not.toContainText("0.0 trades a second");
 });

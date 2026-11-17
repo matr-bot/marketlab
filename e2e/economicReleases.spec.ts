@@ -17,7 +17,12 @@ test("RATES uses the FED calibration, shares its digest gate, and reports peak p
   const card = page.getByTestId("release-card");
   await expect(card).toContainText("FAIR VALUE -3.0% · 30 s reaction pending");
   await expect(card).toContainText("PANIC 1.50× · VOLATILITY 1.00× · LIQUIDITY 1.00×");
+  // The drawer shows NEWS, so the desk message waits as an unread count on DESK; CHAT shows it (D-074).
+  await expect(page.getByTestId("drawer-unread-DESK")).toBeVisible();
+  await command(page, "CHAT");
   await expect(page.getByTestId("chat")).toContainText("RATES +0.75 vs +0.25 expected → fair value -3.0%");
+  await expect(page.getByTestId("drawer-unread-DESK")).toHaveCount(0);
+  await command(page, "NEWS");
   await command(page, "SPEED 8");
   await expect(card).toContainText(/FAIR VALUE -3\.0% · PEAK -\d+\.\d{2}% · AT 30 S -\d+\.\d{2}% \(OVERSHOOT\)/, { timeout: 15_000 });
   const moves = (await card.innerText()).match(/PEAK (-\d+\.\d{2})% · AT 30 S (-\d+\.\d{2})%/);

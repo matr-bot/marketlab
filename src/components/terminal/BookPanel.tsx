@@ -7,8 +7,8 @@ import { formatMid, formatPrice, formatQty } from "@/lib/format";
 import { Explain } from "./Learn";
 import styles from "./terminal.module.css";
 
-/** Minimum row height in px; rows stretch to fill the panel exactly. */
-const ROW_H = 16;
+/** Minimum row height in px (one 13px data line, D-070); rows stretch to fill the panel exactly. */
+export const ROW_H = 18;
 
 /**
  * Levels to show per side: as many as fit in `height` (header and spread rows take one row each).

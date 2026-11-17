@@ -179,7 +179,7 @@ export function StrategyPanel({
           BACKTEST
         </button>
         {strategy.status === "running" && (
-          <button type="button" className={styles.chip} data-testid="strat-stop" onClick={onStop}>
+          <button type="button" className={styles.secondary} data-testid="strat-stop" onClick={onStop}>
             STOP
           </button>
         )}

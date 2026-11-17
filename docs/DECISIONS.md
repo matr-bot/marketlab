@@ -1822,3 +1822,18 @@ A filled white or gray "selected" button for STRAT's actions read as a component
   buttons).
 - Everything else stays a quiet chip (gray border); a selected segment is white text on `#1F1F1F`.
 - STRAT's "SHOW ME WHAT I BUILT" is renamed **BACKTEST**; it still opens the glass box (D-065).
+
+## D-070 · Type hierarchy: three sizes, no numbered panel boxes
+
+**Date:** 2026-11-17 · **Status:** Accepted
+
+Everything was 12px, so nothing led the eye. Now there are three sizes, as `TYPE` in `tokens.ts`
+(emitted as `--fs-label`, `--fs-data`, `--fs-hero`):
+- **22px bold:** the last price in the status bar, the one number you look at first.
+- **13px:** all data (the body default), tabular figures, monospace.
+- **11px gray:** panel titles (uppercase, letter-spaced 0.08em), column headers, labels, units,
+  buttons and secondary text.
+- **Panel number boxes dropped.** The header is now `GP · MLAB PRICE` in 11px gray. The slot stays
+  as `data-slot` for tests and for the active-panel logic until code routing changes in step 4c.
+- STRAT's STOP joins START and BACKTEST as an outlined secondary button (D-069): it is the panel's
+  main action while a strategy runs. NEW and CANCEL stay quiet chips.

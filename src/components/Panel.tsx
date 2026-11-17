@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import styles from "./Panel.module.css";
 
 type PanelProps = {
-  /** Panel number in the default layout (CLAUDE.md, Default layout). */
+  /** Slot in the default layout; kept as `data-slot` for tests, no longer drawn (D-070). */
   number: number;
   /** Function code, e.g. "GP". */
   code: string;
@@ -17,7 +17,7 @@ type PanelProps = {
   children: ReactNode;
 };
 
-/** A numbered terminal panel: header `1 GP · MLAB PRICE`, then its body. */
+/** A terminal panel: an 11px gray header `GP · MLAB PRICE`, then its body. */
 export function Panel({ number, code, title, meta, className, active = false, onActivate, children }: PanelProps) {
   return (
     <section
@@ -29,7 +29,6 @@ export function Panel({ number, code, title, meta, className, active = false, on
       onMouseDown={onActivate}
     >
       <header className={styles.head}>
-        <span className={styles.number}>{number}</span>
         <span className={styles.code}>{code}</span>
         <span className={styles.sep}>·</span>
         <h2 className={styles.title}>{title}</h2>

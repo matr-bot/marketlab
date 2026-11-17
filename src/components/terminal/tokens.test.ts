@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
-import { cssVar, cssVariables, SECONDARY_BUTTON, TOKENS, type Token } from "./tokens";
+import { cssVar, cssVariables, SECONDARY_BUTTON, TOKENS, TYPE, type Token } from "./tokens";
 
 // D-068: every color comes from tokens.ts, and amber (`accent`) appears only in the allowed places.
 
@@ -36,7 +36,8 @@ describe("color tokens (D-068)", () => {
   it("maps every token to a CSS custom property", () => {
     expect(cssVar("panelBg")).toBe("--panel-bg");
     expect(cssVar("upTint")).toBe("--up-tint");
-    expect(Object.keys(cssVariables())).toHaveLength(Object.keys(TOKENS).length);
+    expect(Object.keys(cssVariables())).toHaveLength(Object.keys(TOKENS).length + Object.keys(TYPE).length);
+    expect(cssVariables()["--fs-hero"]).toBe("22px");
   });
 
   it("finds the UI files", () => {
@@ -57,7 +58,7 @@ describe("color tokens (D-068)", () => {
   });
 
   it("uses only CSS variables that a token (or the font) defines", () => {
-    const known = new Set((Object.keys(TOKENS) as Token[]).map(cssVar));
+    const known = new Set([...(Object.keys(TOKENS) as Token[]).map(cssVar), ...(Object.keys(TYPE) as Array<keyof typeof TYPE>).map(cssVar)]);
     const unknown = UI.filter((p) => p.endsWith(".css")).flatMap((p) =>
       [...readFileSync(p, "utf8").matchAll(/var\((--[a-z0-9-]+)\)/g)].map((m) => m[1]).filter((v) => !known.has(v) && !v.startsWith("--font-")).map((v) => `${rel(p)} ${v}`),
     );

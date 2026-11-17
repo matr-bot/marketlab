@@ -77,16 +77,15 @@
 }
 
 .ticker {
-  color: var(--label);
+  color: var(--data);
   font-weight: 700;
-  font-size: 15px;
 }
 
 .simTag {
   align-self: center;
   color: var(--label);
   border: 1px solid var(--border);
-  font-size: 11px;
+  font-size: var(--fs-label);
   line-height: 1;
   padding: 2px 3px 1px;
   letter-spacing: 0.08em;
@@ -97,7 +96,7 @@
   align-self: center;
   color: var(--alert-fg);
   background: var(--alert);
-  font-size: 11px;
+  font-size: var(--fs-label);
   font-weight: 700;
   line-height: 1;
   padding: 2px 4px 1px;
@@ -105,7 +104,7 @@
 }
 
 .last {
-  font-size: 15px;
+  font-size: var(--fs-hero);
   font-weight: 700;
   color: var(--data);
 }
@@ -117,6 +116,7 @@
 }
 
 .label {
+  font-size: var(--fs-label);
   color: var(--label);
 }
 
@@ -135,6 +135,7 @@
 
 /* Context, not data: hidden outright when the bar is too narrow, never cut mid-word (QA #6). */
 .subtitle {
+  font-size: var(--fs-label);
   color: var(--label);
 }
 
@@ -192,6 +193,7 @@
 }
 
 .commandReply {
+  font-size: var(--fs-label);
   color: var(--label);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -212,6 +214,7 @@
 }
 
 .dimText {
+  font-size: var(--fs-label);
   color: var(--label);
 }
 
@@ -242,6 +245,7 @@
 }
 
 .newsHint {
+  font-size: var(--fs-label);
   color: var(--label);
   margin-left: auto;
 }
@@ -262,10 +266,12 @@
 }
 
 .chatTime {
+  font-size: var(--fs-label);
   color: var(--label);
 }
 
 .chatEmpty {
+  font-size: var(--fs-label);
   color: var(--label);
   padding: 4px 0;
 }
@@ -279,6 +285,7 @@
 }
 
 .whoWindow {
+  font-size: var(--fs-label);
   color: var(--label);
 }
 
@@ -293,6 +300,7 @@
 }
 
 .whoHead {
+  font-size: var(--fs-label);
   display: flex;
   justify-content: space-between;
   color: var(--label);
@@ -332,6 +340,7 @@
 }
 
 .table th {
+  font-size: var(--fs-label);
   color: var(--label);
   font-weight: 400;
   text-align: right;
@@ -410,11 +419,13 @@
 
 .bookHead,
 .bookSpread {
+  font-size: var(--fs-label);
   flex: 0 0 16px;
   align-items: center;
 }
 
 .bookHead {
+  font-size: var(--fs-label);
   color: var(--label);
   border-bottom: 1px solid var(--border);
   padding-top: 1px;
@@ -497,6 +508,7 @@
 
 /* ---------- shared bits ---------- */
 .dim {
+  font-size: var(--fs-label);
   color: var(--label);
 }
 
@@ -507,11 +519,13 @@
 }
 
 .note {
+  font-size: var(--fs-label);
   color: var(--label);
   margin-top: 4px;
 }
 
 .sectionHead {
+  font-size: var(--fs-label);
   color: var(--label);
   border-bottom: 1px solid var(--border);
   margin: 8px 0 4px;
@@ -526,6 +540,7 @@
 
 /* Small keyboard-style buttons (sharp corners, thin border). */
 .chip {
+  font-size: var(--fs-label);
   background: var(--bg);
   border: 1px solid var(--border);
   color: var(--data);
@@ -541,6 +556,7 @@
 
 /* Secondary action: outlined (D-069; the spec is SECONDARY_BUTTON in tokens.ts). */
 .secondary {
+  font-size: var(--fs-label);
   background: transparent;
   border: 1px solid var(--data);
   color: var(--data);
@@ -620,6 +636,7 @@
 }
 
 .deskGrid dt {
+  font-size: var(--fs-label);
   color: var(--label);
 }
 
@@ -640,6 +657,7 @@
 }
 
 .segBtn {
+  font-size: var(--fs-label);
   background: var(--bg);
   border: 1px solid var(--border);
   color: var(--label);
@@ -702,6 +720,7 @@
 }
 
 .sendBtn {
+  font-size: var(--fs-label);
   /* Always reachable: on a short screen the ticket scrolls under it (QA #6). */
   position: sticky;
   bottom: 0;
@@ -761,7 +780,7 @@
 .scnTitle {
   color: var(--data);
   font-weight: 700;
-  font-size: 13px;
+  font-size: var(--fs-data);
 }
 
 .progress {
@@ -851,6 +870,7 @@
 }
 
 .dialogHead {
+  font-size: var(--fs-label);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -965,6 +985,7 @@
 }
 
 .stratStats dt {
+  font-size: var(--fs-label);
   color: var(--label);
 }
 

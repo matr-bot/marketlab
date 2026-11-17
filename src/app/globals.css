@@ -20,7 +20,7 @@ body {
   background: var(--bg);
   color: var(--data);
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: var(--fs-data);
   line-height: 1.35;
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;

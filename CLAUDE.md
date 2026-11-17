@@ -79,7 +79,7 @@ This section is the spec. It replaces the earlier amber-label design. The overha
 | Step | What ships |
 | --- | --- |
 | 1 ✅ | Color tokens (one file), amber in three places only, PAUSED badge (D-068) |
-| 2 | Type hierarchy; panel numbers dropped |
+| 2 ✅ | Type hierarchy; panel numbers dropped (D-070) |
 | 3 | Learn mode (`?learn=1`); ticker crawl, bottom strip and default-view sentences removed |
 | 4a / 4b / 4c | Status strip + playback + SESSION popover / 65-35 grid + drawer / ticket tabs + code routing |
 | 5 | Panel content (WHO table, TAPE B/S, BOOK tints, ticket one-line estimate) |
@@ -104,8 +104,9 @@ never uses a real company's name, logo or exact screens.
   SEND; START SESSION on the launcher) and the command-line cursor. `tokens.test.ts` enforces it.
 - PAUSED: a white-on-red `● PAUSED` badge (`alert`), never amber and never the price-down red.
 - Buttons (D-069): primary = amber fill, one per screen; secondary = outlined (transparent, 1px
-  `#E6E6E6` border and text, square, `#1F1F1F` hover) for STRAT START, BACKTEST and the launcher's
-  secondary actions; everything else a quiet gray chip. No filled white buttons.
+  `#E6E6E6` border and text, square, `#1F1F1F` hover) for STRAT START, BACKTEST, the launcher's
+  secondary actions, and STOP while a strategy runs; everything else a quiet gray chip. No filled
+  white buttons.
 - Focus ring white; text selection gray; hover rows `#141414`.
 
 ### Look

@@ -41,6 +41,16 @@ export const TOKENS = {
 export type Token = keyof typeof TOKENS;
 
 /**
+ * The type scale (D-070): one monospace font, three sizes. Labels (titles, column headers, units,
+ * buttons) 11px gray; data 13px; the last price 22px bold. Emitted as `--fs-label` etc.
+ */
+export const TYPE = {
+  fsLabel: "11px",
+  fsData: "13px",
+  fsHero: "22px",
+} as const;
+
+/**
  * Button tiers (D-069). Primary: the accent fill, one per screen (TKT SEND, START SESSION).
  * Secondary: outlined, for every other action that matters (STRAT START, BACKTEST, the launcher's
  * secondary actions). There is no filled white button. `terminal.module.css` `.secondary` implements
@@ -55,11 +65,12 @@ export const SECONDARY_BUTTON = {
 } as const;
 
 /** camelCase token → CSS custom property name: `panelBg` → `--panel-bg`. */
-export function cssVar(token: Token): string {
+export function cssVar(token: Token | keyof typeof TYPE): string {
   return `--${token.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
 }
 
 /** Every token as a CSS custom property, for the `style` of <html>. */
 export function cssVariables(): Record<string, string> {
-  return Object.fromEntries((Object.keys(TOKENS) as Token[]).map((t) => [cssVar(t), TOKENS[t]]));
+  const all: Record<string, string> = { ...TOKENS, ...TYPE };
+  return Object.fromEntries(Object.entries(all).map(([t, v]) => [cssVar(t as Token), v]));
 }

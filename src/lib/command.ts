@@ -31,6 +31,7 @@ export type Command =
   | { readonly kind: "rerun" }
   | { readonly kind: "link" }
   | { readonly kind: "help" }
+  | { readonly kind: "session" }
   /** Open a function in the active panel (CLAUDE.md, Command bar; D-066). */
   | { readonly kind: "open"; readonly code: FunctionCode }
   /** A trading idea for the strategy agent: `STRAT buy after a 3% drop` (D-064). */
@@ -68,6 +69,7 @@ export const HELP_LINES: readonly (readonly [string, string])[] = [
   ["PAUSE · RUN · SPEED 4", "Stop and start the market, or run it 1, 2, 4 or 8 times faster. Same seed, same market, whatever the speed."],
   ["SCN · SCN rate-shock", "List the scenarios, or open one. Each is a market situation with a brief and a task."],
   ["LINK", "Copy a link that reopens this exact scenario and seed, to assign it or share it."],
+  ["SESSION", "Show this session: scenario, seed, mode and its link (also the SESSION button on the status bar). Esc closes it."],
   ["SEED 42 · RERUN", "Run again with another seed, or the same seed from the start, to ask: what if I had done it differently?"],
   ["?learn=1", "Learn mode: add it to the address (LINK keeps it) and every panel explains itself in plain English. Without it the terminal shows data only."],
 ];
@@ -210,6 +212,8 @@ export function parseCommand(input: string): Command {
     case "HELP":
     case "?":
       return bare({ kind: "help" });
+    case "SESSION":
+      return bare({ kind: "session" });
     case "STOP":
       return bare({ kind: "stopStrategy" });
     default:

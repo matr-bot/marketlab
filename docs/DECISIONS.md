@@ -1897,3 +1897,26 @@ The terminal shows data; explanation lives in HELP, tooltips and Learn mode.
   LOSS, …). So TAPE and BOOK headers are `PX` and `QTY`, TAPE's side column is `B/S` with `B`/`S`,
   the STRAT fields are `SL`, `TP`, `EXIT`, `QTY`, and the NEWS preview's volatility field is
   `VOLATILITY` (VOL means volume).
+
+## D-073 · Step 4a: one-row status strip, playback on it, SESSION popover
+
+**Date:** 2026-11-17 · **Status:** Accepted
+
+- **One row:** `MLAB 186.96 +0.01 (+0.01%) │ BID 186.95 × 108  ASK 186.96 × 44 │ VOL 213.1K │ 09:40:03 │
+  ● PAUSED │ SIMULATED`, then playback on the right. The MARKETLAB wordmark leaves the strip (the
+  launcher carries it, step 6). The clock shows whole seconds (the exact time with milliseconds is its
+  tooltip; TAPE keeps milliseconds per trade).
+- **VOL is compact** (`formatCompact`: exact below 10,000, then `221.5K`, then `1.20M`) with the exact
+  share count as its tooltip. This is the one place a market number is abbreviated on screen: a running
+  total, not a price or an order size, which stay exact everywhere.
+- **Playback** (`Playback.tsx`): one segmented control, `PAUSE`/`RUN` · `1X 2X 4X 8X` · `RERUN` · `LINK`
+  · `SESSION` · `HELP`, each the same as its typed command. The selected speed is white on `#1F1F1F`;
+  the separate speed tag is gone (the segment shows it). The bottom control strip (`ControlStrip`) is
+  removed; the panel grid takes its row.
+- **SESSION** (`SessionPopover.tsx`, also the `SESSION` command): scenario, seed, mode (PRO / LEARN) and
+  the link that reopens the session, with COPY LINK and RERUN. It replaces SCN and SEED on the strip,
+  so any run can still be reproduced in one click. Esc or a click outside closes it.
+- **Narrow screens:** below 1400px the touch sizes (`× 108`) give way and the gaps tighten, so the strip
+  stays one row at 1280px (BOOK's first rows show the same sizes).
+- **TKT:** the last-order line is not drawn until there is an order (no orphan "—" or empty border
+  under OPEN ORDERS).

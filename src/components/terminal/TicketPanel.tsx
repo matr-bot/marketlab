@@ -234,10 +234,14 @@ export function TicketPanel({ frame, lastEvent, paused, onCommand }: { frame: Fr
         {open.length > 3 && <div className={styles.dim}>+{open.length - 3} more</div>}
       </div>
 
-      <div className={styles.lastMessage} data-testid="ticket-message">
-        {lastEvent === null ? "—" : formatUserEvent(lastEvent)}
-        {lastEvent === null && <Explain id="tkt.messages" />}
-      </div>
+      {/* The outcome of the last order; not drawn until there is one (D-073). */}
+      {lastEvent !== null ? (
+        <div className={styles.lastMessage} data-testid="ticket-message">
+          {formatUserEvent(lastEvent)}
+        </div>
+      ) : (
+        <Explain id="tkt.messages" />
+      )}
     </div>
   );
 }

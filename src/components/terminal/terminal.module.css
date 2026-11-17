@@ -1,8 +1,8 @@
 /* ---------- shell ---------- */
 .shell {
   display: grid;
-  /* status, command bar, NEWS strip (absent when idle), panels, control strip */
-  grid-template-rows: auto auto auto 1fr auto;
+  /* status, command bar, NEWS strip (absent when idle), panels */
+  grid-template-rows: auto auto auto 1fr;
   height: 100vh;
   min-height: 560px;
   min-width: 960px;
@@ -61,11 +61,16 @@
 }
 
 /* ---------- status bar ---------- */
+.statusWrap {
+  position: relative;
+  min-width: 0;
+}
+
 .status {
   display: flex;
-  align-items: baseline;
-  gap: 18px;
-  padding: 3px 8px;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 8px;
   border: 1px solid var(--border);
   white-space: nowrap;
   overflow: hidden;
@@ -107,6 +112,66 @@
   font-size: var(--fs-hero);
   font-weight: 700;
   color: var(--data);
+}
+
+/* The │ between status groups. */
+.statusSep {
+  align-self: stretch;
+  width: 1px;
+  margin: 3px 2px;
+  background: var(--border);
+}
+
+.gapLeft {
+  margin-left: 8px;
+}
+
+/* Playback: one segmented control at the right of the status strip (D-073). */
+.playback {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.playBtn {
+  padding: 1px 8px;
+}
+
+.playback > .segBtn + .segBtn,
+.playback > .segBtn + .segment,
+.playback > .segment + .segBtn {
+  margin-left: -1px;
+}
+
+/* SESSION: under the right end of the status strip. */
+.sessionPop {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 20;
+  min-width: 340px;
+  max-width: 520px;
+  margin-top: 2px;
+  padding: 8px 10px;
+  background: var(--panel-bg);
+  border: 1px solid var(--data);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sessionGrid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 12px;
+}
+
+.sessionGrid dt {
+  color: var(--label);
+  font-size: var(--fs-label);
+}
+
+.sessionLink {
+  overflow-wrap: anywhere;
 }
 
 .field {
@@ -563,11 +628,6 @@
   background: var(--border);
 }
 
-.group {
-  display: inline-flex;
-  gap: 2px;
-}
-
 /* ---------- scrolling panel bodies ---------- */
 .ticket,
 .newsWrap,
@@ -819,18 +879,6 @@
   border-top: 1px solid var(--label);
   padding: 4px 8px;
   line-height: 1.5;
-}
-
-/* ---------- control strip ---------- */
-.strip {
-  grid-row: 5;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 6px;
-  border: 1px solid var(--border);
-  white-space: nowrap;
-  overflow: hidden;
 }
 
 /* ---------- help overlay ---------- */
@@ -1101,4 +1149,19 @@
   color: var(--label);
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Narrow screens (D-073): the status strip stays one row; the touch sizes give way (BOOK shows them). */
+@media (max-width: 1399px) {
+  .quoteSize {
+    display: none;
+  }
+
+  .status {
+    gap: 7px;
+  }
+
+  .playBtn {
+    padding: 1px 6px;
+  }
 }

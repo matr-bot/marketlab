@@ -82,7 +82,8 @@ This section is the spec. It replaces the earlier amber-label design. The overha
 | 2 ✅ | Type hierarchy; panel numbers dropped (D-070) |
 | 2b ✅ | Code-only panel titles, no panel scrollbars or fades, BOOK without SIDE, GP active (D-071) |
 | 3 ✅ | Learn mode (`?learn=1`), abbreviation dictionary; ticker crawl, hint text and default-view sentences removed (D-072) |
-| 4a / 4b / 4c | Status strip + playback + SESSION popover / 65-35 grid + drawer / ticket tabs + code routing |
+| 4a ✅ | Status strip + playback + SESSION popover (D-073) |
+| 4b / 4c | 65-35 grid + drawer / ticket tabs + code routing |
 | 5 | Panel content (WHO table, TAPE B/S, BOOK tints, ticket one-line estimate) |
 | 5.5 | Detail pass (self-hosted mono font, decimal alignment, chart crosshair, keymap) |
 | 6 | Session launcher at `/`; the terminal at `/terminal` |
@@ -121,7 +122,7 @@ never uses a real company's name, logo or exact screens.
 
 ### Layout (target, D-068 onward)
 ```
-┌ MLAB 186.93 −0.02 (−0.01%) │ BID 186.93 × 6,342  ASK 186.94 × 113 │ VOL 221.5K │ 09:40:20 │ ● PAUSED │ SIMULATED │ RUN 1X 2X 4X 8X RERUN LINK SESSION ┐
+┌ MLAB 186.93 −0.02 (−0.01%) │ BID 186.93 × 6,342  ASK 186.94 × 113 │ VOL 221.5K │ 09:40:20 │ ● PAUSED │ SIMULATED │ RUN 1X 2X 4X 8X RERUN LINK SESSION HELP ┐
 ├ > command line ───────────────────────────────────────────────────────────────────────────────────────────┤
 │ CHART (~65% width, ~60% height)                                  │ BOOK                                   │
 │                                                                  │                                        │

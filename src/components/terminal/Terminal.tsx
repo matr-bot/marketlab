@@ -21,14 +21,15 @@ import { formatUserEvent } from "@/lib/userMessages";
 import { BookPanel } from "./BookPanel";
 import { ChatPanel } from "./ChatPanel";
 import { CommandBar } from "./CommandBar";
-import { ControlStrip } from "./ControlStrip";
 import { ExecPanel } from "./ExecPanel";
 import { download, GlassBox } from "./GlassBox";
 import { HelpOverlay } from "./HelpOverlay";
 import { LearnContext } from "./Learn";
 import { NewsPanel } from "./NewsPanel";
 import { NewsPreview, type NewsState } from "./NewsPreview";
+import { Playback } from "./Playback";
 import { PriceChart } from "./PriceChart";
+import { SessionPopover } from "./SessionPopover";
 import { StatusBar } from "./StatusBar";
 import { StrategyPanel, type StratSource, type StratState } from "./StrategyPanel";
 import { TapePanel } from "./TapePanel";
@@ -114,6 +115,8 @@ export function Terminal() {
   const [speed, setSpeed] = useState(1);
   const [paused, setPaused] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [sessionOpen, setSessionOpen] = useState(false);
+  const closeSession = useCallback(() => setSessionOpen(false), []);
   // What the reply line says. A newer outcome of the student's orders replaces it (`seen`: the last outcome it already knew).
   const [reply, setReply] = useState({ text: initial?.note ?? "", seen: -1 });
   const learn = initial?.learn ?? false;
@@ -340,6 +343,9 @@ export function Terminal() {
       case "help":
         setHelpOpen(true);
         return;
+      case "session":
+        setSessionOpen((o) => !o);
+        return;
     }
   };
 
@@ -447,7 +453,10 @@ export function Terminal() {
   return (
     <LearnContext value={learn}>
     <div className={styles.shell}>
-      <StatusBar frame={frame} openPrice={m.openPrice} scenarioTitle={scenario.title} paused={paused} speed={speed} />
+      <div className={styles.statusWrap}>
+        <StatusBar frame={frame} openPrice={m.openPrice} paused={paused} controls={<Playback paused={paused} speed={speed} sessionOpen={sessionOpen} onCommand={(t) => void onCommand(t)} />} />
+        {sessionOpen && run !== null && <SessionPopover scenario={scenario} seed={run.seed} learn={learn} link={sessionLink(scenario, run.seed, learn)} onCommand={(t) => void onCommand(t)} onClose={closeSession} />}
+      </div>
       <CommandBar onCommand={onCommand} reply={shown} />
       <NewsPreview news={news} onEdit={onEdit} onApply={apply} onCancel={onCancel} />
       <main className={styles.grid}>
@@ -460,7 +469,6 @@ export function Terminal() {
           );
         })}
       </main>
-      <ControlStrip paused={paused} speed={speed} onCommand={onCommand} />
       {helpOpen && <HelpOverlay onClose={() => setHelpOpen(false)} />}
       {glassOpen && m.strategy !== null && built !== null && (
         <GlassBox

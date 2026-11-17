@@ -44,6 +44,18 @@ export function formatQty(qty: number): string {
   return qtyFormat.format(qty);
 }
 
+/**
+ * A large count, compact for the status bar (D-073): exact below 10,000, then thousands with one
+ * decimal, then millions with two: 9,999 → "9,999", 221,500 → "221.5K", 1,204,300 → "1.20M". The
+ * exact figure goes in the tooltip.
+ */
+export function formatCompact(n: number): string {
+  const abs = Math.abs(n);
+  if (abs < 10_000) return formatQty(n);
+  if (abs < 999_950) return `${(n / 1_000).toFixed(1)}K`;
+  return `${(n / 1_000_000).toFixed(2)}M`;
+}
+
 const TRADER_NAMES: Record<string, string> = {
   noise: "noise traders",
   marketMaker: "market makers",

@@ -17,7 +17,7 @@ test("the market is alive on load: prices change within 5 seconds, with no conso
   await expect.poll(() => last.textContent(), { timeout: 5_000, intervals: [100] }).not.toBe(opening);
 
   // The panels that have shipped are on screen, with engine data in them.
-  await expect(page.getByTestId("sim-clock")).toHaveText(/^09:4\d:\d\d\.\d00$/); // warmed up 10 minutes from 09:30
+  await expect(page.getByTestId("sim-clock")).toHaveText(/^09:4\d:\d\d$/); // warmed up 10 minutes from 09:30; whole seconds on the strip (D-073)
   await expect(page.locator("[data-panel=GP] canvas")).toBeVisible();
   await expect(page.getByTestId("tape").locator("tbody tr").first()).toBeVisible();
   // TAPE (D-067, refined by D-068): a price is green when it ticked up and red when it ticked down;

@@ -14,9 +14,14 @@ test("a scenario link opens the assigned scenario and seed", async ({ page }) =>
   const errors = watchErrors(page);
   await page.goto("/?scn=rate-shock&seed=4101");
   await expect(page.getByTestId("last-price")).toBeVisible({ timeout: 8_000 });
-  await expect(page.getByTestId("status-scenario")).toContainText(/rate/i);
   await expect(page.getByTestId("scenario-title")).toBeVisible();
-  await expect(page.getByTestId("status-bar")).toContainText("4101");
+  // Scenario and seed live in SESSION, off the status strip (D-073).
+  await page.getByTestId("playback-session").click();
+  await expect(page.getByTestId("status-scenario")).toContainText(/rate/i);
+  await expect(page.getByTestId("session-seed")).toHaveText("4101");
+  await expect(page.getByTestId("session")).toContainText("/?scn=rate-shock&seed=4101");
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("session")).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
@@ -91,4 +96,29 @@ test("a headline that starts with a command word goes to the AI preview, and NEW
   await expect(page.getByTestId("news-panel").getByTestId("headline-row")).toContainText("Buy now, pay later lender collapses");
   await expect(page.getByTestId("news-panel").getByTestId("headline-row")).toContainText("FV -2.0%");
   expect(errors).toEqual([]);
+});
+
+test("the status strip is one row with playback on it; SESSION and the speed segment work (D-073)", async ({ page }) => {
+  await page.goto("/?seed=187");
+  await expect(page.getByTestId("last-price")).toBeVisible({ timeout: 8_000 });
+  const bar = page.getByTestId("status-bar");
+  await expect(bar).toContainText(/^MLAB\s*[\d,.]+\s*[+-]?[\d.]+ \([+-]?[\d.]+%\)/);
+  await expect(page.getByTestId("status-quote")).toContainText(/BID\s*[\d,.]+\s*×\s*[\d,]+\s*ASK\s*[\d,.]+\s*×\s*[\d,]+/); // textContent has no spaces between spans
+  await expect(page.getByTestId("status-volume")).toHaveText(/^[\d,.]+[KM]?$/);
+  await expect(page.getByTestId("status-volume")).toHaveAttribute("title", /^[\d,]+ shares traded$/);
+  // One row, nothing cut: the strip fits its width, and its height is one line.
+  expect(await bar.evaluate((el) => el.scrollWidth <= el.clientWidth && el.getBoundingClientRect().height < 40)).toBe(true);
+  await expect(page.locator("[data-testid=strip]")).toHaveCount(0);
+
+  await page.getByTestId("playback-speed-4").click();
+  await expect(page.getByTestId("playback-speed-4")).toHaveAttribute("aria-pressed", "true");
+  await page.getByTestId("playback-pause").click();
+  await expect(page.getByTestId("paused-tag")).toHaveText("● PAUSED");
+  await expect(page.getByTestId("playback-pause")).toHaveText("RUN");
+
+  await page.keyboard.type("SESSION");
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("session")).toContainText("PRO");
+  await page.mouse.click(400, 400); // a click outside closes it
+  await expect(page.getByTestId("session")).toHaveCount(0);
 });

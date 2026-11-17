@@ -27,7 +27,7 @@ test("QA #1: status and NEWS use the same scenario-open price", async ({ page })
   const delta = Math.round((Number(last.replaceAll(",", "")) - Number(open!.replaceAll(",", ""))) * 100);
   const change = (await page.getByTestId("status-change").innerText()).trim();
   expect(change).toContain(`${delta > 0 ? "+" : delta < 0 ? "-" : ""}${(Math.abs(delta) / 100).toFixed(2)}`);
-  expect(stats).toContain(`CHG ${change.split(" ")[1]}`);
+  expect(stats).toContain(`CHG ${change.match(/\(([^)]+)\)/)![1]}`); // "+0.01 (+0.01%)" (D-073)
 });
 
 test("QA #2 and #8: a student's resting order is marked in BOOK and its later fill is announced", async ({ page }) => {
@@ -58,7 +58,7 @@ test("QA #8: BOOK lists a student's order beyond the visible levels", async ({ p
 test("QA #3: CHAT does not invent a quiet-market rate at the open", async ({ page }) => {
   await page.goto("/?seed=187");
   await expect(page.getByTestId("last-price")).toBeVisible();
-  await expect.poll(async () => page.getByTestId("sim-clock").innerText()).not.toBe("09:40:00.000");
+  await expect.poll(async () => page.getByTestId("sim-clock").innerText()).not.toBe("09:40:00");
   await expect(page.getByTestId("chat").locator("[data-kind=quiet]")).toHaveCount(0);
   await expect(page.getByTestId("chat")).not.toContainText("0.0 trades a second");
 });

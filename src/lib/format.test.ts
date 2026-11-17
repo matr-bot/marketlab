@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatAvgPrice, formatBps, formatCentsPerShare, formatChange, formatDollars, formatDollarsX2, formatElapsed, formatInterval, formatMid, formatMidX2, formatPercent, formatPrice, formatQty } from "./format";
+import { formatAvgPrice, formatCompact, formatBps, formatCentsPerShare, formatChange, formatDollars, formatDollarsX2, formatElapsed, formatInterval, formatMid, formatMidX2, formatPercent, formatPrice, formatQty } from "./format";
 
 describe("display formatting: exact cents, never rounded", () => {
   it.each([
@@ -35,6 +35,7 @@ describe("display formatting: exact cents, never rounded", () => {
 
   it("formats share counts with separators", () => {
     expect([formatQty(1_340), formatQty(1_204_300), formatQty(7)]).toEqual(["1,340", "1,204,300", "7"]);
+    expect([0, 9_999, 10_000, 221_500, 221_549, 999_949, 999_950, 1_204_300, 12_345_678].map(formatCompact)).toEqual(["0", "9,999", "10.0K", "221.5K", "221.5K", "999.9K", "1.00M", "1.20M", "12.35M"]);
   });
 });
 

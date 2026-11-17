@@ -156,6 +156,9 @@ describe("parseCommand: running the market and the scenario", () => {
     expect(parseCommand("RERUN")).toEqual({ kind: "rerun" });
     expect(parseCommand("restart")).toEqual({ kind: "rerun" });
     expect(parseCommand("LINK")).toEqual({ kind: "link" });
+    expect(parseCommand("session")).toEqual({ kind: "session" });
+    expect(parseCommand("SESSION 2")).toMatchObject({ kind: "error" });
+    expect(parseCommand("Session musicians strike")).toMatchObject({ kind: "news" });
     expect(parseCommand("help")).toEqual({ kind: "help" });
     expect(parseCommand("?")).toEqual({ kind: "help" });
   });

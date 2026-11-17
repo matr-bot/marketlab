@@ -1781,3 +1781,29 @@ From a QA pass on the deployed build. Each item's cause and fix:
   its title, progress and target tracker; TKT's SEND sticks to the bottom; panel titles never
   truncate (the header note gives way); BOOK marks the student's resting orders (`·YOU`) and lists
   any beyond the levels shown.
+
+## D-068 · Color tokens: one file, amber in three places, sides refined
+
+**Date:** 2026-11-17 · **Status:** Accepted (refines D-067; starts the UI overhaul, D-068 onward)
+
+The terminal read as an "AI demo": amber was on every title, header, label, chip and button, so
+nothing stood out. Now every color comes from one file and amber means one thing: "this is where you act".
+- **One token file.** `src/components/terminal/tokens.ts` holds every color. `layout.tsx` sets them as
+  CSS custom properties on `<html>`; CSS modules use only `var(--…)`; the canvas chart and the flash
+  hook import the values. `tokens.test.ts` fails on any color literal in `src/app` or
+  `src/components` outside that file, and on any `var(--x)` that no token defines.
+- **Palette.** Background `#000000`, panels `#0A0A0A`, borders `#1F1F1F`, data `#E6E6E6`, labels
+  `#7A7A7A`, up `#26A65B`, down `#E5484D`, accent amber `#F5A623`.
+- **Amber (`accent`) only in three places:** the active panel's border, the one primary action button
+  on a screen (TKT's SEND in the terminal; START SESSION on the launcher), and the command-line cursor.
+  The test pins the selectors allowed to use it. Panel titles, column headers, labels, chips, the
+  SPREAD row, the speed buttons and HELP text are label gray; a selected segment is white on `#1F1F1F`.
+- **PAUSED** is a white-on-red `● PAUSED` badge in its own `alert` token (`#C21F2A`), not amber and not
+  the price-down red.
+- **Focus and selection.** The focus ring is white (it must stay visible on black); `::selection` is
+  gray.
+- **Sides, refining D-067.** TAPE keeps D-067: the price and arrow follow the tick; the side is a
+  neutral gray B/S (no side hue). BOOK depth bars are muted green (bids) and muted red (asks), as on
+  professional depth ladders: the side of the book, not a price move. The TKT BUY/SELL toggle fills
+  green or red when selected. D-067's steel-blue and mauve hues are retired. Everywhere else green
+  and red remain price direction only.

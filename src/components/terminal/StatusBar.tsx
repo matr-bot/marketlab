@@ -27,8 +27,8 @@ export function StatusBar({ frame, openPrice, scenarioTitle, paused, speed }: { 
         SIMULATED
       </span>
       {paused && (
-        <span className={styles.simTag} data-testid="paused-tag" title="The market is paused. RUN resumes it.">
-          PAUSED
+        <span className={styles.alertTag} data-testid="paused-tag" title="The market is paused. RUN resumes it.">
+          ● PAUSED
         </span>
       )}
       {!paused && speed !== 1 && (

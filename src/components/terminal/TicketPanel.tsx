@@ -20,8 +20,8 @@ const QUICK_SIZES: readonly (readonly [string, string])[] = [
  * TKT: the order ticket. A thin form over the command bar: it builds the same text you could type
  * (`BUY 500 @ 187.25`), runs it through the same parser, and sends it. Below the form, an estimate
  * walks the book on screen the way the matching engine will, so you see roughly what an order will
- * cost before you send it. Green and red mean price direction only, so the two sides are told apart
- * by label and outline, not by color.
+ * cost before you send it. The selected side is filled green (BUY) or red (SELL), the one place
+ * outside price direction and BOOK that uses them (D-068).
  */
 export function TicketPanel({ frame, lastEvent, paused, onCommand }: { frame: Frame; lastEvent: UserEvent | null; paused: boolean; onCommand: (text: string) => void }) {
   const [side, setSide] = useState<"buy" | "sell">("buy");
@@ -116,7 +116,7 @@ export function TicketPanel({ frame, lastEvent, paused, onCommand }: { frame: Fr
             <button
               key={s}
               type="button"
-              className={`${styles.segBtn} ${side === s ? styles.segOn : ""}`}
+              className={`${styles.segBtn} ${side === s ? (s === "buy" ? styles.buyOn : styles.sellOn) : ""}`}
               aria-pressed={side === s}
               data-testid={`ticket-${s}`}
               onClick={() => {

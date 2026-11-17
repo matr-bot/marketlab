@@ -20,26 +20,25 @@ test("the market is alive on load: prices change within 5 seconds, with no conso
   await expect(page.getByTestId("sim-clock")).toHaveText(/^09:4\d:\d\d\.\d00$/); // warmed up 10 minutes from 09:30
   await expect(page.locator("[data-panel=GP] canvas")).toBeVisible();
   await expect(page.getByTestId("tape").locator("tbody tr").first()).toBeVisible();
-  // Green and red mean price direction only (QA #5): a TAPE price is green when it ticked up and red
-  // when it ticked down; the AGGRESSOR label is in a side hue that is neither.
-  const GREEN = "rgb(31, 214, 96)";
-  const RED = "rgb(255, 64, 64)";
+  // TAPE (D-067, refined by D-068): a price is green when it ticked up and red when it ticked down;
+  // the side label is neutral label gray, never green or red.
+  const GREEN = "rgb(38, 166, 91)";
+  const RED = "rgb(229, 72, 77)";
+  const LABEL = "rgb(122, 122, 122)";
   const rows = await page.getByTestId("tape").locator("tbody tr").evaluateAll((trs) =>
     (trs as HTMLTableRowElement[]).map((r) => ({ aggressor: r.getAttribute("data-aggressor"), tick: r.getAttribute("data-tick"), price: getComputedStyle(r.cells[1]).color, labelColor: getComputedStyle(r.cells[3]).color, label: r.cells[3].textContent })),
   );
   for (const r of rows) {
     expect(r.label).toBe(r.aggressor === "buy" ? "BUYER" : "SELLER");
     expect(r.price).toBe(r.tick === "up" ? GREEN : RED);
-    expect([GREEN, RED]).not.toContain(r.labelColor);
+    expect(r.labelColor).toBe(LABEL);
   }
-  const labelColors = new Map(rows.map((r) => [r.aggressor, r.labelColor]));
-  expect(new Set(labelColors.values()).size).toBe(labelColors.size); // buyers and sellers in two different hues
   await expect(page.getByTestId("book").getByText("SPREAD")).toBeVisible();
   await expect(page.getByTestId("book").getByText(/^(BID|ASK)$/).first()).toBeVisible();
-  // BOOK's depth bars are in the side hues, never green or red (QA #5).
-  const barColors = await page.getByTestId("book").locator("[data-side] [aria-hidden]").evaluateAll((els) => els.map((e) => getComputedStyle(e).backgroundColor));
+  // BOOK's depth bars are the side of the book in muted tints: bids green, asks red (D-068).
+  const barColors = await page.getByTestId("book").locator("[data-side] [aria-hidden]").evaluateAll((els) => els.map((e) => [e.parentElement!.getAttribute("data-side"), getComputedStyle(e).backgroundColor]));
   expect(barColors.length).toBeGreaterThan(0);
-  for (const c of barColors) expect(c).not.toMatch(/^rgba?\((31, 214, 96|255, 64, 64)/);
+  for (const [side, c] of barColors) expect(c).toBe(side === "BID" ? "rgba(38, 166, 91, 0.18)" : "rgba(229, 72, 77, 0.18)");
   // The same number of levels on each side, centered on the spread.
   const book = page.getByTestId("book");
   const levels = Number(await book.getAttribute("data-levels"));

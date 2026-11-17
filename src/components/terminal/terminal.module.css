@@ -72,32 +72,42 @@
 }
 
 .brand {
-  color: var(--bg);
-  background: var(--amber);
+  color: var(--data);
   font-weight: 700;
-  padding: 0 6px;
 }
 
 .ticker {
-  color: var(--amber);
+  color: var(--label);
   font-weight: 700;
   font-size: 15px;
 }
 
 .simTag {
   align-self: center;
-  color: var(--amber);
-  border: 1px solid var(--amber);
+  color: var(--label);
+  border: 1px solid var(--border);
   font-size: 11px;
   line-height: 1;
   padding: 2px 3px 1px;
   letter-spacing: 0.08em;
 }
 
+/* PAUSED: its own alert treatment, never amber and never the price-down red (D-068). */
+.alertTag {
+  align-self: center;
+  color: var(--alert-fg);
+  background: var(--alert);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 4px 1px;
+  letter-spacing: 0.08em;
+}
+
 .last {
   font-size: 15px;
   font-weight: 700;
-  color: var(--fg);
+  color: var(--data);
 }
 
 .field {
@@ -107,11 +117,11 @@
 }
 
 .label {
-  color: var(--amber);
+  color: var(--label);
 }
 
 .num {
-  color: var(--fg);
+  color: var(--data);
   text-align: right;
 }
 
@@ -125,7 +135,7 @@
 
 /* Context, not data: hidden outright when the bar is too narrow, never cut mid-word (QA #6). */
 .subtitle {
-  color: var(--dim);
+  color: var(--label);
 }
 
 @media (max-width: 1400px) {
@@ -166,7 +176,7 @@
 }
 
 .prompt {
-  color: var(--amber);
+  color: var(--label);
   font-weight: 700;
 }
 
@@ -175,14 +185,14 @@
   background: transparent;
   border: none;
   outline: none;
-  color: var(--fg);
+  color: var(--data);
   font: inherit;
   text-transform: uppercase;
-  caret-color: var(--amber);
+  caret-color: var(--accent);
 }
 
 .commandReply {
-  color: var(--amber);
+  color: var(--label);
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -194,15 +204,15 @@
   flex-wrap: wrap;
   gap: 4px 14px;
   padding: 3px 8px;
-  border: 1px solid var(--amber);
+  border: 1px solid var(--border);
 }
 
 .newsHeadline {
-  color: var(--fg);
+  color: var(--data);
 }
 
 .dimText {
-  color: var(--dim);
+  color: var(--label);
 }
 
 .newsField {
@@ -214,7 +224,7 @@
 .newsInput {
   width: 64px;
   background: var(--bg);
-  color: var(--fg);
+  color: var(--data);
   border: 1px solid var(--border);
   font: inherit;
   text-align: right;
@@ -222,17 +232,17 @@
 }
 
 .newsInput:focus {
-  border-color: var(--amber);
+  border-color: var(--data);
   outline: none;
 }
 
 .newsReason {
-  color: var(--dim);
+  color: var(--label);
   font-style: italic;
 }
 
 .newsHint {
-  color: var(--amber);
+  color: var(--label);
   margin-left: auto;
 }
 
@@ -252,11 +262,11 @@
 }
 
 .chatTime {
-  color: var(--amber);
+  color: var(--label);
 }
 
 .chatEmpty {
-  color: var(--dim);
+  color: var(--label);
   padding: 4px 0;
 }
 
@@ -269,11 +279,11 @@
 }
 
 .whoWindow {
-  color: var(--dim);
+  color: var(--label);
 }
 
 .whoSummary {
-  color: var(--fg);
+  color: var(--data);
   font-weight: 700;
   padding: 2px 0 4px;
 }
@@ -285,7 +295,7 @@
 .whoHead {
   display: flex;
   justify-content: space-between;
-  color: var(--amber);
+  color: var(--label);
   border-bottom: 1px solid var(--border);
 }
 
@@ -306,11 +316,11 @@
   left: 0;
   top: 1px;
   bottom: 1px;
-  background: var(--highlight);
+  background: var(--bar);
 }
 
 .headlineItem {
-  color: var(--amber);
+  color: var(--label);
   font-weight: 700;
 }
 
@@ -322,7 +332,7 @@
 }
 
 .table th {
-  color: var(--amber);
+  color: var(--label);
   font-weight: 400;
   text-align: right;
   padding: 1px 8px;
@@ -377,20 +387,20 @@
 }
 
 .depthBid {
-  background: rgba(111, 168, 220, 0.18);
+  background: var(--up-tint);
 }
 
 .depthAsk {
-  background: rgba(195, 155, 211, 0.18);
+  background: var(--down-tint);
 }
 
 /* TAPE aggressor: the side that crossed, in the side hues (not price direction). */
 .sideBuy {
-  color: var(--bid);
+  color: var(--label);
 }
 
 .sideSell {
-  color: var(--ask);
+  color: var(--label);
 }
 
 .bookRow > span:first-child {
@@ -405,7 +415,7 @@
 }
 
 .bookHead {
-  color: var(--amber);
+  color: var(--label);
   border-bottom: 1px solid var(--border);
   padding-top: 1px;
   padding-bottom: 1px;
@@ -431,19 +441,19 @@
 .bookSpread {
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
-  color: var(--amber);
+  color: var(--label);
 }
 
 .bookAsks > .bookEmpty,
 .bookBids > .bookEmpty {
   display: block;
   flex: 0 0 16px;
-  color: var(--amber);
+  color: var(--label);
   text-align: center;
 }
 
 .bookSide {
-  color: var(--dim);
+  color: var(--label);
 }
 
 /* ---------- chart ---------- */
@@ -463,7 +473,7 @@
   display: grid;
   place-items: center;
   height: 100vh;
-  color: var(--amber);
+  color: var(--label);
   letter-spacing: 0.2em;
   /* Shown only if the warm-up takes longer than about a second (CLAUDE.md, No "AI dashboard" tells). */
   opacity: 0;
@@ -480,29 +490,29 @@
   display: grid;
   place-items: center;
   height: 100vh;
-  color: var(--amber);
+  color: var(--data);
   text-align: center;
   padding: 24px;
 }
 
 /* ---------- shared bits ---------- */
 .dim {
-  color: var(--dim);
+  color: var(--label);
 }
 
 .para {
   margin: 0 0 6px;
-  color: var(--fg);
+  color: var(--data);
   line-height: 1.45;
 }
 
 .note {
-  color: var(--amber);
+  color: var(--label);
   margin-top: 4px;
 }
 
 .sectionHead {
-  color: var(--amber);
+  color: var(--label);
   border-bottom: 1px solid var(--border);
   margin: 8px 0 4px;
   padding-bottom: 1px;
@@ -518,7 +528,7 @@
 .chip {
   background: var(--bg);
   border: 1px solid var(--border);
-  color: var(--amber);
+  color: var(--data);
   padding: 1px 7px;
   cursor: pointer;
   letter-spacing: 0.04em;
@@ -526,17 +536,17 @@
 
 .chip:hover {
   background: var(--hover);
-  border-color: var(--amber-dim);
+  border-color: var(--label);
 }
 
 .segOn {
-  background: var(--amber);
-  border-color: var(--amber);
-  color: var(--bg);
+  background: var(--border);
+  border-color: var(--label);
+  color: var(--data);
 }
 
 .chip.segOn:hover {
-  background: var(--amber);
+  background: var(--border);
 }
 
 .group {
@@ -595,12 +605,12 @@
 }
 
 .deskGrid dt {
-  color: var(--amber);
+  color: var(--label);
 }
 
 .deskGrid dd {
   text-align: right;
-  color: var(--fg);
+  color: var(--data);
 }
 
 .formRow {
@@ -617,7 +627,7 @@
 .segBtn {
   background: var(--bg);
   border: 1px solid var(--border);
-  color: var(--amber);
+  color: var(--label);
   padding: 2px 12px;
   cursor: pointer;
   letter-spacing: 0.06em;
@@ -625,6 +635,28 @@
 
 .segBtn + .segBtn {
   margin-left: -1px;
+}
+
+/* A selected segment (MKT / LMT): white on the border gray, never amber (D-068). */
+.segBtn.segOn {
+  background: var(--border);
+  border-color: var(--label);
+  color: var(--data);
+}
+
+/* The selected side of the ticket (D-068). */
+.segBtn.buyOn,
+.segBtn.buyOn:hover {
+  background: var(--up);
+  border-color: var(--up);
+  color: var(--bg);
+}
+
+.segBtn.sellOn,
+.segBtn.sellOn:hover {
+  background: var(--down);
+  border-color: var(--down);
+  color: var(--bg);
 }
 
 .segBtn:hover {
@@ -635,14 +667,14 @@
   width: 92px;
   background: var(--bg);
   border: 1px solid var(--border);
-  color: var(--fg);
+  color: var(--data);
   padding: 1px 5px;
   text-align: right;
-  caret-color: var(--amber);
+  caret-color: var(--data);
 }
 
 .input:focus {
-  border-color: var(--amber);
+  border-color: var(--data);
   outline: none;
 }
 
@@ -650,7 +682,7 @@
   border: 1px solid var(--border);
   padding: 3px 6px;
   min-height: 34px;
-  color: var(--fg);
+  color: var(--data);
   line-height: 1.4;
 }
 
@@ -662,8 +694,8 @@
   flex-shrink: 0;
   width: 100%;
   padding: 4px 0;
-  background: var(--amber);
-  border: 1px solid var(--amber);
+  background: var(--accent);
+  border: 1px solid var(--accent);
   color: var(--bg);
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -673,7 +705,7 @@
 .sendBtn:disabled {
   background: var(--bg);
   border-color: var(--border);
-  color: var(--dim);
+  color: var(--label);
   cursor: not-allowed;
 }
 
@@ -697,7 +729,7 @@
 
 .lastMessage {
   margin-top: auto;
-  color: var(--amber);
+  color: var(--data);
   border-top: 1px solid var(--border);
   padding-top: 4px;
   line-height: 1.4;
@@ -712,7 +744,7 @@
 }
 
 .scnTitle {
-  color: var(--amber);
+  color: var(--data);
   font-weight: 700;
   font-size: 13px;
 }
@@ -725,7 +757,7 @@
 
 .progressBar {
   height: 100%;
-  background: var(--amber);
+  background: var(--label);
 }
 
 .statRow {
@@ -743,12 +775,12 @@
 }
 
 .headlineCode {
-  color: var(--amber);
+  color: var(--data);
   font-weight: 700;
 }
 
 .headlineText {
-  color: var(--fg);
+  color: var(--data);
 }
 
 .impactRow {
@@ -767,7 +799,7 @@
 /* ---------- EXR ---------- */
 .exrTotal {
   flex: 0 0 auto;
-  border-top: 1px solid var(--amber-dim);
+  border-top: 1px solid var(--label);
   padding: 4px 8px;
   line-height: 1.5;
 }
@@ -788,7 +820,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.75);
+  background: var(--scrim);
   display: grid;
   place-items: center;
   z-index: 10;
@@ -800,7 +832,7 @@
   display: flex;
   flex-direction: column;
   background: var(--bg);
-  border: 1px solid var(--amber);
+  border: 1px solid var(--border);
 }
 
 .dialogHead {
@@ -808,8 +840,8 @@
   justify-content: space-between;
   align-items: center;
   padding: 4px 8px;
-  border-bottom: 1px solid var(--amber);
-  color: var(--amber);
+  border-bottom: 1px solid var(--border);
+  color: var(--label);
   font-weight: 700;
   letter-spacing: 0.08em;
 }
@@ -831,7 +863,7 @@
 
 .helpCmd {
   width: 230px;
-  color: var(--amber);
+  color: var(--data);
   white-space: nowrap;
 }
 
@@ -865,15 +897,15 @@
   width: 100%;
   resize: none;
   background: var(--bg);
-  color: var(--fg);
+  color: var(--data);
   border: 1px solid var(--border);
   padding: 3px 5px;
   font: inherit;
-  caret-color: var(--amber);
+  caret-color: var(--data);
 }
 
 .stratInput:focus {
-  border-color: var(--amber);
+  border-color: var(--data);
   outline: none;
 }
 
@@ -907,7 +939,7 @@
 .stratRules {
   margin: 0;
   padding-left: 14px;
-  color: var(--fg);
+  color: var(--data);
 }
 
 .stratStats {
@@ -918,12 +950,12 @@
 }
 
 .stratStats dt {
-  color: var(--amber);
+  color: var(--label);
 }
 
 .stratStats dd {
   margin: 0;
-  color: var(--fg);
+  color: var(--data);
 }
 
 .stratHead {
@@ -938,7 +970,7 @@
   display: flex;
   flex-direction: column;
   background: var(--bg);
-  border: 1px solid var(--amber);
+  border: 1px solid var(--border);
 }
 
 .glass:focus {
@@ -969,7 +1001,7 @@
 }
 
 .glassQuote {
-  color: var(--fg);
+  color: var(--data);
   margin: 4px 0;
 }
 
@@ -979,11 +1011,11 @@
 }
 
 .formulaSym {
-  color: var(--amber-dim);
+  color: var(--label);
 }
 
 .formulaNum {
-  color: var(--fg);
+  color: var(--data);
   font-variant-numeric: tabular-nums;
 }
 
@@ -991,7 +1023,7 @@
   margin: 4px 0;
   padding: 4px 6px;
   border: 1px solid var(--border);
-  color: var(--fg);
+  color: var(--data);
   white-space: pre;
   overflow: auto;
 }
@@ -1018,7 +1050,7 @@
   border: 1px solid var(--border);
   margin: 6px 0;
   padding: 4px 6px;
-  color: var(--fg);
+  color: var(--data);
 }
 
 .releaseRow {
@@ -1039,18 +1071,18 @@
 
 /* BOOK: the student's own resting orders (QA #8). Amber is UI, not price direction. */
 .bookMine .bookSide {
-  color: var(--amber);
+  color: var(--data);
 }
 
 .bookMine {
-  outline: 1px solid var(--amber-dim);
+  outline: 1px solid var(--label);
   outline-offset: -1px;
 }
 
 .bookBeyond {
   display: block;
   flex-shrink: 0;
-  color: var(--amber);
+  color: var(--label);
   overflow: hidden;
   text-overflow: ellipsis;
 }

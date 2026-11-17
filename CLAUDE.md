@@ -72,141 +72,98 @@ screen must be true to what the engine actually did.
 - User accounts / login, multiplayer, mobile-first layout
 - Full options market or implied-volatility surface (stretch at most: simple option pricing)
 
-## Design System (terminal-style; replaces the earlier "Look" and neon-green rules)
-This section is the spec. The UI is built only once live engine data is flowing (Sun 10/18),
-then grows day by day with the roadmap:
+## Design System (professional terminal; the UI overhaul, D-068 onward)
+This section is the spec. It replaces the earlier amber-label design. The overhaul ships in steps
+(✅ = shipped):
 
-| Day | Design parts that ship |
+| Step | What ships |
 | --- | --- |
-| Sun 10/18 | Theme (black / amber / white, flash rules), status bar, scrolling ticker, default-layout grid, `GP` (price chart), `TAPE`, `BOOK` basics (best bid/ask, top levels) |
-| Tue 10/20 | `NEWS` headline input (with the command bar, codes for panels that exist), `CHAT` (desk chat / narrator), `WHO` (click a candle in `GP`) |
-| Wed 10/21 | `STRAT` + the strategy agent + glass box reveal (✅ D-062 to D-066), `TKT` manual trading (✅ shipped early, D-056) |
-| Thu 10/22 | `EXR` (slippage split, P&L) (✅ shipped early, D-058) |
-| Cut unless ahead | `CROWD`, missions, full `BOOK` depth view, realism panel, Learn / Pro modes (with the per-panel "On a professional terminal…" notes), rewind with the `REPLAY` label, what-if reruns, `ASK`, shortcut strip, hover formulas, `HELP`, function codes beyond existing panels |
+| 1 ✅ | Color tokens (one file), amber in three places only, PAUSED badge (D-068) |
+| 2 | Type hierarchy; panel numbers dropped |
+| 3 | Learn mode (`?learn=1`); ticker crawl, bottom strip and default-view sentences removed |
+| 4a / 4b / 4c | Status strip + playback + SESSION popover / 65-35 grid + drawer / ticket tabs + code routing |
+| 5 | Panel content (WHO table, TAPE B/S, BOOK tints, ticket one-line estimate) |
+| 5.5 | Detail pass (self-hosted mono font, decimal alignment, chart crosshair, keymap) |
+| 6 | Session launcher at `/`; the terminal at `/terminal` |
 
-Until a function ships, its slot in the default layout is simply not drawn (the grid closes up);
-there are no placeholder panels, so there is never a blank or fake state.
+Functions that have not shipped are not drawn: no placeholder panels, never a blank or fake state.
 
-### Goal
-MarketLab looks and feels like a professional trading terminal, so students who learn here can
-move easily to real terminals on a trading floor. Terminal-style, but NEVER use any real
-company's name, logo or exact screens.
+### Principle
+The terminal shows data. Explanation lives in HELP, tooltips and Learn mode. No sentences in the
+default view; honest status and error replies (AI unavailable, values capped) are the exception.
+MarketLab looks like a professional trading terminal so students move easily to real ones, but it
+never uses a real company's name, logo or exact screens.
 
-### Colors and look
-- Pure black background.
-- AMBER (orange-gold) for labels, panel headers and UI text.
-- WHITE for numbers and data.
-- GREEN and RED ONLY for price direction: a price up or down (candles, the status bar change,
-  flashes, ticker items, and each `TAPE` price and arrow by its tick versus the previous trade).
-  The buy and sell SIDES (`TAPE` AGGRESSOR, `BOOK` depth bars) use two neutral hues, steel blue
-  and mauve, never green or red (D-067, replacing D-042's side coloring). Nothing else is green or
-  red, with one named exception: the bottom shortcut strip's key colors (see Layout), as on real
-  terminal keyboards.
-- Monospace font, small and dense; numbers right-aligned so digits line up.
-- Thin, solid borders with sharp corners. No dashed lines, rounded corners, shadows or gradients.
-- Dense rows and tight spacing; no big empty boxes.
+### Colors (`src/components/terminal/tokens.ts`, the only place a color may be written)
+- Background `#000000`; panels `#0A0A0A`; borders `#1F1F1F`.
+- Data `#E6E6E6`: all numbers. Labels `#7A7A7A`: panel titles, column headers, units, secondary text.
+- Up `#26A65B` / down `#E5484D`: price direction (candles, last price and its flash, change, the TAPE
+  price and arrow by tick). Also, as the side of the book: BOOK depth bars in muted tints, and the TKT
+  BUY/SELL toggle when selected. TAPE's side column is a neutral gray B/S (D-067, refined by D-068).
+- Accent amber `#F5A623`: ONLY the active panel's border, the one primary action on a screen (TKT
+  SEND; START SESSION on the launcher) and the command-line cursor. `tokens.test.ts` enforces it.
+- PAUSED: a white-on-red `● PAUSED` badge (`alert`), never amber and never the price-down red.
+- Focus ring white; text selection gray; hover rows `#141414`.
 
-### No "AI dashboard" tells
-- No LIVE badge, glowing dot or "live" indicator anywhere. The moving numbers show it is live.
-- Status labels: a small permanent SIMULATED label next to the ticker (the market is not real),
-  and a small REPLAY label shown during rewind. Nothing else.
-- The ticker is fictional: MLAB (MarketLab), never a real symbol. A real fund's name next to a
-  price it has never traded at is the first thing a finance judge would spot (D-041).
-- The market is ALREADY RUNNING when the page loads (calm regime, demo seed). Never show
-  "engine not running" as a first impression. If the warm-up takes longer than about 1 second,
-  show a brief "OPENING MARKET" state instead of a frozen screen.
+### Look
+- One monospace font everywhere, tabular figures; numbers right-aligned so digits line up.
+- 1px solid hairlines, sharp corners, no shadows, gradients or glow; dense rows, no big empty boxes.
+- No LIVE badge or glowing dot; the moving numbers show it is live. Status labels: a permanent
+  SIMULATED badge, and PAUSED while paused.
+- Fictional ticker MLAB (D-041), never a real symbol.
+- The market is already running when the terminal opens (calm regime, demo seed); a brief "OPENING
+  MARKET" state covers a slow warm-up.
 
-### Layout
-- **Top status bar:** ticker, last price, change and % change, volume, sim clock.
-- **Scrolling ticker tape** under the status bar: one thin strip where every trade slides
-  sideways, like an exchange ticker. Format: `MLAB 1,340 @ 187.42 ▲`, green or red by whether the
-  trade was up or down from the previous trade. Injected headlines scroll through it in amber. It
-  speeds up when trading is busy and slows when it is quiet. The ticker is the ONE place smooth
-  scrolling is allowed; the numbers inside it never animate.
-- **Command bar:** typing a code such as `MLAB GP` and pressing Enter opens that function in the
-  active panel (see Command bar below).
-- **A grid of numbered panels** (1, 2, 3, …). Each header shows its number and code, e.g.
-  `1 GP · MLAB PRICE`. Typing a code opens that function in the active panel; the default layout
-  below is what every page load shows.
-- **Bottom shortcut strip** with color-coded keys: yellow for market/function keys, green for
-  GO/Enter, red for cancel/Esc.
-- **Keyboard first.** The mouse still works, but everything can be done by typing.
-- **Sim controls** (play/pause, speed 1x/4x, regime, seed, rerun, what-if, Learn/Pro) are
-  command-bar commands and shortcut keys, not buttons scattered across panels. The seed is always
-  visible so any run can be reproduced.
-- The GLASS BOX is a full-screen reveal opened from STRAT ("Show me what I built"), not a
-  permanent panel.
-
-### Default layout (what the page shows on load)
-It follows the demo story, cause → reaction → your result → reveal, and the whole 90-second demo
-works from it without opening any panels.
-
+### Layout (target, D-068 onward)
 ```
-┌ status bar: MLAB  187.42  +0.35 +0.19%  VOL 1,204,300  09:41:27.300  SEED 187 ─────────────┐
-├ ticker: … MLAB 1,340 @ 187.42 ▲ … MLAB 200 @ 187.41 ▼ … FED SURPRISE HIKE 75BPS … ────────────┤
-├ command bar: > _ ───────────────────────────────────────────────────────────────────────────┤
-│ 1 GP · MLAB PRICE                                         │ 5 BOOK · MLAB DEPTH             │
-│ (largest panel: ~2/3 width, ~half the height;            │                                 │
-│  candles + headline and trade markers)                    ├─────────────────────────────────┤
-│                                                           │ 6 TKT · ORDER TICKET            │
-├─────────────────────────────┬─────────────────────────────┼─────────────────────────────────┤
-│ 2 CROWD · WHO IS TRADING    │ 3 CHAT · DESK CHAT          │ 7 STRAT · STRATEGY              │
-├─────────────────────────────┴─────────────────────────────┼─────────────────────────────────┤
-│ 4 TAPE · TIME & SALES                                     │ 8 EXR · EXECUTION REPORT        │
-└ shortcut strip: [F1 HELP] [F2 GP] [F3 BOOK] …  [GO] [CANCEL] ─────────────────────────────────┘
+┌ MLAB 186.93 −0.02 (−0.01%) │ BID 186.93 × 6,342  ASK 186.94 × 113 │ VOL 221.5K │ 09:40:20 │ ● PAUSED │ SIMULATED │ RUN 1X 2X 4X 8X RERUN LINK SESSION ┐
+├ > command line ───────────────────────────────────────────────────────────────────────────────────────────┤
+│ CHART (~65% width, ~60% height)                                  │ BOOK                                   │
+│                                                                  │                                        │
+├──────────────────────────────┬───────────────────────────────────┼────────────────────────────────────────┤
+│ TAPE                         │ WHO                               │ TICKET  [ORDER | FILLS | OPEN]          │
+├──────────────────────────────┴───────────────────────────────────┴────────────────────────────────────────┤
+│ drawer [STRATEGY | DESK | NEWS]  (collapsed by default)                                                  │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
+- Panel titles are 11px gray uppercase (`TAPE`, `WHO · 60S`); no numbered boxes.
+- EXR is the ticket's FILLS tab. STRAT, CHAT and NEWS share the bottom drawer: it opens on its code
+  or a click, when a strategy starts, on a headline / panic / vacuum desk message, and (NEWS) when a
+  non-free-play scenario loads. Once collapsed it stays shut until the next headline.
+- Function codes: `GP`, `BOOK`, `TAPE`, `WHO` focus their panel; `TKT`, `EXR` select the ticket tab;
+  `STRAT`, `CHAT`, `NEWS` open their drawer tab (replaces D-066's panel swapping).
+- Playback (RUN / 1X 2X 4X 8X / RERUN / LINK) is a compact segmented control on the status strip;
+  the selected speed is white on `#1F1F1F`. Scenario and seed are in the SESSION popover and on the
+  launcher, so any run can still be reproduced.
+- The GLASS BOX is a full-screen reveal opened from STRAT (`BACKTEST`), not a permanent panel.
+- No scrolling ticker crawl and no bottom hint bar: TAPE and the command line cover them.
+- Keyboard first: every primary action has a key (shown inside the control in label gray, e.g.
+  `SEND ↵`); HELP lists the keymap. The mouse still works.
 
-- **Left, cause → reaction:** `1 GP` is the largest element. `2 CROWD` and `3 CHAT` sit right under
-  it, so when a headline hits, the price move, who is trading and the desk's commentary are all in
-  view at once. `4 TAPE` is directly below them.
-- **Right, the market and your desk:** `5 BOOK` (depth) on top, then the user's desk:
-  `6 TKT` (manual buy/sell), `7 STRAT` (type a strategy; "Show me what I built" opens the glass
-  box) and `8 EXR` (slippage, P&L; Sharpe and drawdown if time).
-- **Demo path with no panels opened:** idea → type it in `7 STRAT`; market → type the headline in
-  the command bar, watch `1 GP`, `2 CROWD`, `3 CHAT` and the ticker; reality check → `8 EXR`;
-  reveal → "Show me what I built" in `7 STRAT`.
-- `NEWS`, `WHO`, `ASK` and `HELP` open in the active panel on demand. Headlines entered in the
-  command bar also scroll through the ticker in amber.
+### Learn mode
+`?learn=1` (a checkbox on the launcher). Every sentence removed from the default view lives in
+`src/lib/explain.ts` and shows through `<Explain id>` only in Learn mode, together with HELP and the
+hover explanations. Pro (the default) shows data only.
 
-### Function codes
-| Code | Function |
-| --- | --- |
-| `GP` | Price chart (candles, with event markers for headlines and user trades) |
-| `BOOK` | Order book depth |
-| `TAPE` | Time & sales |
-| `NEWS` | Headline feed and headline input |
-| `TKT` | Order ticket: buy/sell, limit/market |
-| `EXR` | Execution report: slippage (spread + impact), P&L (Sharpe, drawdown if time) |
-| `STRAT` | Strategy builder and glass box |
-| `WHO` | Who moved the price (attribution) |
-| `ASK` | Ask a plain-English question, answered from real engine data (see AI contracts) |
-| `CHAT` | Desk chat: the narrator's running commentary |
-| `HELP` | List of all codes |
-| `CROWD` | Each agent type's mood, position and activity (cut unless ahead) |
-
-### Desk chat panel (the narrator; deterministic, not AI)
-The narrator posts short updates like a colleague on a trading desk, e.g. "Big seller hitting
-bids, 62% of flow is panic selling." It is generated by our own code from engine events and the
-fill log, so every number in it is true. In Learn mode it also says where to look.
-
-### Learn mode and Pro mode
-- LEARN mode (default): fewer panels, plain-English labels, the desk chat guides attention, and
-  each panel carries a short note: "On a professional terminal, this is called ___. Traders use
-  it to ___." That is the bridge to real trading.
-- PRO mode: full dense terminal with every panel visible.
-- Every metric and label has a plain-English hover explanation (e.g. SPREAD: "The gap between
-  the best buy and sell price. Wider means it costs more to trade.").
+### Launcher (`/`)
+Not a marketing page: no hero, gradients, adjectives, feature cards or emoji. Same tokens and font,
+anchored top-left, keyboard-driven (arrows + Enter). Scenario list, seed (random by default,
+editable), Learn mode, START SESSION (the one amber element). Footer: agents · limit order book ·
+deterministic replay, version and short git SHA, HELP. Selections pass to `/terminal` as URL params;
+old `/?scn=&seed=` links redirect there.
 
 ### Numbers must move like a real market
 - Price movement comes ONLY from engine trades, never from UI animation or fake data.
-- The stock starts at a realistic price (around $187, penny ticks: tick size 1 cent).
-- When a PRICE changes, it flashes green (up) or red (down) versus the previous price for a split
-  second, then returns to white. Every other changing number (volume, sizes, the clock, counts)
-  gets a brief neutral highlight, then returns to white, because green and red mean price
-  direction only. No sliding or counting-up animations.
-- The tape, ticker and order book update exactly when trades and orders happen, so busy moments
-  look busy and quiet moments look quiet.
-- Exact prices and sizes (e.g. 1,340 shares), never rounded.
+- The stock starts around $187 with penny ticks.
+- The tick flash (last price, changed book levels, ~150ms, up/down) is the only animation in the
+  app. Other changing numbers get a brief neutral highlight. No sliding, counting-up, fades or
+  transitions; the drawer and tabs open instantly.
+- The tape and book update exactly when trades and orders happen; exact prices and sizes, never
+  rounded.
+
+### Desk chat (the narrator; deterministic, not AI)
+Short desk-style updates generated by our code from engine events and the fill log, so every number
+in them is true. It lives in the drawer's DESK tab.
 
 ## Command bar
 Accepts function codes (`MLAB GP`, `BOOK`, `HELP`, …), commands (`SHOCK <headline>`, `RUN`,
@@ -418,6 +375,5 @@ strategy agent + glass box, the execution report.
 - TypeScript strict mode. Small, focused commits with clear messages.
 - Every engine change comes with Vitest tests. Run tests before committing.
 - Plan before large changes: explain the plan, then implement.
-- Visual style: see "Design System" above (black, amber labels, white numbers, green/red only
-  for price direction, sharp borders, keyboard first). This replaces the earlier neon-green
-  terminal aesthetic.
+- Visual style: see "Design System" above (tokens only, gray labels, white numbers, amber only for
+  the active panel / primary action / cursor, sharp borders, keyboard first).

@@ -5,7 +5,7 @@ import type { Candle, FrameHeadline } from "@/engine/feed";
 import { formatSimTime } from "@/engine/simClock";
 import { formatPrice } from "@/lib/format";
 import styles from "./terminal.module.css";
-import { COLORS } from "./theme";
+import { TOKENS } from "./tokens";
 
 const AXIS_W = 62;
 const TIME_H = 16;
@@ -100,7 +100,7 @@ function draw(
   selected: number | null,
   font: string,
 ): Geometry | null {
-  g.fillStyle = COLORS.bg;
+  g.fillStyle = TOKENS.bg;
   g.fillRect(0, 0, w, h);
   const plotW = w - AXIS_W;
   const plotH = h - TIME_H;
@@ -136,9 +136,9 @@ function draw(
 
   // Grid and price labels at round steps.
   const step = STEPS.find((s) => (hi - lo) / s <= 7) ?? STEPS[STEPS.length - 1];
-  g.strokeStyle = COLORS.grid;
+  g.strokeStyle = TOKENS.grid;
   g.lineWidth = 1;
-  g.fillStyle = COLORS.white;
+  g.fillStyle = TOKENS.label;
   g.textAlign = "right";
   for (let p = Math.ceil(lo / step) * step; p <= hi; p += step) {
     const y = Math.round(yOf(p)) + 0.5;
@@ -152,11 +152,11 @@ function draw(
   // Time labels on whole minutes.
   g.textAlign = "center";
   g.textBaseline = "alphabetic";
-  g.fillStyle = COLORS.amber;
+  g.fillStyle = TOKENS.label;
   for (const c of visible) {
     if (c.start % 60_000 !== 0) continue;
     const x = Math.round(xOf(c)) + 0.5;
-    g.strokeStyle = COLORS.grid;
+    g.strokeStyle = TOKENS.grid;
     g.beginPath();
     g.moveTo(x, 0);
     g.lineTo(x, plotH);
@@ -166,7 +166,7 @@ function draw(
 
   // Volume bars (neutral: green and red are for price direction only).
   const maxVol = Math.max(...visible.map((c) => c.volume));
-  g.fillStyle = COLORS.border;
+  g.fillStyle = TOKENS.border;
   for (const c of visible) {
     const vh = (c.volume / maxVol) * (plotH * VOLUME_SHARE - 4);
     g.fillRect(Math.round(xOf(c)) - (body - 1) / 2, plotH - vh, body, vh);
@@ -175,21 +175,21 @@ function draw(
   // Candles: wick, then body. Up green, down red, unchanged white.
   for (const c of visible) {
     const x = Math.round(xOf(c));
-    g.fillStyle = c.close > c.open ? COLORS.up : c.close < c.open ? COLORS.down : COLORS.white;
+    g.fillStyle = c.close > c.open ? TOKENS.up : c.close < c.open ? TOKENS.down : TOKENS.data;
     const top = yOf(c.high);
     g.fillRect(x, top, 1, Math.max(1, yOf(c.low) - top));
     const bodyTop = yOf(Math.max(c.open, c.close));
     g.fillRect(x - (body - 1) / 2, bodyTop, body, Math.max(1, yOf(Math.min(c.open, c.close)) - bodyTop));
   }
 
-  // Headline markers: a thin amber line at the candle the headline arrived in, with its code on top.
+  // Headline markers: a thin gray line at the candle the headline arrived in, with its code on top.
   g.textAlign = "left";
   g.textBaseline = "top";
   for (const hl of headlines) {
     const ago = (newest - (hl.time - (hl.time % candleMs))) / candleMs;
     if (ago < 0 || ago >= fits) continue;
     const x = Math.round(plotW - slot / 2 - ago * slot - 2) + 0.5;
-    g.strokeStyle = COLORS.amber;
+    g.strokeStyle = TOKENS.label;
     g.beginPath();
     g.moveTo(x, 0);
     g.lineTo(x, plotH);
@@ -197,37 +197,37 @@ function draw(
     const label = markerLabel(hl.code);
     const tw = g.measureText(label).width + 6;
     const left = x + 1 + tw > plotW ? x - tw : x + 1; // near the axis, put the label left of the line
-    g.fillStyle = COLORS.amber;
+    g.fillStyle = TOKENS.border;
     g.fillRect(left, 2, tw, 14);
-    g.fillStyle = COLORS.bg;
+    g.fillStyle = TOKENS.data;
     g.fillText(label, left + 3, 3);
   }
 
-  // The candle picked for WHO: a thin amber frame around its slot.
+  // The candle picked for WHO: a thin white frame around its slot.
   if (selected !== null && (newest - selected) / candleMs < fits) {
     const x = Math.round(plotW - slot / 2 - ((newest - selected) / candleMs) * slot - 2);
-    g.strokeStyle = COLORS.amber;
+    g.strokeStyle = TOKENS.data;
     g.strokeRect(x - slot / 2 + 0.5, 0.5, slot - 1, plotH - 1);
   }
 
   // Last price: a thin solid line and its value on the axis.
   if (last !== null) {
     const y = Math.round(yOf(last)) + 0.5;
-    g.strokeStyle = COLORS.amber;
+    g.strokeStyle = TOKENS.label;
     g.beginPath();
     g.moveTo(0, y);
     g.lineTo(plotW, y);
     g.stroke();
-    g.fillStyle = COLORS.amber;
+    g.fillStyle = TOKENS.data;
     g.fillRect(plotW + 1, y - 7, AXIS_W - 1, 14);
-    g.fillStyle = COLORS.bg;
+    g.fillStyle = TOKENS.bg;
     g.textAlign = "right";
     g.textBaseline = "middle";
     g.fillText(formatPrice(last), w - 4, y);
   }
 
   // Axis border.
-  g.strokeStyle = COLORS.border;
+  g.strokeStyle = TOKENS.border;
   g.beginPath();
   g.moveTo(plotW + 0.5, 0);
   g.lineTo(plotW + 0.5, plotH);

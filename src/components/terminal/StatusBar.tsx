@@ -17,7 +17,6 @@ export function StatusBar({ frame, openPrice, scenarioTitle, paused, speed }: { 
   const last = frame.last ?? base;
   const change = last - base;
   const lastRef = useFlash<HTMLSpanElement>(frame.last, "price");
-  const volRef = useFlash<HTMLSpanElement>(frame.volume, "neutral");
   const direction = change > 0 ? styles.up : change < 0 ? styles.down : styles.num;
   return (
     <header className={styles.status} data-testid="status-bar">
@@ -44,7 +43,7 @@ export function StatusBar({ frame, openPrice, scenarioTitle, paused, speed }: { 
       </span>
       <span className={styles.field}>
         <span className={styles.label}>VOL</span>
-        <span ref={volRef} className={styles.num}>
+        <span className={styles.num}>
           {formatQty(frame.volume)}
         </span>
       </span>

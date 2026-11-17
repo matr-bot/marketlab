@@ -34,7 +34,6 @@ test("the market is alive on load: prices change within 5 seconds, with no conso
     expect(r.labelColor).toBe(LABEL);
   }
   await expect(page.getByTestId("book").getByText("SPREAD")).toBeVisible();
-  await expect(page.getByTestId("book").getByText(/^(BID|ASK)$/).first()).toBeVisible();
   // BOOK's depth bars are the side of the book in muted tints: bids green, asks red (D-068).
   const barColors = await page.getByTestId("book").locator("[data-side] [aria-hidden]").evaluateAll((els) => els.map((e) => [e.parentElement!.getAttribute("data-side"), getComputedStyle(e).backgroundColor]));
   expect(barColors.length).toBeGreaterThan(0);
@@ -45,15 +44,15 @@ test("the market is alive on load: prices change within 5 seconds, with no conso
   expect(levels).toBeGreaterThan(0); // responsive layouts may fit fewer levels
   await expect(book.locator("[data-side=ASK]")).toHaveCount(levels);
   await expect(book.locator("[data-side=BID]")).toHaveCount(levels);
-  // Depth bars: one per level, the largest level's bar is full width.
+  // Depth bars: one per level; the largest level's bar is the widest, half the row (D-071).
   const bars = await page.locator("[data-testid=book] [data-side] > [aria-hidden]").evaluateAll((els) => els.map((e) => (e as HTMLElement).style.width));
   expect(bars.length).toBeGreaterThan(0);
-  expect(bars).toContain("100%");
+  expect(bars).toContain("50%");
   await expect(page.getByTestId("ticker").locator("span").first()).toBeVisible();
   await expect(page.getByTestId("status-bar")).toContainText("MLAB");
   await expect(page.getByTestId("status-bar").getByText("SIMULATED", { exact: true })).toBeVisible();
   await expect(page.getByTestId("status-bar")).toContainText("every trade from 77 agents");
-  await expect(page.locator("[data-panel=GP]")).toContainText("MLAB PRICE · 10S CANDLES");
+  await expect(page.locator("[data-panel=GP] header")).toHaveText(/^GP\s*MLAB · 10S$/); // code + right-aligned detail (D-071)
   await expect(page.getByText(/not running/i)).toHaveCount(0);
 
   expect(errors).toEqual([]);

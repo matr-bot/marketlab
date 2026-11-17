@@ -8,7 +8,6 @@ import { formatDollars, formatQty } from "@/lib/format";
 import { describeRules, RULE_LABELS } from "@/lib/glassbox/english";
 import { dollars } from "@/lib/glassbox/formulas";
 import styles from "./terminal.module.css";
-import { useOverflowFade } from "./useOverflowFade";
 
 /** What STRAT shows: typing an idea, waiting for the AI, a preview to check and edit, or the live strategy. */
 export type StratState =
@@ -76,12 +75,11 @@ export function StrategyPanel({
   onNew: () => void;
 }) {
   const [text, setText] = useState("");
-  const { ref: fade } = useOverflowFade<HTMLDivElement>();
 
   if (state.phase === "compose" || state.phase === "interpreting") {
     const busy = state.phase === "interpreting";
     return (
-      <div ref={fade} className={styles.strat} data-testid="strat" data-phase={state.phase}>
+      <div className={styles.strat} data-testid="strat" data-phase={state.phase}>
         <p className={styles.dim}>Describe a trading idea in plain English. It becomes rules from a fixed menu (buy or sell after a drop or rise, stop loss, take profit, time exit) that you check before it trades.</p>
         <textarea
           className={styles.stratInput}
@@ -119,7 +117,7 @@ export function StrategyPanel({
     const lines = describeRules(draft);
     const lineFor = (key: string) => lines.find((l) => l.key === key || (key === "pct" || key === "windowSec" || key === "qty" ? l.key === "entry" : false))?.text;
     return (
-      <div ref={fade} className={styles.strat} data-testid="strat" data-phase="preview">
+      <div className={styles.strat} data-testid="strat" data-phase="preview">
         <div className={styles.stratSource}>
           <span className={styles.label}>{SOURCE_LABELS[state.source]}</span> <span className={styles.dimText}>read “{state.text}” as:</span>
         </div>
@@ -162,13 +160,13 @@ export function StrategyPanel({
   }
 
   // Live: the strategy as the engine runs it.
-  if (strategy === null) return <div ref={fade} className={styles.strat} data-testid="strat" data-phase="starting">Starting at the next tick…</div>;
+  if (strategy === null) return <div className={styles.strat} data-testid="strat" data-phase="starting">Starting at the next tick…</div>;
   const sh = strategy.sharpe;
   const dd = strategy.drawdown;
   const lastDecision = decisions.at(-1) ?? null;
   const status = strategy.status === "running" ? (strategy.inPosition ? "RUNNING · IN A POSITION" : "RUNNING · WAITING FOR THE ENTRY") : strategy.status === "closing" ? "STOPPED · CLOSING LEFTOVER SHARES" : "STOPPED";
   return (
-    <div ref={fade} className={styles.strat} data-testid="strat" data-phase="live" data-status={strategy.status}>
+    <div className={styles.strat} data-testid="strat" data-phase="live" data-status={strategy.status}>
       <div className={styles.stratHead}>
         <span className={styles.simTag} data-testid="strat-status">
           {status}

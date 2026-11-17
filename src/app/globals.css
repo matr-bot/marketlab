@@ -45,22 +45,17 @@ input {
   font: inherit;
 }
 
-/* Thin dark scrollbars where a panel scrolls. */
+/* Thin dark scrollbars where a dialog scrolls; none inside panels, which still scroll (wheel, keys). */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
 }
 
-/* A scroll area whose content continues fades the cut edge instead of showing half a line (QA #6;
-   useOverflowFade sets the attributes). */
-[data-below] {
-  mask-image: linear-gradient(to bottom, var(--bg) calc(100% - 1.6em), transparent);
+[data-panel],
+[data-panel] * {
+  scrollbar-width: none;
 }
 
-[data-above] {
-  mask-image: linear-gradient(to top, var(--bg) calc(100% - 1.6em), transparent);
-}
-
-[data-above][data-below] {
-  mask-image: linear-gradient(to bottom, transparent, var(--bg) 1.6em, var(--bg) calc(100% - 1.6em), transparent);
+[data-panel] ::-webkit-scrollbar {
+  display: none;
 }

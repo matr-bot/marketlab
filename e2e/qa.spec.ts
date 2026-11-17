@@ -38,7 +38,10 @@ test("QA #2 and #8: a student's resting order is marked in BOOK and its later fi
   await command(page, `SELL 100 @ ${ask}`);
   await command(page, "RUN");
   await expect(page.getByTestId("ticket-message")).toContainText("is resting in the book");
-  await expect(page.getByTestId("book").locator("[data-mine=true]")).toContainText("ASK·YOU");
+  // No SIDE column (D-071): the student's level is outlined, data-side says which side, and the tooltip says it is theirs.
+  const mine = page.getByTestId("book").locator("[data-mine=true]");
+  await expect(mine).toHaveAttribute("data-side", "ASK");
+  await expect(mine).toHaveAttribute("title", /^Your order: 100 of these/);
   await command(page, "SPEED 8");
   await expect(page.getByTestId("ticket-message")).toContainText(`SELL 100 @ ${ask} filled`, { timeout: 15_000 });
 });
@@ -122,7 +125,7 @@ test("QA #10: the ticket explains blocked SEND, and SCN explains its seed change
 });
 
 for (const height of [720, 600]) {
-  test(`QA #6: 1280x${height} keeps the quiet-buy tracker and SEND visible and fades clipped rows`, async ({ page }) => {
+  test(`QA #6: 1280x${height} keeps the quiet-buy tracker and SEND visible; clipped rows cut hard, no scrollbars`, async ({ page }) => {
     await page.setViewportSize({ width: 1280, height });
     await page.goto("/?scn=quiet-buy&seed=4105");
     await expect(page.getByTestId("last-price")).toBeVisible();
@@ -138,14 +141,10 @@ for (const height of [720, 600]) {
     });
     expect(rowBounds.length).toBeGreaterThan(0);
     expect(rowBounds.every(Boolean)).toBe(true);
+    // D-071: a hard cut (no fade mask) and no visible scrollbar inside panels; they still scroll.
     const tape = page.getByTestId("tape").locator("..");
-    await expect(tape).toHaveAttribute("data-below", "");
-    expect(await tape.evaluate((el) => getComputedStyle(el).maskImage)).toContain("linear-gradient");
+    expect(await tape.evaluate((el) => getComputedStyle(el).maskImage)).toBe("none");
     const newsScroll = page.getByTestId("news-panel").locator(":scope > div").nth(1);
-    const clipped = await newsScroll.evaluate((el) => el.scrollHeight > el.clientHeight + 1);
-    if (clipped) {
-      await expect(newsScroll).toHaveAttribute("data-below", "");
-      expect(await newsScroll.evaluate((el) => getComputedStyle(el).maskImage)).toContain("linear-gradient");
-    }
+    expect(await newsScroll.evaluate((el) => [getComputedStyle(el).maskImage, getComputedStyle(el).scrollbarWidth, getComputedStyle(el).overflowY])).toEqual(["none", "none", "auto"]);
   });
 }

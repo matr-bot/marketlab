@@ -10,6 +10,7 @@ import { FREE_PLAY, resolveRun, runLink, SCENARIOS, scenarioById, type Scenario 
 import type { UserQueueResult } from "@/engine/simulation";
 import { clampStrategy, type StrategySpec } from "@/engine/strategy";
 import { parseCommand, type FunctionCode } from "@/lib/command";
+import { formatSimTime } from "@/engine/simClock";
 import { formatInterval } from "@/lib/format";
 import type { RunData } from "@/lib/glassbox/python";
 import { offlineFallback, OFFLINE_HELP } from "@/lib/offlineMatch";
@@ -51,8 +52,8 @@ const SLOTS: readonly Slot[] = [1, 2, 3, 4, 5, 6, 7, 8];
 
 /** The default layout (CLAUDE.md): 2 holds WHO (CROWD is cut) and 7 STRAT; NEWS opens by its code (D-066). */
 const DEFAULT_SLOTS: Readonly<Record<Slot, FunctionCode>> = { 1: "GP", 2: "WHO", 3: "CHAT", 4: "TAPE", 5: "BOOK", 6: "TKT", 7: "STRAT", 8: "EXR" };
-/** The panel a typed code opens in until another is clicked. */
-const DEFAULT_ACTIVE: Slot = 7;
+/** The panel a typed code opens in until another is clicked: the chart (D-071). */
+const DEFAULT_ACTIVE: Slot = 1;
 
 const WELCOME = "Type a headline, CPI 3.4, FED, BUY 500, STRAT <your idea> or HELP, and press Enter.";
 
@@ -163,16 +164,21 @@ export function Terminal() {
     latestSeqRef.current = latestEvent?.seq ?? -1;
   });
 
-  /** Open a function in the active panel; if it is already on screen, the two panels swap. */
+  /**
+   * Where a typed code opens: the active panel, except that the chart is never replaced by a code
+   * while it is active (it is by default, D-071); then panel 7. Step 4c replaces this routing.
+   */
+  const target: Slot = active === 1 ? 7 : active;
+  /** Open a function in the target panel; if it is already on screen, the two panels swap. */
   const open = useCallback(
     (code: FunctionCode) => {
       setSlots((s) => {
-        if (s[active] === code) return s;
+        if (s[target] === code) return s;
         const at = SLOTS.find((n) => s[n] === code);
-        return at === undefined ? { ...s, [active]: code } : { ...s, [at]: s[active], [active]: code };
+        return at === undefined ? { ...s, [target]: code } : { ...s, [at]: s[target], [target]: code };
       });
     },
-    [active],
+    [target],
   );
   const visible = (code: FunctionCode) => SLOTS.some((n) => slots[n] === code);
 
@@ -265,7 +271,7 @@ export function Terminal() {
         return;
       case "open":
         open(cmd.code);
-        say(`${cmd.code} is in panel ${active}. Click a panel to choose where codes open.`);
+        say(`${cmd.code} is in panel ${target}. Click a panel to choose where codes open.`);
         return;
       case "strategy":
         if (cmd.text === "") {
@@ -395,25 +401,24 @@ export function Terminal() {
   const shown = latestEvent !== null && latestEvent.seq > reply.seen ? formatUserEvent(latestEvent) : reply.text;
   const canReveal = m.strategy !== null && built !== null;
 
-  /** Title, header note and body of a function, wherever it is shown. */
-  const fn = (code: FunctionCode): { title: string; meta?: string; body: ReactNode } => {
+  /** Screen-reader label, right-aligned header detail and body of a function, wherever it is shown (D-071). */
+  const fn = (code: FunctionCode): { label: string; meta?: string; body: ReactNode } => {
     switch (code) {
       case "GP":
-        return { title: `${frame.ticker} PRICE · ${formatInterval(frame.candleMs)} CANDLES`, body: <PriceChart candles={candles} candleMs={frame.candleMs} last={frame.last} headlines={headlines} selected={selectedCandle} onSelect={(s) => onSelectCandle(s, frame.candleMs)} /> };
+        return { label: `${frame.ticker} PRICE`, meta: `${frame.ticker} · ${formatInterval(frame.candleMs)}`, body: <PriceChart candles={candles} candleMs={frame.candleMs} last={frame.last} headlines={headlines} selected={selectedCandle} onSelect={(s) => onSelectCandle(s, frame.candleMs)} /> };
       case "WHO":
-        return { title: "WHO MOVED THE PRICE", body: <WhoPanel who={who} selected={selectedCandle !== null && whoWindow !== null} /> };
+        return { label: "WHO MOVED THE PRICE", meta: selectedCandle !== null && whoWindow !== null ? `${formatSimTime(who.from).slice(0, 8)}–${formatSimTime(who.to).slice(0, 8)} · ESC` : "60S", body: <WhoPanel who={who} /> };
       case "CHAT":
-        return { title: "DESK CHAT", body: <ChatPanel chat={chat} /> };
+        return { label: "DESK CHAT", body: <ChatPanel chat={chat} /> };
       case "TAPE":
-        return { title: "TIME & SALES", body: <TapePanel tape={tape} /> };
+        return { label: "TIME & SALES", body: <TapePanel tape={tape} /> };
       case "BOOK":
-        return { title: `${frame.ticker} DEPTH`, body: <BookPanel frame={frame} /> };
+        return { label: `${frame.ticker} DEPTH`, meta: frame.ticker, body: <BookPanel frame={frame} /> };
       case "TKT":
-        return { title: "ORDER TICKET", meta: "NO REAL MONEY", body: <TicketPanel frame={frame} lastEvent={latestEvent} paused={paused} onCommand={onCommand} /> };
+        return { label: "ORDER TICKET", body: <TicketPanel frame={frame} lastEvent={latestEvent} paused={paused} onCommand={onCommand} /> };
       case "STRAT":
         return {
-          title: "STRATEGY",
-          meta: "RULES FROM A FIXED MENU",
+          label: "STRATEGY",
           body: (
             <StrategyPanel
               state={strat}
@@ -430,9 +435,9 @@ export function Terminal() {
           ),
         };
       case "NEWS":
-        return { title: "SCENARIO & HEADLINES", body: <NewsPanel scenario={scenario} market={m} onCommand={onCommand} /> };
+        return { label: "SCENARIO & HEADLINES", body: <NewsPanel scenario={scenario} market={m} onCommand={onCommand} /> };
       case "EXR":
-        return { title: "EXECUTION REPORT", meta: "COST VS THE MID WHEN YOUR ORDER ARRIVED", body: <ExecPanel exr={m.exr} /> };
+        return { label: "EXECUTION REPORT", body: <ExecPanel exr={m.exr} /> };
     }
   };
 
@@ -449,7 +454,7 @@ export function Terminal() {
         {SLOTS.map((n) => {
           const f = fn(slots[n]);
           return (
-            <Panel key={n} number={n} code={slots[n]} title={f.title} meta={f.meta} className={AREA[n]} active={n === active} onActivate={() => setActive(n)}>
+            <Panel key={n} number={n} code={slots[n]} label={f.label} meta={f.meta} className={AREA[n]} active={n === active} onActivate={() => setActive(n)}>
               {f.body}
             </Panel>
           );

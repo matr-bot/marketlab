@@ -140,13 +140,15 @@ function draw(
   g.lineWidth = 1;
   g.fillStyle = TOKENS.label;
   g.textAlign = "right";
+  // An axis label the last-price tag (14px tall) would cover is not drawn (D-071).
+  const lastY = last === null ? null : Math.round(yOf(last)) + 0.5;
   for (let p = Math.ceil(lo / step) * step; p <= hi; p += step) {
     const y = Math.round(yOf(p)) + 0.5;
     g.beginPath();
     g.moveTo(0, y);
     g.lineTo(plotW, y);
     g.stroke();
-    g.fillText(formatPrice(p), w - 4, y);
+    if (lastY === null || Math.abs(y - lastY) >= 14) g.fillText(formatPrice(p), w - 4, y);
   }
 
   // Time labels on whole minutes.

@@ -1837,3 +1837,25 @@ Everything was 12px, so nothing led the eye. Now there are three sizes, as `TYPE
   as `data-slot` for tests and for the active-panel logic until code routing changes in step 4c.
 - STRAT's STOP joins START and BACKTEST as an outlined secondary button (D-069): it is the panel's
   main action while a strategy runs. NEW and CANCEL stay quiet chips.
+
+## D-071 · Step 2b: quieter panels
+
+**Date:** 2026-11-17 · **Status:** Accepted
+
+- **GP is the active panel on load** (the amber border sits on the chart). Until step 4c reroutes
+  function codes, a code typed while GP is active opens in panel 7, so the chart is never replaced.
+- **Panel headers: code only**, in label gray (`GP`, `WHO`, `TAPE`, `BOOK`, `TKT`, `EXR`, `STRAT`,
+  `CHAT`), with useful detail as right-aligned gray meta: `MLAB · 10S` (GP), `MLAB` (BOOK), `60S`
+  (WHO, or the clicked candle's window and `ESC`). The descriptions ("WHO MOVED THE PRICE", "ORDER
+  TICKET", …) are screen-reader labels only; Learn mode shows them in step 3. The header notes "NO REAL
+  MONEY", "RULES FROM A FIXED MENU" and "COST VS THE MID WHEN YOUR ORDER ARRIVED" are gone from the
+  header (Learn mode, step 3). WHO's "last 60 s · click a candle…" line moved into that meta.
+- **No scrollbars inside panels.** Panels still scroll (wheel, keys); the bar is hidden.
+- **Hard cut, no fade.** The overflow fade (`useOverflowFade`, QA #6) and its gradient masks are removed:
+  a clipped row is cut at the panel edge.
+- **BOOK: no SIDE column.** The tint is the side (D-068); `data-side` stays for tests. The widest depth
+  bar is half the row (`BAR_MAX_PCT`), right-anchored, so the largest level no longer tints the whole
+  row. The student's level keeps its outline and tooltip (it lost the `·YOU` text with the column).
+- **TAPE: no ▲▼.** The price's color alone carries the tick direction.
+- **Status VOL: no flash box** behind the number.
+- **Chart:** an axis price label the last-price tag would cover is not drawn.

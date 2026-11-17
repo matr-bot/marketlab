@@ -5,7 +5,6 @@ import { orderSlippageBps, perShareCents } from "@/engine/executionReport";
 import { formatSimTime } from "@/engine/simClock";
 import { formatAvgPrice, formatBps, formatCentsPerShare, formatDollarsX2, formatMidX2, formatQty } from "@/lib/format";
 import styles from "./terminal.module.css";
-import { useOverflowFade } from "./useOverflowFade";
 
 const per = (x2: number | null, qty: number) => (x2 === null ? null : perShareCents(x2, qty));
 
@@ -16,7 +15,6 @@ const per = (x2: number | null, qty: number) => (x2 === null ? null : perShareCe
  * share. A positive cost is money lost to the market; negative is price improvement.
  */
 export function ExecPanel({ exr }: { exr: FrameExecution | null }) {
-  const { ref: fade } = useOverflowFade<HTMLDivElement>();
   if (exr === null || exr.orders.length === 0) {
     return (
       <div className={styles.emptyState} data-testid="exr-empty">
@@ -29,7 +27,7 @@ export function ExecPanel({ exr }: { exr: FrameExecution | null }) {
   const rows = [...exr.orders].reverse();
   return (
     <div className={styles.exrWrap} data-testid="exr">
-      <div ref={fade} className={styles.exrScroll}>
+      <div className={styles.exrScroll}>
         <table className={styles.table}>
           <thead>
             <tr>

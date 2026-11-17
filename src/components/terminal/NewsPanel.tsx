@@ -8,7 +8,6 @@ import { fairValueChange, releaseLine, releaseValue } from "@/engine/economicRel
 import { formatSimTime } from "@/engine/simClock";
 import { scenarioProgress, type HeadlineState, type MarketState } from "@/lib/marketState";
 import styles from "./terminal.module.css";
-import { useOverflowFade } from "./useOverflowFade";
 
 const TYPE_LABELS: Partial<Record<AgentType, string>> = {
   marketMaker: "MARKET MAKERS",
@@ -32,7 +31,6 @@ function latestImpact(headlines: readonly HeadlineState[]): HeadlineState | null
  * in the minute after each headline) come from the engine, so they are the debrief.
  */
 export function NewsPanel({ scenario, market, onCommand }: { scenario: Scenario; market: MarketState; onCommand: (text: string) => void }) {
-  const { ref: fade } = useOverflowFade<HTMLDivElement>();
   const p = scenarioProgress(market, scenario);
   const headlines = [...market.headlines].reverse().slice(0, 4);
   const impact = latestImpact(market.headlines);
@@ -75,7 +73,7 @@ export function NewsPanel({ scenario, market, onCommand }: { scenario: Scenario;
           </div>
         )}
       </div>
-      <div ref={fade} className={styles.newsScroll}>
+      <div className={styles.newsScroll}>
         <p className={styles.para}>
           <span className={styles.label}>TASK </span>
           {scenario.task}

@@ -30,21 +30,27 @@ export function ordersBeyond(orders: readonly OpenOrder[], asks: readonly DepthL
   return orders.filter((o) => !shown.has(`${o.side} ${o.price}`));
 }
 
-/** One level, with a depth bar behind it: width = this level's size ÷ the largest size shown. `mine`: the student's shares resting here. */
+/** The widest depth bar, in % of the row: the largest level never tints the whole row (D-071). */
+export const BAR_MAX_PCT = 50;
+
+/**
+ * One level, with a depth bar behind it, right-anchored: width = this level's size ÷ the largest size
+ * shown, scaled to BAR_MAX_PCT. The tint is the side (D-068), so there is no SIDE column (D-071).
+ * `mine`: the student's shares resting here (outlined row, tooltip).
+ */
 function Level({ level, side, maxQty, mine }: { level: DepthLevel; side: "BID" | "ASK"; maxQty: number; mine: number }) {
   return (
     <div className={`${styles.bookRow} ${mine > 0 ? styles.bookMine : ""}`} data-side={side} data-mine={mine > 0 || undefined} title={mine > 0 ? `Your order: ${formatQty(mine)} of these ${formatQty(level.qty)} shares` : undefined}>
-      <span className={styles.bookSide}>{mine > 0 ? `${side}·YOU` : side}</span>
       <span>{level.orderCount}</span>
       <span>{formatQty(level.qty)}</span>
       <span>{formatPrice(level.price)}</span>
-      <span aria-hidden className={`${styles.depthBar} ${side === "BID" ? styles.depthBid : styles.depthAsk}`} style={{ width: `${(100 * level.qty) / maxQty}%` }} />
+      <span aria-hidden className={`${styles.depthBar} ${side === "BID" ? styles.depthBid : styles.depthAsk}`} style={{ width: `${(BAR_MAX_PCT * level.qty) / maxQty}%` }} />
     </div>
   );
 }
 
 /**
- * Best bid/ask and the levels behind them, each with a depth bar in the side hues (QA #5)
+ * Best bid/ask and the levels behind them, each with a depth bar in its side's muted tint (D-068)
  * so thinning liquidity is visible at a glance. No change highlights here: price flashes belong
  * to the status bar and TAPE. Asks sit above the spread (best at the bottom), bids below it (best
  * at the top), the same number on each side, so the spread is always centered and the panel full.
@@ -73,7 +79,6 @@ export function BookPanel({ frame }: { frame: Frame }) {
   return (
     <div ref={boxRef} className={styles.bookPanel} data-testid="book" data-levels={Math.min(n.asks, n.bids)}>
       <div className={`${styles.bookRow} ${styles.bookHead}`}>
-        <span>SIDE</span>
         <span>ORDERS</span>
         <span>SIZE</span>
         <span>PRICE</span>
@@ -86,7 +91,6 @@ export function BookPanel({ frame }: { frame: Frame }) {
       </div>
       <div className={`${styles.bookRow} ${styles.bookSpread}`}>
         <span>SPREAD</span>
-        <span />
         <span>{spread === null ? "—" : formatPrice(spread)}</span>
         <span>{frame.bid === null || frame.ask === null ? "" : `MID ${formatMid(frame.bid, frame.ask)}`}</span>
       </div>

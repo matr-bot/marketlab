@@ -1,10 +1,8 @@
 "use client";
 
 import { topType, type Attribution, type SideAttribution } from "@/engine/attribution";
-import { formatSimTime } from "@/engine/simClock";
 import { formatQty, traderName } from "@/lib/format";
 import styles from "./terminal.module.css";
-import { useOverflowFade } from "./useOverflowFade";
 
 function Side({ label, side }: { label: string; side: SideAttribution }) {
   const rows = (Object.entries(side.byType) as Array<[string, number]>).sort((a, b) => b[1] - a[1]);
@@ -28,16 +26,14 @@ function Side({ label, side }: { label: string; side: SideAttribution }) {
 
 /**
  * WHO moved the price (D-054): aggressive volume by trader type, exact shares, whole percentages
- * that add up to 100. The last 60 s by default; a clicked GP candle shows that candle's window.
+ * that add up to 100. The last 60 s by default; a clicked GP candle shows that candle's window (the
+ * header says which, D-071).
  */
-export function WhoPanel({ who, selected }: { who: Attribution; selected: boolean }) {
-  const { ref: fade } = useOverflowFade<HTMLDivElement>();
+export function WhoPanel({ who }: { who: Attribution }) {
   const main = who.selling.shares >= who.buying.shares ? { word: "selling", side: who.selling } : { word: "buying", side: who.buying };
   const top = topType(main.side);
-  const window = selected ? `${formatSimTime(who.from).slice(0, 8)}–${formatSimTime(who.to).slice(0, 8)} (clicked candle · Esc for live)` : "last 60 s · click a candle for its window";
   return (
-    <div ref={fade} className={styles.who} data-testid="who">
-      <div className={styles.whoWindow}>{window}</div>
+    <div className={styles.who} data-testid="who">
       {who.trades === 0 || top === null ? (
         <div className={styles.chatEmpty}>No trades in this window.</div>
       ) : (

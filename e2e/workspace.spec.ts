@@ -89,3 +89,51 @@ test("the strip stays one row with the workspace tabs, paused included: its last
   expect(fit.height).toBeLessThan(44);
 });
 
+
+test("first STRATEGY load: the example is ready (builder, glass box, START), with no AI call (D-088)", async ({ page }) => {
+  const calls: string[] = [];
+  page.on("request", (r) => r.url().includes("/api/interpret") && calls.push(r.url()));
+  await page.goto("/terminal?seed=187");
+  await expect(page.getByTestId("last-price")).toBeVisible();
+  await page.keyboard.press("Alt+Digit2");
+  const ws = page.getByTestId("strategy-workspace");
+  await expect(ws.getByTestId("strat")).toHaveAttribute("data-phase", "preview");
+  await expect(ws.getByTestId("strat")).toContainText("EXAMPLE · NOT THE AI");
+  await expect(ws.getByTestId("strat-start")).toBeVisible();
+  await expect(page.getByTestId("glass-code")).toContainText("ENTRY_PCT = 0.03");
+  await expect(page.getByTestId("glass-english")).toContainText("panic sellers overshoot");
+  await expect(ws.getByTestId("strat-rules")).toHaveCount(0); // the glass box has the rules in words
+  expect(calls).toEqual([]);
+  // Offered once: after NEW, the builder stays empty for the student's own idea.
+  await ws.getByTestId("strat").getByText("CANCEL").click();
+  await page.keyboard.press("Alt+Digit1");
+  await page.keyboard.press("Alt+Digit2");
+  await expect(ws.getByTestId("strat")).toHaveAttribute("data-phase", "compose");
+});
+
+test("the RULE menu: arrows change it closed, ↵ opens, arrows and ↵ pick, Esc closes only the menu (D-088)", async ({ page }) => {
+  await page.goto("/terminal?seed=187");
+  await expect(page.getByTestId("last-price")).toBeVisible();
+  await page.keyboard.press("Alt+Digit2");
+  const rule = page.locator("button[data-field=rule]");
+  await expect(rule).toHaveAttribute("data-value", "buyAfterDrop");
+  await rule.focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(rule).toHaveAttribute("data-value", "buyAfterRise");
+  await page.keyboard.press("Enter");
+  const menu = page.getByTestId("menu-rule");
+  await expect(menu).toBeVisible();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(menu).toHaveCount(0);
+  await expect(rule).toHaveAttribute("data-value", "sellAfterRise");
+  await expect(page.getByTestId("glass-rules")).toContainText("SELL SHORT AFTER A RISE"); // the glass box follows
+  await page.keyboard.press("Enter");
+  await expect(menu).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+  await expect(page.getByTestId("strategy-workspace").getByTestId("strat")).toHaveAttribute("data-phase", "preview"); // still there
+  await rule.click();
+  await menu.locator("[data-value=buyAfterDrop]").click();
+  await expect(rule).toHaveAttribute("data-value", "buyAfterDrop");
+});

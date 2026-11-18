@@ -17,6 +17,7 @@ import type { RunData } from "@/lib/glassbox/python";
 import { offlineFallback, OFFLINE_HELP } from "@/lib/offlineMatch";
 import { OFFLINE_STRATEGY_HELP, parseStrategyOffline } from "@/lib/offlineStrategy";
 import type { InterpretResponse, StrategyResponse } from "@/lib/schemas";
+import { EXAMPLE_SPEC, EXAMPLE_TEXT } from "@/lib/exampleStrategy";
 import { learnFromQuery, sessionLink } from "@/lib/sessionLink";
 import { formatUserEvent } from "@/lib/userMessages";
 import { BookPanel } from "./BookPanel";
@@ -148,6 +149,8 @@ export function Terminal() {
   const [built, setBuilt] = useState<{ text: string; source: StratSource; reason: string } | null>(null);
   /** TRADE (the terminal) or STRATEGY (builder, glass box, results), D-086. */
   const [workspace, setWorkspace] = useState<Workspace>("TRADE");
+  /** The example is offered once, the first time STRATEGY opens with nothing built (D-088). */
+  const examplePreloaded = useRef(false);
   /** The strategy's equity per sim second, as the engine recorded it (D-086). */
   const [equity, setEquity] = useState<readonly number[]>([]);
   const pendingApply = useRef(false);
@@ -202,6 +205,18 @@ export function Terminal() {
    * Open the drawer (D-077). "full" (the default) shows STRATEGY beside DESK or NEWS; "compact" is DESK
    * alone and never shrinks a drawer that is already full. NEWS is always full: its brief needs room.
    */
+  /**
+   * Switch workspace (D-086). The first time STRATEGY opens with nothing built, the builder gets the
+   * example (D-088): fixed data, no AI call, so the glass box is full and START is ready.
+   */
+  const openWorkspace = (w: Workspace) => {
+    if (w === "STRATEGY" && !examplePreloaded.current && strat.phase === "compose" && market?.strategy == null) {
+      examplePreloaded.current = true;
+      setStrat({ phase: "preview", text: EXAMPLE_TEXT, source: "example", reason: "", draft: EXAMPLE_SPEC });
+    }
+    setWorkspace(w);
+  };
+
   const openDrawer = useCallback(
     (side?: DrawerSide, mode: "compact" | "full" = "full") => {
       if (drawerOpen && side !== undefined && side !== drawerSide) markSeen(drawerSide);
@@ -470,7 +485,7 @@ export function Terminal() {
       const ws = workspaceKey(e.code, { ctrl: e.ctrlKey, meta: e.metaKey, alt: e.altKey });
       if (ws !== null) {
         e.preventDefault();
-        setWorkspace(ws);
+        openWorkspace(ws);
         return;
       }
       const action = globalAction(e.key, e.target, { ctrl: e.ctrlKey, meta: e.metaKey, alt: e.altKey });
@@ -480,7 +495,7 @@ export function Terminal() {
       else if (action === "help") setHelpOpen((o) => !o);
       else if (action === "session") setSessionOpen((o) => !o);
       else if (action === "drawer") toggleDrawer();
-      else if (action === "backtest") setWorkspace((w) => (w === "STRATEGY" ? "TRADE" : "STRATEGY"));
+      else if (action === "backtest") openWorkspace(workspace === "STRATEGY" ? "TRADE" : "STRATEGY");
     };
   });
   useEffect(() => {
@@ -524,6 +539,23 @@ export function Terminal() {
   const scenario = run?.scenario ?? FREE_PLAY;
   const shown = latestEvent !== null && latestEvent.seq > reply.seen ? formatUserEvent(latestEvent) : reply.text;
 
+  /** The strategy builder; `showRules` off in the STRATEGY workspace, whose glass box has them (D-088). */
+  const stratPanel = (showRules: boolean) => (
+    <StrategyPanel
+      state={strat}
+      strategy={m.strategy}
+      decisions={m.decisions}
+      onSubmit={(t) => void submitStrategy(t)}
+      onEdit={(draft) => setStrat((s) => (s.phase === "preview" ? { ...s, draft } : s))}
+      onStart={startStrategy}
+      onCancel={() => setStrat({ phase: "compose", message: null })}
+      onStop={() => void onCommand("STOP")}
+      onReveal={() => openWorkspace("STRATEGY")}
+      onNew={() => setStrat({ phase: "compose", message: null })}
+      showRules={showRules}
+    />
+  );
+
   /** Screen-reader label, right-aligned header detail and body of a function, wherever it is shown (D-071). */
   const fn = (code: FunctionCode): { label: string; meta?: string; body: ReactNode } => {
     switch (code) {
@@ -545,23 +577,7 @@ export function Terminal() {
           body: <TicketDesk tab={ticketTab} onTab={setTicketTab} frame={frame} exr={m.exr} fillsUnread={Math.max(0, (m.exr?.orders.length ?? 0) - fillsSeen)} lastEvent={latestEvent} paused={paused} onCommand={onCommand} />,
         };
       case "STRAT":
-        return {
-          label: "STRATEGY",
-          body: (
-            <StrategyPanel
-              state={strat}
-              strategy={m.strategy}
-              decisions={m.decisions}
-              onSubmit={(t) => void submitStrategy(t)}
-              onEdit={(draft) => setStrat((s) => (s.phase === "preview" ? { ...s, draft } : s))}
-              onStart={startStrategy}
-              onCancel={() => setStrat({ phase: "compose", message: null })}
-              onStop={() => void onCommand("STOP")}
-              onReveal={() => setWorkspace("STRATEGY")}
-              onNew={() => setStrat({ phase: "compose", message: null })}
-            />
-          ),
-        };
+        return { label: "STRATEGY", body: stratPanel(true) };
       case "NEWS":
         return { label: "SCENARIO & HEADLINES", body: <NewsPanel scenario={scenario} market={m} onCommand={onCommand} /> };
       case "EXR":
@@ -615,7 +631,7 @@ export function Terminal() {
           paused={paused}
           controls={
             <>
-              <WorkspaceTabs workspace={workspace} onSelect={setWorkspace} />
+              <WorkspaceTabs workspace={workspace} onSelect={openWorkspace} />
               <Playback paused={paused} speed={speed} sessionOpen={sessionOpen} onCommand={(t) => void onCommand(t)} />
             </>
           }
@@ -625,7 +641,7 @@ export function Terminal() {
       <CommandBar onCommand={onCommand} reply={shown} />
       <NewsPreview news={news} onEdit={onEdit} onApply={apply} onCancel={onCancel} />
       {workspace === "STRATEGY" ? (
-        <StrategyWorkspace builder={fn("STRAT").body} glass={glassBody} strategy={m.strategy} equity={equity} exr={m.exr} frame={frame} candles={candles} headlines={headlines} openPrice={m.openPrice} />
+        <StrategyWorkspace builder={stratPanel(false)} glass={glassBody} strategy={m.strategy} equity={equity} exr={m.exr} frame={frame} candles={candles} headlines={headlines} openPrice={m.openPrice} />
       ) : (
       <>
       <main className={styles.grid}>

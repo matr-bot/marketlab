@@ -1187,9 +1187,9 @@
 }
 
 .stratSource {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* Wraps: the student's own words are never cut off (D-088). */
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .stratGrid {
@@ -1495,4 +1495,61 @@
   .workspaces .keyHint {
     display: none;
   }
+}
+
+/* ---------- MenuSelect: a token-styled select (D-088) ---------- */
+.menuSelect {
+  position: relative;
+  display: inline-block;
+}
+
+.menuButton {
+  display: inline-flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 220px;
+  padding: 0 8px;
+  height: 20px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--data);
+  text-align: left;
+  cursor: pointer;
+}
+
+.menuButton:hover,
+.menuButton[aria-expanded="true"] {
+  border-color: var(--data);
+}
+
+.menuList {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 30;
+  min-width: 100%;
+  margin-top: -1px;
+  list-style: none;
+  background: var(--panel-bg);
+  border: 1px solid var(--data);
+}
+
+.menuList li {
+  display: flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  color: var(--label);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.menuList .menuOn {
+  color: var(--data);
+}
+
+.menuList .menuHi {
+  background: var(--hover);
+  color: var(--data);
 }

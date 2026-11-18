@@ -2211,3 +2211,21 @@ A judge should be able to check every figure on the landing page, so none of the
   the engine's scenario data, which this UI work does not change.
 - **Footer SHA:** `next.config.ts` reads the commit when the server starts, so a dev server shows the
   commit it was started on; a production build reads it at build time (verified below).
+
+## D-088 · STRATEGY workspace fixes after the live review
+
+**Date:** 2026-11-18 · **Status:** Accepted (refines D-086)
+
+- **First load is ready, not empty:** the first time STRATEGY opens with nothing built, the builder holds
+  an example (`src/lib/exampleStrategy.ts`: the demo's idea, "Buy 500 after a quick 3% drop because
+  panic sellers overshoot; stop loss 1%, out after 2 minutes", fixed data clamped exactly as START
+  clamps), labelled `EXAMPLE · NOT THE AI`. The glass box shows its English, rules, formulas and
+  Python, and START (↵) is ready. No AI call is made (an e2e test watches the network). It is offered
+  once; after CANCEL or NEW the builder stays free for the student's own idea.
+- **RULE is a token-styled menu** (`MenuSelect`) instead of the native `<select>`: a mono button with ▾
+  and a square list. ↑ ↓ change it while closed, ↵ or Space opens it, ↑ ↓ and ↵ pick, Esc closes only the
+  menu (not the preview), a click outside closes it. The field is a `div`, not a `label`, so a click on
+  an option cannot re-click the button.
+- **No duplicate English:** in the workspace the builder no longer lists the rules in words; the glass
+  box's section 1 does. The drawer's builder in TRADE keeps them (no glass box there).
+- The builder's source line wraps instead of cutting the student's words off.

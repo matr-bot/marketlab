@@ -8,6 +8,7 @@ import { formatDollars, formatQty } from "@/lib/format";
 import { describeRules, RULE_LABELS } from "@/lib/glassbox/english";
 import { dollars } from "@/lib/glassbox/formulas";
 import { Explain } from "./Learn";
+import { MenuSelect } from "./MenuSelect";
 import { KeyHint } from "./KeyHint";
 import styles from "./terminal.module.css";
 import { Time } from "./Time";
@@ -20,9 +21,9 @@ export type StratState =
   | { readonly phase: "live" };
 
 /** Where a spec came from. Offline results are never labelled as the AI's. */
-export type StratSource = "ai" | "cache" | "offline";
+export type StratSource = "ai" | "cache" | "offline" | "example";
 
-export const SOURCE_LABELS: Record<StratSource, string> = { ai: "AI", cache: "AI (CACHED)", offline: "UNDERSTOOD OFFLINE · NOT THE AI" };
+export const SOURCE_LABELS: Record<StratSource, string> = { ai: "AI", cache: "AI (CACHED)", offline: "UNDERSTOOD OFFLINE · NOT THE AI", example: "EXAMPLE · NOT THE AI" };
 
 export const SHARPE_NOTE =
   "Annualized from one-second returns with the sim's clock: a year is 252 sessions of 23,400 s. Short runs are noisy: a Sharpe from a few minutes of data means little, and a big number here is not a skill signal.";
@@ -80,6 +81,7 @@ export function StrategyPanel({
   onStop,
   onReveal,
   onNew,
+  showRules = true,
 }: {
   state: StratState;
   strategy: Omit<FrameStrategy, "newDecisions"> | null;
@@ -91,6 +93,8 @@ export function StrategyPanel({
   onStop: () => void;
   onReveal: () => void;
   onNew: () => void;
+  /** The rules in words under the preview fields; off where a glass box shows them (D-088). */
+  showRules?: boolean;
 }) {
   const [text, setText] = useState("");
 
@@ -136,21 +140,11 @@ export function StrategyPanel({
         <div className={styles.stratSource}>
           <span className={styles.label}>{SOURCE_LABELS[state.source]}</span> <span className={styles.dimText}>“{state.text}”</span>
         </div>
-        <label className={styles.stratField}>
+        {/* A div, not a label: a click on a menu option must not bubble into a label's click on the button. */}
+        <div className={styles.stratField}>
           <span className={styles.label}>RULE</span>
-          <select
-            className={styles.input}
-            data-field="rule"
-            value={draft.entry.rule}
-            onChange={(e) => onEdit({ ...draft, entry: { ...draft.entry, rule: e.target.value as EntryRule } })}
-          >
-            {ENTRY_RULES.map((r) => (
-              <option key={r} value={r}>
-                {RULE_LABELS[r]}
-              </option>
-            ))}
-          </select>
-        </label>
+          <MenuSelect<EntryRule> field="rule" label="Entry rule" value={draft.entry.rule} options={ENTRY_RULES.map((r) => ({ value: r, label: RULE_LABELS[r] }))} onChange={(rule) => onEdit({ ...draft, entry: { ...draft.entry, rule } })} />
+        </div>
         <div className={styles.stratGrid}>
           {FIELDS.map((f) => (
             <PreviewField key={f.key} field={f} draft={draft} onEdit={onEdit} onStart={onStart} onCancel={onCancel} explain={lineFor(f.key)} />
@@ -166,11 +160,14 @@ export function StrategyPanel({
             <KeyHint k="ESC" />
           </button>
         </div>
-        <ul className={styles.stratRules} data-testid="strat-rules">
-          {lines.map((l) => (
-            <li key={l.key}>{l.text}</li>
-          ))}
-        </ul>
+        {/* The rules in words; the STRATEGY workspace leaves them to its glass box (D-088). */}
+        {showRules && (
+          <ul className={styles.stratRules} data-testid="strat-rules">
+            {lines.map((l) => (
+              <li key={l.key}>{l.text}</li>
+            ))}
+          </ul>
+        )}
         {state.reason && (
           <Explain id="strat.reason">
             <span className={styles.newsReason}>AI&apos;s reason: “{state.reason}”</span>

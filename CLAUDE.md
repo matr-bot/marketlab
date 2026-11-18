@@ -91,7 +91,7 @@ This section is the spec. It replaces the earlier amber-label design. The overha
 | 5.5b ✅ | Chart: crosshair + OHLCV, dashed last, ~12 axis labels, markers with hover text, double-click zoom (D-079) |
 | 5.5c ✅ | Keymap (Space, F1-F4, TKT letters) with hints in controls, `.mmm` timestamps (D-080) |
 | 5.5d ✅ | TAPE prices fully up/down; BOOK cents bright, dollars gray (D-081) |
-| 6 | Landing page at `/` (replay hero, problem, how it works, generated proof, launcher); terminal at `/terminal` |
+| 6 ✅ | Landing page at `/` (replay hero, problem, how it works, generated proof, launcher); terminal at `/terminal` (D-082 to D-085) |
 | 7 | Workspaces: TRADE · STRATEGY (rule builder, glass box, equity curve per sim second) |
 
 Functions that have not shipped are not drawn: no placeholder panels, never a blank or fake state.
@@ -160,6 +160,12 @@ never uses a real company's name, logo or exact screens.
 `?learn=1` (a checkbox on the launcher). Every sentence removed from the default view lives in
 `src/lib/explain.ts` and shows through `<Explain id>` only in Learn mode, together with HELP and the
 hover explanations. Pro (the default) shows data only.
+
+### Proof (D-085)
+Every figure on the landing page is generated: `npm run build` runs `scripts/proof.mjs` (unit tests, a
+red test fails the build) into `public/proof.json`; the mutation score is the committed summary of the
+last `npm run test:mutation` run (`data/proof/mutation.json`), dated. `noFigures.test.ts` fails on any
+figure typed into the landing components.
 
 ### Launcher (`/`)
 Not a marketing page: no hero, gradients, adjectives, feature cards or emoji. Same tokens and font,

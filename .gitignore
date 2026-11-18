@@ -45,3 +45,6 @@ next-env.d.ts
 # stryker
 .stryker-tmp/
 reports/
+
+# generated before each build (scripts/proof.mjs, D-085)
+/public/proof.json

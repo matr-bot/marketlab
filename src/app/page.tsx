@@ -2,6 +2,7 @@ import { randomInt } from "node:crypto";
 import { connection } from "next/server";
 import { HeroReplay } from "@/components/landing/HeroReplay";
 import { Landing } from "@/components/landing/Landing";
+import { Proof } from "@/components/landing/Proof";
 import { DEMO_SEED } from "@/engine/demoMarket";
 import { SCENARIOS } from "@/engine/scenarios";
 import { AGENT_MODELS, crowdCounts } from "@/lib/models";
@@ -19,6 +20,7 @@ export default async function Home() {
       scenarios={SCENARIOS.map((s) => ({ id: s.id, title: s.title, teaches: s.teaches }))}
       build={{ version: process.env.NEXT_PUBLIC_APP_VERSION ?? "", sha: process.env.NEXT_PUBLIC_GIT_SHA ?? "" }}
       hero={<HeroReplay seed={DEMO_SEED} />}
+      proof={<Proof />}
     />
   );
 }

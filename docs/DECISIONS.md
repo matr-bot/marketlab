@@ -2134,3 +2134,32 @@ technical layer behind `[+]` (a native `<details>`: it opens in place, without a
 - The marker reads **HIKE**, the code the engine logs for this scenario's headline ("Fed surprise hike
   75bps", the same shock as the FED preset); the full headline shows on hover. The screen shows what the
   engine did, so it is not relabeled FED.
+
+## D-085 · Step 6d: PROOF, every number generated, none typed
+
+**Date:** 2026-11-18 · **Status:** Accepted
+
+A judge should be able to check every figure on the landing page, so none of them is written by hand.
+- **`npm run build` runs `scripts/proof.mjs` first** (prebuild). It runs the unit tests (Vitest, JSON
+  report), lists the browser tests (Playwright `--list`), reads the last mutation summary, and writes
+  `public/proof.json` (gitignored; also linked from the page as the raw source). A failing unit test
+  fails the build, so these numbers never ship over red tests.
+- **Mutation score:** Stryker is too slow for a deploy build, so `npm run test:mutation` now ends with
+  `scripts/mutation-summary.mjs`, which writes the committed `data/proof/mutation.json`: Stryker's score
+  (detected = killed + timed out, over valid mutants), the counts, when it ran and on which commit, and
+  any uncommitted engine files the run included. The page shows it dated, as the last run, never as
+  live. Stryker now also writes its JSON report.
+- **Claims are backed by named tests** (`CLAIMS` in `scripts/proofLib.mjs`) and shown only if every
+  test behind them was found and passed in that build: DETERMINISTIC REPLAY (byte-identical fill log
+  for seed 187; identical fill log whatever the frame timing, D-039), INTEGER-CENT MONEY (a limit off
+  the tick is rejected; floating-point math is kept out of price and cash code), RUNS IN THE BROWSER
+  (`src/lib/network.test.ts`, new: the only fetch targets are `/api/interpret` and `/proof.json`; the
+  engine and worker never touch the network). The layer behind `[+]` lists each test by file and
+  name.
+- **No figure is typed:** `src/components/landing/noFigures.test.ts` parses Landing, Proof and
+  HeroReplay with the TypeScript compiler and fails on any digit in JSX text, in a rendered string or
+  template, or a number literal as a JSX child (attributes and code are not figures). A planted
+  `1,055` / `{77}` / `"77 agents"` is caught. The hero's agent count comes from the crowd; the build
+  label from `package.json` and git.
+- Links: SOURCE (the repository), DECISIONS.md at the built commit, and proof.json.
+- The proof arithmetic (`summarizeMutants`, `summarizeUnit`, `backedClaims`) is unit-tested.

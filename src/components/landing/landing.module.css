@@ -272,6 +272,27 @@
   cursor: not-allowed;
 }
 
+/* PROOF (D-085): the figures in data white, their labels gray. */
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  color: var(--label);
+  font-size: var(--fs-label);
+  letter-spacing: 0.06em;
+}
+
+.stats b {
+  color: var(--data);
+  font-size: var(--fs-data);
+  font-weight: 700;
+}
+
+.links {
+  display: flex;
+  gap: 24px;
+}
+
 .footer {
   display: flex;
   justify-content: space-between;

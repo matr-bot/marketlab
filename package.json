@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/proof.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -11,7 +12,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "typecheck": "next typegen && tsc --noEmit",
-    "test:mutation": "stryker run",
+    "test:mutation": "stryker run && node scripts/mutation-summary.mjs",
     "bench": "vitest bench --run"
   },
   "dependencies": {

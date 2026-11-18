@@ -64,3 +64,18 @@ test("the hero replays the Fed hike from the real engine: calm, HIKE, panic in W
   await expect(replay).toHaveAttribute("data-loop", "1", { timeout: 30_000 }); // a new loop: a RERUN
   await expect(chart).toHaveAttribute("data-markers", "", { timeout: 5_000 });
 });
+
+test("PROOF shows exactly the numbers in proof.json, and its claims with the tests behind them (D-085)", async ({ page, request }) => {
+  const proof = await (await request.get("/proof.json")).json();
+  await page.goto("/");
+  const stats = page.getByTestId("proof-stats");
+  await expect(stats.locator("[data-stat=unit]")).toHaveText(`${proof.unit.passed.toLocaleString("en-US")} UNIT TESTS PASSED`);
+  await expect(stats.locator("[data-stat=browser]")).toHaveText(`${proof.browser.listed} BROWSER TESTS · CI`);
+  if (proof.mutation?.score != null) await expect(stats.locator("[data-stat=mutation]")).toHaveText(`MUTATION ${proof.mutation.score.toFixed(1)}% · ENGINE`);
+  else await expect(stats.locator("[data-stat=mutation]")).toHaveCount(0);
+  for (const c of proof.claims) await expect(stats.locator(`[data-stat=${c.id}]`)).toHaveText(c.label);
+  expect(proof.unit.failed).toBe(0);
+  await page.getByTestId("proof-layer").locator("summary").click();
+  await expect(page.getByTestId("proof-layer")).toContainText(proof.claims[0].tests[0].title);
+  await expect(page.getByTestId("proof-repo")).toHaveAttribute("href", proof.repo);
+});

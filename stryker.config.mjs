@@ -6,7 +6,8 @@ const config = {
   vitest: { configFile: "vitest.stryker.config.mts" }, // leaves out whole-market workloads (D-028)
   mutate: ["src/engine/**/*.ts", "!src/engine/**/*.test.ts", "!src/engine/**/*.bench.ts", "!src/engine/testing/**"],
   coverageAnalysis: "perTest",
-  reporters: ["clear-text", "progress", "html"],
+  reporters: ["clear-text", "progress", "html", "json"],
+  jsonReporter: { fileName: "reports/mutation/mutation.json" }, // read by scripts/mutation-summary.mjs (D-085)
   htmlReporter: { fileName: "reports/mutation/index.html" },
   thresholds: { high: 90, low: 80, break: null },
   tempDirName: ".stryker-tmp",

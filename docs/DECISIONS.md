@@ -2029,3 +2029,26 @@ During a shock the two-pane drawer took about a third of the screen, and the cha
   scale, no radius, shadow, gradient or transition) and `e2e/geometry.spec.ts` checks what the
   browser computes (radius 0 and no shadow on every element in the panels, strip, drawer and SESSION;
   the font and its figures).
+
+## D-079 · Step 5.5b: the chart (crosshair, OHLCV, markers, zoom)
+
+**Date:** 2026-11-18 · **Status:** Accepted
+
+- **Crosshair and OHLCV:** a dotted crosshair follows the pointer with the price under it tagged on the
+  axis; the readout top-left shows the hovered candle's time, O, H, L, C (C in its direction color) and
+  V, or the latest candle when the pointer is away. The readout and the headline hover are HTML
+  overlays (crisp at any pixel ratio, readable by screen readers and tests); the rest is canvas.
+- **Last price** is a dashed line with its value on the axis. This and the crosshair are the
+  deliberate exceptions to "no dashed lines": a dashed level reads as a reference, not as data.
+- **Axis:** about 12 round price labels instead of 7; a label under the last-price or crosshair tag is
+  not drawn. **Volume** is neutral at 25% opacity. **Candles** have a 1-2px gap between bodies.
+- **Headline markers:** a thin vertical line with a short code (`markerCode`: FED, CEO, BEAT, DNGR,
+  CPI, NEWS…, at most five characters); hovering within 5px shows the full headline and its time.
+- **Double-click zooms the price axis** to the candles of the last two minutes (and the last price),
+  so a small move after a crash is readable; double-click again resets. `Y 2M` in the readout says it
+  is zoomed. A single click still picks a candle for WHO, after 250ms, so the first click of a
+  double-click picks nothing.
+- The geometry is computed once per render (`layout`, pure), and the drawing and the pointer share it.
+  `src/lib/chart.ts` (codes, the zoomed range, the axis step) is unit-tested; `e2e/chart.spec.ts`
+  covers hover, the WHO click, the marker text and the zoom.
+- Two e2e checks from step 5 read WHO twice while the window rolled (flaky); each now reads one snapshot.

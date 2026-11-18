@@ -127,9 +127,7 @@ test("WHO keeps its five rows at all times, zero rows gray, with NET colored by 
   await page.waitForTimeout(1_500);
   expect(await who.locator("table").boundingBox()).toEqual(box); // no layout shift as the window rolls
   // NET: green when buying exceeds selling, red when selling does.
-  const netCell = page.getByTestId("who-net").locator("td").nth(1);
-  const text = (await netCell.textContent())!;
-  const color = await netCell.evaluate((el) => getComputedStyle(el).color);
+  const { text, color } = await page.getByTestId("who-net").locator("td").nth(1).evaluate((el) => ({ text: el.textContent!, color: getComputedStyle(el).color })); // one read: the window rolls
   if (text.startsWith("+")) expect(color).toBe("rgb(38, 166, 91)");
   else if (text.startsWith("-")) expect(color).toBe("rgb(229, 72, 77)");
 });

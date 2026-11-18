@@ -88,7 +88,8 @@ This section is the spec. It replaces the earlier amber-label design. The overha
 | 5 ✅ | Panel content: WHO fixed table with NET, FILLS totals, no overflowing text (D-076) |
 | 5b ✅ | Compact DESK drawer for shocks, DESK newest on top, chart ≥ 60% of its column (D-077) |
 | 5.5a ✅ | JetBrains Mono (tnum, zero), big figure, 150ms tick flash only, 4px scale, 20px rows (D-078) |
-| 5.5b / 5.5c | Chart (crosshair, OHLCV, dashed last, markers, double-click zoom) / keymap and timestamps |
+| 5.5b ✅ | Chart: crosshair + OHLCV, dashed last, ~12 axis labels, markers with hover text, double-click zoom (D-079) |
+| 5.5c | Keymap and key hints, `.mmm` timestamps |
 | 6 | Session launcher at `/`; the terminal at `/terminal` |
 
 Functions that have not shipped are not drawn: no placeholder panels, never a blank or fake state.
@@ -117,6 +118,7 @@ never uses a real company's name, logo or exact screens.
 ### Look
 - One monospace font everywhere, tabular figures; numbers right-aligned so digits line up.
 - 1px solid hairlines, sharp corners, no shadows, gradients or glow; dense rows, no big empty boxes.
+  The chart's dashed last-price line and dotted crosshair are the only dashed lines (D-079).
 - No LIVE badge or glowing dot; the moving numbers show it is live. Status labels: a permanent
   SIMULATED badge, and PAUSED while paused.
 - Fictional ticker MLAB (D-041), never a real symbol.

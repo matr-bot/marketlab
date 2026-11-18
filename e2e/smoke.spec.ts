@@ -162,12 +162,17 @@ test("a custom headline: the AI's params preview, Enter applies, the price react
   await expect(page.getByTestId("chat").locator("[data-kind=headline]")).toContainText("Chip supplier halts all deliveries to MLAB · fair value -4.0%");
   await expect(page.getByTestId("who-summary")).toHaveText(/^\d+% of (selling|buying) came from [a-z ]+\.$/);
   // WHO (D-076): five fixed rows, % of all aggressive volume summing to 100, NET = buying − selling.
-  const rows = await page.getByTestId("who").locator("tbody tr").evaluateAll((trs) =>
-    (trs as HTMLTableRowElement[]).map((r) => ({ label: r.cells[0].textContent, sell: Number(r.cells[1].textContent!.replace(/,/g, "")), buy: Number(r.cells[2].textContent!.replace(/,/g, "")), pct: Number(r.cells[3].textContent) })),
-  );
+  // One snapshot of the table: the live window rolls between separate reads.
+  const { rows, net } = await page.getByTestId("who").evaluate((who) => {
+    const num = (t: string | null) => Number(t!.replace(/,/g, ""));
+    const trs = [...who.querySelectorAll("tbody tr")] as HTMLTableRowElement[];
+    return {
+      rows: trs.map((r) => ({ label: r.cells[0].textContent, sell: num(r.cells[1].textContent), buy: num(r.cells[2].textContent), pct: num(r.cells[3].textContent) })),
+      net: num(who.querySelector("[data-testid=who-net] td:nth-child(2)")!.textContent),
+    };
+  });
   expect(rows.map((r) => r.label)).toEqual(["MM", "NOISE", "VALUE", "PANIC", "YOU"]);
   expect(rows.reduce((s, r) => s + r.pct, 0)).toBe(100);
-  const net = Number((await page.getByTestId("who-net").locator("td").nth(1).textContent())!.replace(/,/g, ""));
   expect(net).toBe(rows.reduce((s, r) => s + r.buy - r.sell, 0));
   expect(errors).toEqual([]);
 });

@@ -32,6 +32,9 @@ export const TOKENS = {
   /** The tick flash (D-078): the background behind a price or a book level that just moved up or down. */
   upFlash: "rgba(38, 166, 91, 0.45)",
   downFlash: "rgba(229, 72, 77, 0.45)",
+  /** The BOOK level flash: a 25% tint, not a solid row (D-089). */
+  upFlashSoft: "rgba(38, 166, 91, 0.25)",
+  downFlashSoft: "rgba(229, 72, 77, 0.25)",
   /** Horizontal percentage bars (WHO). */
   bar: "rgba(122, 122, 122, 0.22)",
   selection: "#3A3A3A",

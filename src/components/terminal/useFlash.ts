@@ -6,10 +6,13 @@ import { TOKENS } from "./tokens";
 /** How long a tick flash shows (D-078). It is the only animation in the app. */
 export const FLASH_MS = 150;
 
-/** Flash `el`'s background up (green) or down (red) for FLASH_MS, then nothing: no fade, no slide. */
-export function flash(el: Element, direction: "up" | "down") {
+/**
+ * Flash `el`'s background up (green) or down (red) for FLASH_MS, then nothing: no fade, no slide.
+ * `soft` is a 25% tint, for a whole BOOK row (D-089); the last price uses the stronger flash.
+ */
+export function flash(el: Element, direction: "up" | "down", soft = false) {
   if (typeof (el as HTMLElement).animate !== "function") return;
-  const backgroundColor = direction === "up" ? TOKENS.upFlash : TOKENS.downFlash;
+  const backgroundColor = direction === "up" ? (soft ? TOKENS.upFlashSoft : TOKENS.upFlash) : soft ? TOKENS.downFlashSoft : TOKENS.downFlash;
   (el as HTMLElement).animate([{ backgroundColor }, { backgroundColor }], { duration: FLASH_MS, easing: "steps(1, end)" });
 }
 

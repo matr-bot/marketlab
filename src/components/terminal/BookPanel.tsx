@@ -85,7 +85,7 @@ export function BookPanel({ frame }: { frame: Frame }) {
       const qty = Number(row.dataset.qty);
       now.set(key, qty);
       const before = sizes.current?.get(key);
-      if (sizes.current !== null && before !== qty) flash(row, before === undefined || qty > before ? "up" : "down");
+      if (sizes.current !== null && before !== qty) flash(row, before === undefined || qty > before ? "up" : "down", true);
     }
     sizes.current = now;
   });

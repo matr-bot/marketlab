@@ -18,7 +18,8 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={mono.variable} style={cssVariables()}>
-      <body>{children}</body>
+      {/* Browser extensions (Grammarly) add attributes to <body> before React hydrates; that is not a bug of ours (D-089). */}
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }

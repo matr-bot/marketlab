@@ -31,3 +31,21 @@ test("numbers use tabular figures with a slashed zero in the self-hosted mono fo
   expect(style.numeric).toContain("tabular-nums");
   expect(style.numeric).toContain("slashed-zero");
 });
+
+test("BOOK levels flash a 25% tint, the last price the full flash, for 150ms (D-078, D-089)", async ({ page }) => {
+  await page.goto("/terminal?seed=187");
+  await expect(page.getByTestId("last-price")).toBeVisible();
+  await expect
+    .poll(
+      () =>
+        page.getByTestId("book").evaluate((el) => {
+          for (const row of el.querySelectorAll("[data-price]")) {
+            const a = row.getAnimations()[0];
+            if (a) return { color: (a.effect as KeyframeEffect).getKeyframes()[0].backgroundColor, ms: (a.effect as KeyframeEffect).getTiming().duration };
+          }
+          return null;
+        }),
+      { timeout: 10_000, intervals: [20] },
+    )
+    .toMatchObject({ color: expect.stringMatching(/^rgba\((38, 166, 91|229, 72, 77), 0\.25\)$/), ms: 150 });
+});

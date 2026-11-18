@@ -2229,3 +2229,14 @@ A judge should be able to check every figure on the landing page, so none of the
 - **No duplicate English:** in the workspace the builder no longer lists the rules in words; the glass
   box's section 1 does. The drawer's builder in TRADE keeps them (no glass box there).
 - The builder's source line wraps instead of cutting the student's words off.
+
+## D-089 · Small fixes after the live review
+
+**Date:** 2026-11-18 · **Status:** Accepted
+
+- **BOOK flash is a 25% tint** (`upFlashSoft`, `downFlashSoft`): a whole row in the full flash read as a
+  solid fill. The last price keeps the stronger flash. Still 150ms, still the only animation; an e2e
+  test reads the animation's keyframes.
+- **`suppressHydrationWarning` on `<body>`:** browser extensions such as Grammarly add attributes to
+  `<body>` before React hydrates, which React reported as a mismatch. It applies to `<body>`'s own
+  attributes only, not to anything inside it.

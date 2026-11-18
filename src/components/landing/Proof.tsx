@@ -24,7 +24,7 @@ interface ProofData {
     readonly commit: string;
     readonly uncommitted: readonly string[];
   } | null;
-  readonly claims: ReadonlyArray<{ readonly id: string; readonly label: string; readonly tests: ReadonlyArray<{ readonly file: string; readonly title: string }> }>;
+  readonly claims: ReadonlyArray<{ readonly id: string; readonly label: string; readonly tests: ReadonlyArray<{ readonly file: string; readonly title: string; readonly name: string }> }>;
 }
 
 const day = (iso: string) => iso.slice(0, 10);
@@ -70,12 +70,22 @@ export function Proof() {
             MUTATION <b>{mutation.score.toFixed(1)}%</b> · ENGINE
           </span>
         )}
-        {proof.claims.map((c) => (
-          <span key={c.id} data-stat={c.id}>
-            {c.label}
-          </span>
-        ))}
       </div>
+      {/* Each claim names the tests that back it; a claim exists only if they passed in this build. */}
+      <ul className={styles.claims} data-testid="proof-claims">
+        {proof.claims.map((c) => (
+          <li key={c.id} data-claim={c.id}>
+            <span className={styles.claimLabel}>{c.label}</span>
+            <span>
+              {c.tests.map((t) => (
+                <span key={t.title} className={styles.claimTest} title={`${t.file}: ${t.title}`}>
+                  {t.name} <span className={styles.passed}>✓</span>{" "}
+                </span>
+              ))}
+            </span>
+          </li>
+        ))}
+      </ul>
       <details className={styles.layer} data-testid="proof-layer">
         <summary>
           <span className={styles.plus} aria-hidden />

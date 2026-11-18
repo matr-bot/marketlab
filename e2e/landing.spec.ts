@@ -59,10 +59,15 @@ test("the hero replays the Fed hike from the real engine: calm, HIKE, panic in W
   const chart = replay.getByTestId("chart");
   await expect(chart).toHaveAttribute("data-markers", "", { timeout: 5_000 }); // calm before the hike
   await expect(chart).toHaveAttribute("data-markers", "HIKE", { timeout: 15_000 });
+  // The log beside it is the desk's own lines for this run, and the chart shows about three minutes.
+  await expect(page.getByTestId("replay-log")).toContainText("RATES +0.75", { timeout: 5_000 });
+  const span = await chart.getAttribute("data-markers");
+  expect(span).toBe("HIKE");
   const panic = replay.locator("tr[data-type=panic]");
   await expect(panic).not.toHaveAttribute("data-zero", /.*/, { timeout: 10_000 }); // panic sellers traded
   await expect(replay).toHaveAttribute("data-loop", "1", { timeout: 30_000 }); // a new loop: a RERUN
   await expect(chart).toHaveAttribute("data-markers", "", { timeout: 5_000 });
+  await expect(page.getByTestId("replay-log")).not.toContainText("RATES +0.75"); // the log restarts with the loop
 });
 
 test("PROOF shows exactly the numbers in proof.json, and its claims with the tests behind them (D-085)", async ({ page, request }) => {
@@ -73,7 +78,11 @@ test("PROOF shows exactly the numbers in proof.json, and its claims with the tes
   await expect(stats.locator("[data-stat=browser]")).toHaveText(`${proof.browser.listed} BROWSER TESTS · CI`);
   if (proof.mutation?.score != null) await expect(stats.locator("[data-stat=mutation]")).toHaveText(`MUTATION ${proof.mutation.score.toFixed(1)}% · ENGINE`);
   else await expect(stats.locator("[data-stat=mutation]")).toHaveCount(0);
-  for (const c of proof.claims) await expect(stats.locator(`[data-stat=${c.id}]`)).toHaveText(c.label);
+  for (const c of proof.claims) {
+    const row = page.getByTestId("proof-claims").locator(`[data-claim=${c.id}]`);
+    await expect(row).toContainText(c.label);
+    for (const t of c.tests) await expect(row).toContainText(`${t.name} ✓`); // named, from proof.json
+  }
   expect(proof.unit.failed).toBe(0);
   await page.getByTestId("proof-layer").locator("summary").click();
   await expect(page.getByTestId("proof-layer")).toContainText(proof.claims[0].tests[0].title);

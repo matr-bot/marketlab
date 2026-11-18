@@ -5,6 +5,7 @@ import { FREE_PLAY, parseSeed, scenarioById } from "@/engine/scenarios";
 import type { AgentModel } from "@/lib/models";
 import { sessionLink } from "@/lib/sessionLink";
 import { KeyHint } from "../terminal/KeyHint";
+import { HeroReplay } from "./HeroReplay";
 import term from "../terminal/terminal.module.css";
 import styles from "./landing.module.css";
 
@@ -39,17 +40,15 @@ export function Landing({
   models,
   scenarios,
   build,
-  hero,
   proof,
 }: {
   initialSeed: number;
   demoSeed: number;
   agents: number;
   models: ReadonlyArray<AgentModel & { count: number }>;
+  /** The launcher's scenarios (the contest demo script is left out, D-087; `SCN demo` still opens it). */
   scenarios: readonly ScenarioItem[];
   build: { version: string; sha: string };
-  /** The replay of the FED moment (step 6c); not drawn until it ships. */
-  hero?: ReactNode;
   /** The generated proof (step 6d); not drawn until it ships. */
   proof?: ReactNode;
 }) {
@@ -94,8 +93,10 @@ export function Landing({
         <span className={styles.dim}>SIMULATED EXCHANGE · NO REAL MONEY</span>
       </header>
 
-      <section className={styles.hero} aria-label="MarketLab">
-        <div className={styles.heroText}>
+      <HeroReplay
+        seed={demoSeed}
+        intro={
+          <>
           <h1 className={styles.h1}>A stock market you can break.</h1>
           <p className={styles.lede} data-testid="hero-line">
             {agents} trading agents, one real order book, every price explainable.
@@ -104,9 +105,9 @@ export function Landing({
             OPEN TERMINAL
             <KeyHint k="↵" />
           </a>
-        </div>
-        {hero}
-      </section>
+          </>
+        }
+      />
 
       <section className={styles.section} aria-labelledby="problem">
         <h2 id="problem" className={styles.h2}>

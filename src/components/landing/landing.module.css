@@ -1,7 +1,9 @@
 /* The landing page (D-083): the terminal's tokens and font, anchored top-left, no gradients, no
    illustrations, no cards. Amber only on OPEN TERMINAL. */
 .page {
+  /* A centred column (D-087): no empty right side on a wide screen. */
   max-width: 1120px;
+  margin: 0 auto;
   padding: 16px 24px 32px;
   display: flex;
   flex-direction: column;
@@ -42,7 +44,8 @@
 }
 
 .h1 {
-  font-size: var(--fs-hero);
+  font-size: var(--fs-display);
+  line-height: 1.15;
   font-weight: 700;
 }
 
@@ -51,6 +54,65 @@
 }
 
 /* The one amber element on this page. */
+/* The replay's event log: the desk narrator's lines for this run, oldest first (D-087). */
+.replayLog {
+  margin-top: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 160px;
+}
+
+.replayLogHead {
+  color: var(--label);
+  font-size: var(--fs-label);
+  letter-spacing: 0.08em;
+}
+
+.replayLine {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 8px;
+  font-size: var(--fs-label);
+  line-height: 1.4;
+}
+
+.replayTime {
+  color: var(--data);
+}
+
+/* Each claim with the tests that back it (D-087). */
+.claims {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.claims li {
+  display: grid;
+  grid-template-columns: 192px minmax(0, 1fr);
+  gap: 12px;
+  font-size: var(--fs-label);
+}
+
+.claimLabel {
+  color: var(--data);
+  letter-spacing: 0.06em;
+}
+
+.claimTest {
+  display: block;
+  color: var(--label);
+}
+
+/* ✓: the claim's tests passed in this build. White, not green: green means price direction only. */
+.passed {
+  color: var(--data);
+}
+
 .openTerminal {
   align-self: flex-start;
   background: var(--accent);
@@ -284,7 +346,7 @@
 
 .stats b {
   color: var(--data);
-  font-size: var(--fs-data);
+  font-size: var(--fs-stat);
   font-weight: 700;
 }
 

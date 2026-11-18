@@ -49,6 +49,9 @@ export const TYPE = {
   fsLabel: "11px",
   fsData: "13px",
   fsHero: "22px",
+  /** The landing page only (D-087): its headline and its proof figures. */
+  fsDisplay: "36px",
+  fsStat: "28px",
 } as const;
 
 /**

@@ -27,7 +27,7 @@ try {
 const unitReport = JSON.parse(readFileSync(unitOut, "utf8"));
 rmSync(unitOut, { force: true });
 const unit = summarizeUnit(unitReport);
-const tests = unitReport.testResults.flatMap((f) => f.assertionResults.map((a) => ({ file: relative(process.cwd(), f.name), title: a.fullName, status: a.status })));
+const tests = unitReport.testResults.flatMap((f) => f.assertionResults.map((a) => ({ file: relative(process.cwd(), f.name), title: a.fullName, name: a.title, status: a.status })));
 
 // Browser tests: listed (they run in CI on every push, not in this build).
 let browser = null;

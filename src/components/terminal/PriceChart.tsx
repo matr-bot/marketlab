@@ -34,14 +34,14 @@ interface Geometry {
 }
 
 /** The chart's layout (D-079), or null when there is nothing to draw yet. Pure: no drawing. */
-function layout(w: number, h: number, candles: readonly Candle[], candleMs: number, last: number | null, headlines: readonly FrameHeadline[], zoom: boolean): Geometry | null {
+function layout(w: number, h: number, candles: readonly Candle[], candleMs: number, last: number | null, headlines: readonly FrameHeadline[], zoom: boolean, maxSlot: number): Geometry | null {
   const plotW = w - AXIS_W;
   const plotH = h - TIME_H;
-  if (candles.length === 0 || plotW <= MAX_SLOT || plotH <= 20) return null;
+  if (candles.length === 0 || plotW <= maxSlot || plotH <= 20) return null;
   // Candles positioned by time, newest at the right edge; an interval with no trades is a gap.
   const newest = candles[candles.length - 1].start;
   const span = (newest - candles[0].start) / candleMs + 1; // candle slots from the oldest we have to now
-  const slot = Math.max(MIN_SLOT, Math.min(MAX_SLOT, Math.floor((plotW - 4) / span)));
+  const slot = Math.max(MIN_SLOT, Math.min(maxSlot, Math.floor((plotW - 4) / span)));
   const body = slot - 1 - ((slot - 1) % 2 === 0 ? 1 : 0); // odd, so the wick is centered; a 1-2px gap between bodies
   const fits = Math.floor((plotW - 4) / slot);
   const visible = candles.filter((c) => (newest - c.start) / candleMs < fits);
@@ -74,6 +74,7 @@ export function PriceChart({
   selected = null,
   onSelect,
   readout = true,
+  maxSlot = MAX_SLOT,
 }: {
   candles: readonly Candle[];
   candleMs: number;
@@ -84,6 +85,8 @@ export function PriceChart({
   onSelect?: (start: number | null) => void;
   /** The OHLCV readout top-left; off for the small chart in the STRATEGY workspace's corner (D-086). */
   readout?: boolean;
+  /** Widest candle slot in px; the landing replay widens it so three minutes fill the chart (D-087). */
+  maxSlot?: number;
 }) {
   const boxRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -101,7 +104,7 @@ export function PriceChart({
     return () => observer.disconnect();
   }, []);
 
-  const geometry = useMemo(() => (size.w === 0 || size.h === 0 ? null : layout(size.w, size.h, candles, candleMs, last, headlines, zoom)), [size, candles, candleMs, last, headlines, zoom]);
+  const geometry = useMemo(() => (size.w === 0 || size.h === 0 ? null : layout(size.w, size.h, candles, candleMs, last, headlines, zoom, maxSlot)), [size, candles, candleMs, last, headlines, zoom, maxSlot]);
 
   useEffect(() => {
     const canvas = canvasRef.current;

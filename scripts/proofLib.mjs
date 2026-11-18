@@ -46,12 +46,12 @@ export const CLAIMS = [
 
 /**
  * Which claims their tests back.
- * @param {Array<{ file: string, title: string, status: string }>} tests every test, file relative to the repo
+ * @param {Array<{ file: string, title: string, name?: string, status: string }>} tests every test, file relative to the repo; `title` is the full name (describe blocks included), `name` the test's own
  */
 export function backedClaims(tests) {
   return CLAIMS.flatMap((c) => {
     const found = c.tests.map((t) => tests.find((x) => x.file === t.file && t.title.test(x.title)));
     if (found.some((f) => f === undefined || f.status !== "passed")) return [];
-    return [{ id: c.id, label: c.label, tests: found.map((f) => ({ file: f.file, title: f.title })) }];
+    return [{ id: c.id, label: c.label, tests: found.map((f) => ({ file: f.file, title: f.title, name: f.name ?? f.title })) }];
   });
 }

@@ -16,6 +16,8 @@ describe("proof numbers are computed from reports (D-085)", () => {
   it("shows a claim only when every test behind it was found and passed", () => {
     const all = CLAIMS.flatMap((c) => c.tests.map((t) => ({ file: t.file, title: `x ${t.title.source.replace(/\\/g, "")} x`, status: "passed" })));
     expect(backedClaims(all).map((c) => c.id)).toEqual(["replay", "money", "network"]);
+    expect(backedClaims(all.map((t) => ({ ...t, name: "own name" })))[0].tests[0].name).toBe("own name"); // the test's own name, for the page
+    expect(backedClaims(all)[0].tests[0].name).toBe(all[0].title); // without one, the full name
     const oneFailed = all.map((t, i) => (i === 0 ? { ...t, status: "failed" } : t));
     expect(backedClaims(oneFailed).map((c) => c.id)).toEqual(["money", "network"]);
     expect(backedClaims(all.slice(1)).map((c) => c.id)).toEqual(["money", "network"]);

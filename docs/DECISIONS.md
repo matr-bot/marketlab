@@ -2192,3 +2192,22 @@ A judge should be able to check every figure on the landing page, so none of the
   drop their key hints too, and an e2e test checks the strip's last control is inside it while paused.
   The chart's axis labels scale with its height (at most one per 24px), so the corner chart's labels
   do not overlap.
+
+## D-087 · Landing fixes after the live review
+
+**Date:** 2026-11-18 · **Status:** Accepted (refines D-083 to D-085)
+
+- **Centred:** the 1120px column is centred, so a wide screen has no empty right side.
+- **Hero:** the headline is 36px (`--fs-display`, a landing-only size). Beside OPEN TERMINAL, a replay
+  log shows the desk narrator's own lines for the replayed run (RATES +0.75 vs +0.25 expected → fair
+  value −3.0%, panic selling has started, value traders sold …), oldest first, synced to the replay and
+  restarting with each loop: the same engine data as DESK, not a paraphrase. The chart shows the last
+  three minutes, with candles widened (`maxSlot`) to fill it, so the calm stands before the crash.
+- **PROOF:** each claim lists the tests that back it by their own names with a ✓ (white, not green:
+  green is price direction), all from `proof.json`; the stat figures are 28px (`--fs-stat`).
+- **Launcher:** the contest demo script (`demo`, two releases in 2½ minutes) is left out of the
+  launcher list; `SCN demo` and `?scn=demo` links still open it. It and "Hypothetical macro day" (four
+  releases over about 20 minutes, a class exercise) kept nearly the same title. Their titles live in
+  the engine's scenario data, which this UI work does not change.
+- **Footer SHA:** `next.config.ts` reads the commit when the server starts, so a dev server shows the
+  commit it was started on; a production build reads it at build time (verified below).

@@ -1949,3 +1949,22 @@ layout now gives the space to data and shows the rest on demand.
   the SESSION popover and still work typed.
 - **BOOK row height is 18px** (one 13px data line, D-070); at 16px the rows overflowed the panel on
   short screens. BOOK keeps room for at least one level a side.
+
+## D-075 · Step 4c: TKT tabs ORDER | FILLS | OPEN; EXR is FILLS
+
+**Date:** 2026-11-18 · **Status:** Accepted
+
+Once EXR appeared as its own panel, the right column was crowded: BOOK fell to one level a side and
+the ticket's last line was clipped.
+- **TKT has three tabs** (`TicketDesk.tsx`): ORDER (the ticket, the estimate and SEND), FILLS (the
+  execution report; the EXR panel is gone) and OPEN (the student's resting limit orders, as a B/S, QTY,
+  PX table, with CANCEL ALL; moved off ORDER). BOOK gets its height back.
+- **Counts on tabs:** FILLS shows the orders that filled since the student last looked at FILLS (it
+  counts as seen on opening or leaving it); OPEN shows how many orders rest. A fill never switches the
+  tab, so SEND never disappears under the student.
+- **Codes:** `TKT` opens ORDER, `EXR` opens FILLS; both put the amber border on TKT. EXR is always
+  available (an empty FILLS is a gray "—"), so the `NO FILLS YET` reply from D-074 is gone. With
+  D-074's drawer codes and the grid codes, every function code now routes to a fixed place.
+- **Units once:** FILLS's cost columns are in basis points, said once in the TKT header (`BPS`), so the
+  column is `SLIP`, not a wrapped `SLIP BPS`.
+- The Learn-mode estimate no longer runs under SEND: ORDER has the room the open-orders list used.

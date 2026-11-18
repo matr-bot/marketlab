@@ -43,7 +43,7 @@ export function ExecPanel({ exr }: { exr: FrameExecution | null }) {
               <th title="Average price you got.">AVG</th>
               {learn && <th title="The mid price when your order arrived: the price you intended.">ARR MID</th>}
               {learn && <th title="Total slippage, cents per share: average price vs the arrival mid. Positive is a cost.">SLIP ¢/SH</th>}
-              <th title="Total slippage in basis points (hundredths of a percent) of the order's value at the arrival mid. Positive is a cost.">SLIP BPS</th>
+              <th title="Total slippage in basis points (hundredths of a percent) of the order's value at the arrival mid. Positive is a cost.">SLIP</th>
               <th title="Basis points paid just to cross from the mid to the best price on the other side.">SPREAD</th>
               <th title="Basis points your own size cost beyond the best price: the order pushing the price against itself.">IMPACT</th>
             </tr>

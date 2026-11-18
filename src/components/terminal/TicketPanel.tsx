@@ -90,7 +90,6 @@ export function TicketPanel({ frame, lastEvent, paused, onCommand }: { frame: Fr
   }
 
   const { desk } = frame;
-  const open = desk.openOrders;
   return (
     <div className={styles.ticket} data-testid="ticket">
       <Explain id="tkt.simulated" />
@@ -217,23 +216,6 @@ export function TicketPanel({ frame, lastEvent, paused, onCommand }: { frame: Fr
         </div>
       )}
 
-      <div className={styles.openOrders}>
-        <div className={styles.openHead}>
-          <span className={styles.label}>OPEN ORDERS ({open.length})</span>
-          {open.length > 0 && (
-            <button type="button" className={styles.chip} data-testid="ticket-cancel" onClick={() => onCommand("CANCEL")}>
-              CANCEL ALL
-            </button>
-          )}
-        </div>
-        {open.slice(0, 3).map((o) => (
-          <div key={o.id} className={styles.openRow}>
-            {o.side.toUpperCase()} {formatQty(o.qty)} @ {formatPrice(o.price)}
-          </div>
-        ))}
-        {open.length > 3 && <div className={styles.dim}>+{open.length - 3} more</div>}
-      </div>
-
       {/* The outcome of the last order; not drawn until there is one (D-073). */}
       {lastEvent !== null ? (
         <div className={styles.lastMessage} data-testid="ticket-message">
@@ -241,6 +223,43 @@ export function TicketPanel({ frame, lastEvent, paused, onCommand }: { frame: Fr
         </div>
       ) : (
         <Explain id="tkt.messages" />
+      )}
+    </div>
+  );
+}
+
+/** OPEN (D-075): the student's resting limit orders, newest last, with CANCEL ALL. */
+export function OpenOrders({ orders, onCommand }: { orders: Frame["desk"]["openOrders"]; onCommand: (text: string) => void }) {
+  return (
+    <div className={styles.openOrders} data-testid="open-orders">
+      {orders.length === 0 ? (
+        <div className={styles.dim}>—</div>
+      ) : (
+        <>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>B/S</th>
+                <th>QTY</th>
+                <th>PX</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.map((o) => (
+                <tr key={o.id} data-testid="open-row">
+                  <td>{o.side === "buy" ? "B" : "S"}</td>
+                  <td>{formatQty(o.qty)}</td>
+                  <td>{formatPrice(o.price)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className={styles.formRow}>
+            <button type="button" className={styles.chip} data-testid="ticket-cancel" onClick={() => onCommand("CANCEL")}>
+              CANCEL ALL
+            </button>
+          </div>
+        </>
       )}
     </div>
   );

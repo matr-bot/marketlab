@@ -47,7 +47,8 @@ test("the demo: a strategy in plain English trades through FED, shows in EXR, an
   await expect(page.getByTestId("strat-last")).toContainText("ENTRY: BUY 500", { timeout: 20_000 });
   await expect(page.getByTestId("strat-position")).toHaveText("+500");
 
-  // 3. REALITY CHECK: the strategy's order in EXR, with its cost split.
+  // 3. REALITY CHECK: the strategy's order in EXR (the ticket's FILLS tab, D-075), with its cost split.
+  await page.getByTestId("ticket-tab-FILLS").click();
   await expect(page.getByTestId("exr-src").first()).toHaveText("STRAT");
   await expect(page.getByTestId("exr-total")).toContainText("SPREAD");
 

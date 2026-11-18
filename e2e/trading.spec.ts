@@ -29,14 +29,22 @@ test("a market order fills and the execution report splits its cost", async ({ p
   const errors = watchErrors(page);
   await page.goto("/");
   await expect(page.getByTestId("last-price")).toBeVisible({ timeout: 8_000 });
-  await expect(page.locator("[data-panel=EXR]")).toHaveCount(0); // no fills, no EXR panel (D-074)
+  // EXR is the ticket's FILLS tab (D-075): no count before any fill.
+  await expect(page.getByTestId("ticket-tab-FILLS")).toHaveText("FILLS");
 
   await page.keyboard.type("BUY 500");
   await page.keyboard.press("Enter");
-  await expect(page.getByTestId("exr-row").first()).toBeVisible({ timeout: 8_000 });
+  await expect(page.getByTestId("ticket-position")).toContainText("500", { timeout: 8_000 });
+  await expect(page.getByTestId("ticket-tab-FILLS")).toHaveText("FILLS1"); // one unseen fill
+  await page.keyboard.type("EXR");
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("exr-row").first()).toBeVisible();
+  await expect(page.getByTestId("ticket-tab-FILLS")).toHaveText("FILLS");
   await expect(page.getByTestId("exr-total")).toContainText("SLIP");
   await expect(page.getByTestId("exr-total")).toContainText("IMPACT");
-  await expect(page.getByTestId("ticket-position")).toContainText("500");
+  await page.keyboard.type("TKT");
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("ticket-send")).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -84,7 +92,7 @@ test("a headline that starts with a command word goes to the AI preview, and NEW
   await page.keyboard.type("Buy now, pay later lender collapses");
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("news")).toHaveAttribute("data-phase", "preview"); // not parsed as an order
-  await expect(page.locator("[data-panel=EXR]")).toHaveCount(0);
+  await expect(page.getByTestId("ticket-tab-FILLS")).toHaveText("FILLS"); // no fill
 
   await page.keyboard.press("Enter"); // the empty bar applies the preview
   await expect(page.getByTestId("news")).toHaveAttribute("data-phase", "applied");

@@ -7,16 +7,13 @@ async function command(page: Page, text: string) {
   await page.getByTestId("command-input").press("Enter");
 }
 
-test("free play opens with the drawer collapsed to its tab row, and no empty EXR", async ({ page }) => {
+test("free play opens with the drawer collapsed to its tab row", async ({ page }) => {
   await page.goto("/?seed=187");
   await expect(page.getByTestId("last-price")).toBeVisible();
   const drawer = page.getByTestId("drawer");
   await expect(drawer).not.toHaveAttribute("data-open", /.*/);
   expect((await drawer.boundingBox())!.height).toBeLessThan(30);
   for (const id of ["strat", "chat", "news-panel"]) await expect(page.getByTestId(id)).toHaveCount(0);
-  await expect(page.locator("[data-panel=EXR]")).toHaveCount(0);
-  await command(page, "EXR");
-  await expect(page.getByTestId("command-reply")).toHaveText("EXR · NO FILLS YET");
   // Grid panels: chart, tape, WHO, book, ticket. GP is active (amber border).
   for (const code of ["GP", "TAPE", "WHO", "BOOK", "TKT"]) await expect(page.locator(`[data-panel=${code}]`)).toBeVisible();
   await expect(page.locator("[data-panel=GP]")).toHaveAttribute("data-active", "true");
@@ -66,12 +63,33 @@ test("STRATEGY, DESK and NEWS tabs, and the function codes route to them", async
   await expect(page.locator("[data-panel=GP]")).not.toHaveAttribute("data-active", /.*/);
 });
 
-test("a scenario opens the drawer on NEWS; the first fill brings EXR", async ({ page }) => {
+test("a scenario opens the drawer on NEWS; a fill shows on the ticket's FILLS tab", async ({ page }) => {
   await page.goto("/?scn=rate-shock&seed=4101");
   await expect(page.getByTestId("last-price")).toBeVisible();
   await expect(page.getByTestId("drawer").locator("[data-pane=NEWS]")).toBeVisible();
   await expect(page.getByTestId("scenario-title")).toBeVisible();
   await command(page, "BUY 100");
-  await expect(page.locator("[data-panel=EXR]")).toBeVisible({ timeout: 8_000 });
+  await expect(page.getByTestId("ticket-tab-FILLS")).toHaveText("FILLS1", { timeout: 8_000 });
+  await command(page, "EXR");
+  await expect(page.locator("[data-panel=TKT]")).toHaveAttribute("data-active", "true");
   await expect(page.getByTestId("exr-row")).toHaveCount(1);
+});
+
+test("TKT tabs: ORDER, FILLS (EXR) and OPEN, with resting orders and CANCEL ALL on OPEN (D-075)", async ({ page }) => {
+  await page.goto("/?seed=187");
+  await expect(page.getByTestId("last-price")).toBeVisible();
+  await command(page, "PAUSE");
+  await command(page, "BUY 100 @ 150.00"); // far below the market: rests
+  await command(page, "RUN");
+  await expect(page.getByTestId("ticket-tab-OPEN")).toHaveText("OPEN1");
+  await page.getByTestId("ticket-tab-OPEN").click();
+  await expect(page.getByTestId("open-row")).toHaveText(/B\s*100\s*150\.00/);
+  await page.getByTestId("ticket-cancel").click();
+  await expect(page.getByTestId("open-row")).toHaveCount(0);
+  await expect(page.getByTestId("ticket-tab-OPEN")).toHaveText("OPEN");
+  await command(page, "EXR");
+  await expect(page.getByTestId("ticket-tab-FILLS")).toHaveAttribute("aria-selected", "true");
+  await command(page, "TKT");
+  await expect(page.getByTestId("ticket-tab-ORDER")).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByTestId("ticket-send")).toBeVisible();
 });

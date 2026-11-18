@@ -49,13 +49,30 @@
 
 /* The ticket's form is about 300px; on a short screen it shrinks and scrolls, SEND pinned to its bottom. */
 .rightCol > .tkt {
-  flex: 0 1 300px;
-  min-height: 200px;
+  flex: 0 1 330px;
+  min-height: 220px;
 }
 
-.exr {
-  flex: 0 0 30%;
+/* TKT tabs: ORDER | FILLS | OPEN (D-075). */
+.ticketDesk {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
 }
+
+.subTabs {
+  display: flex;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.ticketBody {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
 
 .tape,
 .whoArea {
@@ -873,8 +890,10 @@
 }
 
 .openOrders {
-  border-top: 1px solid var(--border);
-  padding-top: 4px;
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  padding: 4px 8px;
 }
 
 .openHead {

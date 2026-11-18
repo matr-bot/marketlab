@@ -28,7 +28,7 @@ describe("abbreviation dictionary (D-072)", () => {
   it("finds the labels it checks", () => {
     const texts = labels().map((l) => l.text);
     expect(texts.length).toBeGreaterThan(30);
-    for (const t of ["QTY", "PX", "AVG", "P&L", "B/S", "SLIP BPS"]) expect(texts).toContain(t);
+    for (const t of ["QTY", "PX", "AVG", "P&L", "B/S", "SLIP", "SLIP ¢/SH"]) expect(texts).toContain(t);
   });
 
   it("explains every term, and every long form points at a term", () => {

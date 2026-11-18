@@ -34,7 +34,7 @@ import { SessionPopover } from "./SessionPopover";
 import { StatusBar } from "./StatusBar";
 import { StrategyPanel, type StratSource, type StratState } from "./StrategyPanel";
 import { TapePanel } from "./TapePanel";
-import { TicketPanel } from "./TicketPanel";
+import { TicketDesk, type TicketTab } from "./TicketDesk";
 import styles from "./terminal.module.css";
 import { useMarket, type RunSpec } from "./useMarket";
 import { WhoPanel } from "./WhoPanel";
@@ -51,7 +51,7 @@ interface Run {
 }
 
 /** The panels on the fixed grid, plus the drawer (D-074). The active one has the amber border. */
-type PanelId = "GP" | "TAPE" | "WHO" | "BOOK" | "TKT" | "EXR" | "DRAWER";
+type PanelId = "GP" | "TAPE" | "WHO" | "BOOK" | "TKT" | "DRAWER";
 /** Desk messages that open a collapsed drawer: a headline always, panic and vacuum unless the student collapsed it since (D-074). */
 const DRAWER_KINDS: ReadonlySet<string> = new Set(["headline", "panic", "vacuum"]);
 
@@ -124,6 +124,9 @@ export function Terminal() {
   const [whoWindow, setWhoWindow] = useState<Attribution | null>(null);
   const [selectedCandle, setSelectedCandle] = useState<number | null>(null);
   const [active, setActive] = useState<PanelId>("GP");
+  const [ticketTab, setTicketTabState] = useState<TicketTab>("ORDER");
+  /** Orders in the execution report the student has seen on FILLS (D-075). */
+  const [fillsSeen, setFillsSeen] = useState(0);
   // The drawer: collapsed in free play; open on NEWS when a scenario opens (its brief, task and calendar).
   const scenarioOnLoad = initial !== null && initial.run.scenario.id !== FREE_PLAY.id;
   const [drawerOpen, setDrawerOpen] = useState(scenarioOnLoad);
@@ -195,22 +198,35 @@ export function Terminal() {
     setDrawerOpen((o) => !o);
   };
 
+  // FILLS counts as seen when the student opens it or leaves it.
+  const fillCount = market?.exr?.orders.length ?? 0;
+  const setTicketTab = useCallback(
+    (tab: TicketTab) => {
+      if (tab === "FILLS" || ticketTab === "FILLS") setFillsSeen(fillCount);
+      setTicketTabState(tab);
+    },
+    [ticketTab, fillCount],
+  );
+
   /**
-   * A function code (D-074): STRAT, CHAT and NEWS open the drawer (CHAT on the DESK side); the panels on
-   * the grid take the amber border. False if there is nothing to show (EXR before any fill).
+   * A function code (D-074, D-075): STRAT, CHAT and NEWS open the drawer (CHAT on the DESK side); TKT
+   * and EXR open the ticket's ORDER and FILLS tabs; the panels on the grid take the amber border.
    */
   const open = useCallback(
-    (code: FunctionCode): boolean => {
+    (code: FunctionCode) => {
       if (code === "STRAT" || code === "CHAT" || code === "NEWS") {
         openDrawer(code === "STRAT" ? undefined : code === "CHAT" ? "DESK" : "NEWS");
         setActive("DRAWER");
-        return true;
+        return;
       }
-      if (code === "EXR" && (market?.exr?.orders.length ?? 0) === 0) return false;
+      if (code === "TKT" || code === "EXR") {
+        setTicketTab(code === "TKT" ? "ORDER" : "FILLS");
+        setActive("TKT");
+        return;
+      }
       setActive(code);
-      return true;
     },
-    [openDrawer, market],
+    [openDrawer, setTicketTab],
   );
 
   const apply = useCallback(() => {
@@ -272,6 +288,7 @@ export function Terminal() {
     // The new market's desk messages and headlines start again from zero.
     handledChat.current = null;
     setSeen({ desk: -1, news: 0 });
+    setFillsSeen(0);
     showRunInAddressBar(next.scenario, next.seed, learn);
   };
 
@@ -305,7 +322,8 @@ export function Terminal() {
         await interpretHeadline(cmd.headline);
         return;
       case "open":
-        say(open(cmd.code) ? "" : `${cmd.code} · NO FILLS YET`);
+        open(cmd.code);
+        say("");
         return;
       case "strategy":
         if (cmd.text === "") {
@@ -470,7 +488,12 @@ export function Terminal() {
       case "BOOK":
         return { label: `${frame.ticker} DEPTH`, meta: frame.ticker, body: <BookPanel frame={frame} /> };
       case "TKT":
-        return { label: "ORDER TICKET", body: <TicketPanel frame={frame} lastEvent={latestEvent} paused={paused} onCommand={onCommand} /> };
+        return {
+          label: "ORDER TICKET",
+          // FILLS: its cost columns are in basis points, said once in the header (D-075).
+          meta: ticketTab === "FILLS" ? "BPS" : undefined,
+          body: <TicketDesk tab={ticketTab} onTab={setTicketTab} frame={frame} exr={m.exr} fillsUnread={Math.max(0, (m.exr?.orders.length ?? 0) - fillsSeen)} lastEvent={latestEvent} paused={paused} onCommand={onCommand} />,
+        };
       case "STRAT":
         return {
           label: "STRATEGY",
@@ -492,6 +515,7 @@ export function Terminal() {
       case "NEWS":
         return { label: "SCENARIO & HEADLINES", body: <NewsPanel scenario={scenario} market={m} onCommand={onCommand} /> };
       case "EXR":
+        // Not a panel of its own any more: the ticket's FILLS tab (D-075).
         return { label: "EXECUTION REPORT", body: <ExecPanel exr={m.exr} /> };
     }
   };
@@ -505,7 +529,6 @@ export function Terminal() {
       </Panel>
     );
   };
-  const exrShown = (m.exr?.orders.length ?? 0) > 0;
   const unread = { DESK: chat.filter((c) => c.seq > seen.desk).length, NEWS: Math.max(0, headlines.length - seen.news) };
 
   return (
@@ -528,7 +551,6 @@ export function Terminal() {
         <div className={styles.rightCol}>
           {panelFor("BOOK", styles.book)}
           {panelFor("TKT", styles.tkt)}
-          {exrShown && panelFor("EXR", styles.exr)}
         </div>
       </main>
       <Drawer

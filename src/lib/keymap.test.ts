@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { globalAction, isTyping, KEYMAP, ticketAction } from "./keymap";
+import { globalAction, isTyping, KEYMAP, ticketAction, workspaceKey } from "./keymap";
 
 const none = { ctrl: false, meta: false, alt: false };
 const input = { tagName: "INPUT" } as unknown as EventTarget;
@@ -30,5 +30,13 @@ describe("keymap (D-080)", () => {
   it("lists every global key in the table HELP shows", () => {
     const keys = KEYMAP.map((k) => k.keys);
     for (const k of ["␣", "F1", "F2", "F3", "F4", "B · S", "M · L"]) expect(keys).toContain(k);
+  });
+
+  it("switches workspaces with Alt/Option + 1 or 2, by physical key (D-086)", () => {
+    const alt = { ...none, alt: true };
+    expect([workspaceKey("Digit1", alt), workspaceKey("Digit2", alt), workspaceKey("Digit3", alt)]).toEqual(["TRADE", "STRATEGY", null]);
+    expect(workspaceKey("Digit1", none)).toBeNull();
+    expect(workspaceKey("Digit2", { ...alt, meta: true })).toBeNull();
+    expect(KEYMAP.map((k) => k.keys)).toContain("⌥1 · ⌥2");
   });
 });

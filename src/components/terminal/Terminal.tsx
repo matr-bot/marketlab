@@ -10,7 +10,7 @@ import { FREE_PLAY, resolveRun, SCENARIOS, scenarioById, type Scenario } from "@
 import type { UserQueueResult } from "@/engine/simulation";
 import { clampStrategy, type StrategySpec } from "@/engine/strategy";
 import { parseCommand, type FunctionCode } from "@/lib/command";
-import { globalAction } from "@/lib/keymap";
+import { globalAction, workspaceKey, type Workspace } from "@/lib/keymap";
 import { formatSimTime } from "@/engine/simClock";
 import { formatInterval } from "@/lib/format";
 import type { RunData } from "@/lib/glassbox/python";
@@ -24,7 +24,7 @@ import { ChatPanel } from "./ChatPanel";
 import { CommandBar } from "./CommandBar";
 import { ExecPanel } from "./ExecPanel";
 import { Drawer, type DrawerMode, type DrawerSide } from "./Drawer";
-import { download, GlassBox } from "./GlassBox";
+import { download, GlassBoxBody } from "./GlassBox";
 import { HelpOverlay } from "./HelpOverlay";
 import { LearnContext } from "./Learn";
 import { NewsPanel } from "./NewsPanel";
@@ -33,6 +33,9 @@ import { Playback } from "./Playback";
 import { PriceChart } from "./PriceChart";
 import { SessionPopover } from "./SessionPopover";
 import { StatusBar } from "./StatusBar";
+import { StrategyWorkspace } from "./StrategyWorkspace";
+import { Explain } from "./Learn";
+import { WorkspaceTabs } from "./WorkspaceTabs";
 import { StrategyPanel, type StratSource, type StratState } from "./StrategyPanel";
 import { TapePanel } from "./TapePanel";
 import { TicketDesk, type TicketTab } from "./TicketDesk";
@@ -143,7 +146,10 @@ export function Terminal() {
   const [strat, setStrat] = useState<StratState>({ phase: "compose", message: null });
   /** The English behind the strategy that was started: what the glass box quotes. */
   const [built, setBuilt] = useState<{ text: string; source: StratSource; reason: string } | null>(null);
-  const [glassOpen, setGlassOpen] = useState(false);
+  /** TRADE (the terminal) or STRATEGY (builder, glass box, results), D-086. */
+  const [workspace, setWorkspace] = useState<Workspace>("TRADE");
+  /** The strategy's equity per sim second, as the engine recorded it (D-086). */
+  const [equity, setEquity] = useState<readonly number[]>([]);
   const pendingApply = useRef(false);
   const wantRunData = useRef(false);
   const latestSeqRef = useRef(-1);
@@ -165,6 +171,7 @@ export function Terminal() {
   const onWho = useCallback((a: Attribution) => setWhoWindow(a), []);
   const onRunData = useCallback(
     (data: RunData | null) => {
+      setEquity(data?.equity ?? []);
       if (!wantRunData.current) return;
       wantRunData.current = false;
       if (data === null) say("No run data yet: the strategy has not seen a price.");
@@ -174,6 +181,12 @@ export function Terminal() {
   );
   const spec: RunSpec | null = run === null ? null : { seed: run.seed, scenarioId: run.scenario.id, runId: run.runId, strategy: run.strategy };
   const { status, sendShock, sendRelease, sendParams, requestWho, sendCustomShock, sendOrder, sendCancel, sendStrategy, sendStopStrategy, requestRunData } = useMarket(spec, { speed, paused }, { onShockResult, onOrderResult, onWho, onRunData });
+  // The equity curve (D-086): each time the engine records a second of equity, fetch its record. Sampled by
+  // the engine at exact sim seconds, so the same seed and spec give the same curve; runs in TRADE too.
+  const equityPoints = status.kind === "live" ? (status.market.strategy?.points ?? 0) : 0;
+  useEffect(() => {
+    if (equityPoints > 0) requestRunData();
+  }, [equityPoints, requestRunData]);
 
   const market = status.kind === "live" ? status.market : null;
   const latestEvent = market?.userEvents.at(-1) ?? null;
@@ -297,6 +310,7 @@ export function Terminal() {
     // The new market's desk messages and headlines start again from zero.
     handledChat.current = null;
     setSeen({ desk: -1, news: 0 });
+    setEquity([]);
     setFillsSeen(0);
     showRunInAddressBar(next.scenario, next.seed, learn);
   };
@@ -453,6 +467,12 @@ export function Terminal() {
   const globalKeys = useRef<(e: KeyboardEvent) => void>(() => undefined);
   useEffect(() => {
     globalKeys.current = (e: KeyboardEvent) => {
+      const ws = workspaceKey(e.code, { ctrl: e.ctrlKey, meta: e.metaKey, alt: e.altKey });
+      if (ws !== null) {
+        e.preventDefault();
+        setWorkspace(ws);
+        return;
+      }
       const action = globalAction(e.key, e.target, { ctrl: e.ctrlKey, meta: e.metaKey, alt: e.altKey });
       if (action === null || e.repeat) return;
       e.preventDefault();
@@ -460,7 +480,7 @@ export function Terminal() {
       else if (action === "help") setHelpOpen((o) => !o);
       else if (action === "session") setSessionOpen((o) => !o);
       else if (action === "drawer") toggleDrawer();
-      else if (action === "backtest" && market?.strategy != null && built !== null) setGlassOpen((o) => !o);
+      else if (action === "backtest") setWorkspace((w) => (w === "STRATEGY" ? "TRADE" : "STRATEGY"));
     };
   });
   useEffect(() => {
@@ -503,7 +523,6 @@ export function Terminal() {
   const who = selectedCandle !== null && whoWindow !== null ? whoWindow : frame.who;
   const scenario = run?.scenario ?? FREE_PLAY;
   const shown = latestEvent !== null && latestEvent.seq > reply.seen ? formatUserEvent(latestEvent) : reply.text;
-  const canReveal = m.strategy !== null && built !== null;
 
   /** Screen-reader label, right-aligned header detail and body of a function, wherever it is shown (D-071). */
   const fn = (code: FunctionCode): { label: string; meta?: string; body: ReactNode } => {
@@ -538,7 +557,7 @@ export function Terminal() {
               onStart={startStrategy}
               onCancel={() => setStrat({ phase: "compose", message: null })}
               onStop={() => void onCommand("STOP")}
-              onReveal={() => canReveal && setGlassOpen(true)}
+              onReveal={() => setWorkspace("STRATEGY")}
               onNew={() => setStrat({ phase: "compose", message: null })}
             />
           ),
@@ -560,17 +579,55 @@ export function Terminal() {
       </Panel>
     );
   };
+  // The glass box for the STRATEGY workspace (D-086): the strategy that is running, or the preview being
+  // edited (clamped exactly as START would clamp it, so it shows what the engine would run).
+  const downloadRun = () => {
+    wantRunData.current = true;
+    requestRunData();
+  };
+  let glassBody: ReactNode;
+  let previewSpec: StrategySpec | null = null;
+  if (strat.phase === "preview") {
+    try {
+      previewSpec = clampStrategy(strat.draft);
+    } catch {
+      previewSpec = null;
+    }
+  }
+  if (strat.phase === "preview" && previewSpec !== null) glassBody = <GlassBoxBody text={strat.text} source={strat.source} reason={strat.reason} spec={previewSpec} strategy={null} decisions={[]} onDownloadRun={null} />;
+  else if (m.strategy !== null && built !== null) glassBody = <GlassBoxBody text={built.text} source={built.source} reason={built.reason} spec={m.strategy.spec} strategy={m.strategy} decisions={m.decisions} onDownloadRun={downloadRun} />;
+  else
+    glassBody = (
+      <>
+        <div className={styles.dim}>—</div>
+        <Explain id="strat.intro" />
+      </>
+    );
   const unread = { DESK: chat.filter((c) => c.seq > seen.desk).length, NEWS: Math.max(0, headlines.length - seen.news) };
 
   return (
     <LearnContext value={learn}>
     <div className={styles.shell}>
       <div className={styles.statusWrap}>
-        <StatusBar frame={frame} openPrice={m.openPrice} paused={paused} controls={<Playback paused={paused} speed={speed} sessionOpen={sessionOpen} onCommand={(t) => void onCommand(t)} />} />
+        <StatusBar
+          frame={frame}
+          openPrice={m.openPrice}
+          paused={paused}
+          controls={
+            <>
+              <WorkspaceTabs workspace={workspace} onSelect={setWorkspace} />
+              <Playback paused={paused} speed={speed} sessionOpen={sessionOpen} onCommand={(t) => void onCommand(t)} />
+            </>
+          }
+        />
         {sessionOpen && run !== null && <SessionPopover scenario={scenario} seed={run.seed} learn={learn} link={sessionLink(scenario, run.seed, learn)} onCommand={(t) => void onCommand(t)} onClose={closeSession} />}
       </div>
       <CommandBar onCommand={onCommand} reply={shown} />
       <NewsPreview news={news} onEdit={onEdit} onApply={apply} onCancel={onCancel} />
+      {workspace === "STRATEGY" ? (
+        <StrategyWorkspace builder={fn("STRAT").body} glass={glassBody} strategy={m.strategy} equity={equity} exr={m.exr} frame={frame} candles={candles} headlines={headlines} openPrice={m.openPrice} />
+      ) : (
+      <>
       <main className={styles.grid}>
         <div className={styles.leftCol}>
           {panelFor("GP", styles.gp)}
@@ -598,22 +655,9 @@ export function Terminal() {
         desk={fn("CHAT").body}
         news={fn("NEWS").body}
       />
-      {helpOpen && <HelpOverlay onClose={() => setHelpOpen(false)} />}
-      {glassOpen && m.strategy !== null && built !== null && (
-        <GlassBox
-          text={built.text}
-          source={built.source}
-          reason={built.reason}
-          spec={m.strategy.spec}
-          strategy={m.strategy}
-          decisions={m.decisions}
-          onClose={() => setGlassOpen(false)}
-          onDownloadRun={() => {
-            wantRunData.current = true;
-            requestRunData();
-          }}
-        />
+      </>
       )}
+      {helpOpen && <HelpOverlay onClose={() => setHelpOpen(false)} />}
     </div>
     </LearnContext>
   );

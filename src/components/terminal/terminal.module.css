@@ -1221,8 +1221,9 @@
 
 .stratStats {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0 8px;
+  /* As many columns as fit, each wide enough for a dollar figure; the rest wrap (D-086). */
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 4px 8px;
   margin: 0;
 }
 
@@ -1241,20 +1242,7 @@
   gap: 8px;
 }
 
-/* ---------- glass box (D-065) ---------- */
-.glass {
-  position: fixed;
-  inset: 12px;
-  display: flex;
-  flex-direction: column;
-  background: var(--bg);
-  border: 1px solid var(--border);
-}
-
-.glass:focus {
-  outline: none;
-}
-
+/* ---------- glass box (D-065), inside the STRATEGY workspace (D-086) ---------- */
 .glassGrid {
   flex: 1;
   min-height: 0;
@@ -1376,6 +1364,133 @@
     padding: 0 8px;
   }
 
+}
+
+/* ---------- STRATEGY workspace (D-086) ---------- */
+.workspaces {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.workspaces > .segBtn + .segBtn {
+  margin-left: -1px;
+}
+
+.workspace {
+  grid-row: 4;
+  display: grid;
+  grid-template-columns: minmax(300px, 26fr) minmax(0, 40fr) minmax(320px, 34fr);
+  gap: 4px;
+  min-height: 0;
+}
+
+.wsPane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+}
+
+.wsHead,
+.wsHeadInline {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  color: var(--label);
+  font-size: var(--fs-label);
+  letter-spacing: 0.08em;
+}
+
+.wsHeadInline {
+  padding: 4px 0;
+}
+
+.wsBody {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.wsScroll {
+  overflow: auto;
+  padding: 8px;
+}
+
+/* The glass box stacks in the centre column: English, rules, formulas, Python. */
+.wsScroll .glassGrid {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.wsPrice {
+  border-bottom: 1px solid var(--border);
+}
+
+.wsPriceHead {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  padding: 4px 8px;
+}
+
+.wsLast {
+  font-weight: 700;
+}
+
+.wsPriceChart {
+  position: relative;
+  height: 128px;
+}
+
+.equity {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.equityHead,
+.equityAxis {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--fs-label);
+}
+
+.equityAxis {
+  color: var(--label);
+}
+
+.equitySvg {
+  width: 100%;
+  height: 160px;
+  border: 1px solid var(--border);
+}
+
+.equityZero {
+  stroke: var(--border);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.equityLine {
+  fill: none;
+  stroke: var(--data);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.wsFills {
+  position: relative;
+  height: 220px;
+}
+
+/* The strip also carries the workspace tabs (D-086): below 1600px the playback controls drop their key
+   hints (HELP lists them) so the strip stays one row. */
+@media (max-width: 1599px) {
   .playback .keyHint {
     display: none;
   }

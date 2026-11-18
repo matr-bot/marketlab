@@ -17,7 +17,7 @@ const per = (x2: number | null, qty: number) => (x2 === null ? null : perShareCe
  * arrival mid and cents per share. All figures come from the fill log. A positive cost is money lost
  * to the market; negative is price improvement.
  */
-export function ExecPanel({ exr }: { exr: FrameExecution | null }) {
+export function ExecPanel({ exr, showTotals = true }: { exr: FrameExecution | null; /** False for a subset of the orders, whose totals the engine's are not (D-086). */ showTotals?: boolean }) {
   const learn = useLearn();
   if (exr === null || exr.orders.length === 0) {
     return (
@@ -74,6 +74,7 @@ export function ExecPanel({ exr }: { exr: FrameExecution | null }) {
           </tbody>
         </table>
       </div>
+      {showTotals && (
       <div className={styles.exrTotal} data-testid="exr-total">
         {t.slippageX2 === null || t.spreadX2 === null || t.impactX2 === null || t.passiveX2 === null ? (
           <dl className={styles.totals} title="No order had an arrival mid (one side of the book was empty), so there is no intended price to measure slippage against.">
@@ -122,6 +123,7 @@ export function ExecPanel({ exr }: { exr: FrameExecution | null }) {
           </dl>
         )}
       </div>
+      )}
     </div>
   );
 }

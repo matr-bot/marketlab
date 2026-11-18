@@ -65,7 +65,8 @@ screen must be true to what the engine actually did.
 2. MARKET — a judge types any headline live; the crowd reacts; the strategy trades through it.
 3. REALITY CHECK — execution report: intended price (the arrival mid) vs actual average fill
    (slippage, split into spread cost and impact cost) and P&L.
-4. REVEAL — BACKTEST in STRAT: English → rules → formulas with real numbers → Python.
+4. REVEAL — BACKTEST opens the STRATEGY workspace: English → rules → formulas with real numbers →
+   Python, beside the equity curve.
 
 ## Non-goals (do not build unless explicitly asked)
 - Real-money trading, brokerage connections, live market data dependencies
@@ -92,7 +93,7 @@ This section is the spec. It replaces the earlier amber-label design. The overha
 | 5.5c ✅ | Keymap (Space, F1-F4, TKT letters) with hints in controls, `.mmm` timestamps (D-080) |
 | 5.5d ✅ | TAPE prices fully up/down; BOOK cents bright, dollars gray (D-081) |
 | 6 ✅ | Landing page at `/` (replay hero, problem, how it works, generated proof, launcher); terminal at `/terminal` (D-082 to D-085) |
-| 7 | Workspaces: TRADE · STRATEGY (rule builder, glass box, equity curve per sim second) |
+| 7 ✅ | Workspaces: TRADE · STRATEGY (rule builder, live glass box, equity curve per sim second) (D-086) |
 
 Functions that have not shipped are not drawn: no placeholder panels, never a blank or fake state.
 
@@ -151,7 +152,9 @@ never uses a real company's name, logo or exact screens.
 - Playback (PAUSE / 1X 2X 4X 8X │ SESSION HELP) is a compact segmented control on the status strip;
   the selected speed is white on `#1F1F1F`. Scenario and seed are in the SESSION popover and on the
   launcher, so any run can still be reproduced.
-- The GLASS BOX is a full-screen reveal opened from STRAT (`BACKTEST`), not a permanent panel.
+- Workspaces (D-086): TRADE (⌥1) is the terminal; STRATEGY (⌥2, or BACKTEST / F4) is the rule builder,
+  the glass box (English → rules → formulas → Python, live for the preview too) and the results (equity
+  per sim second from the engine, metrics, the strategy's fills in BPS, the price in the corner).
 - No scrolling ticker crawl and no bottom hint bar: TAPE and the command line cover them.
 - Keyboard first (D-080): every primary action has a key, shown inside the control in label gray
   (`SEND ↵`, `PAUSE ␣`, `HELP F1`); single letters only inside TKT; HELP lists the keymap.

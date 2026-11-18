@@ -2163,3 +2163,28 @@ A judge should be able to check every figure on the landing page, so none of the
   label from `package.json` and git.
 - Links: SOURCE (the repository), DECISIONS.md at the built commit, and proof.json.
 - The proof arithmetic (`summarizeMutants`, `summarizeUnit`, `backedClaims`) is unit-tested.
+
+## D-086 · Step 7: workspaces, TRADE and STRATEGY
+
+**Date:** 2026-11-18 · **Status:** Accepted (BACKTEST now opens the workspace; the glass box overlay is gone)
+
+- **Workspace tabs on the status strip:** `TRADE ⌥1 · STRATEGY ⌥2` (Alt/Option + 1 or 2, by the physical
+  key, so a Mac's Option+1 works; listed in HELP). The market keeps running in both. Below 1600px the
+  playback controls drop their key hints so the strip stays one row.
+- **TRADE** is the terminal as before; the drawer's STRATEGY pane stays for a quick launch.
+- **STRATEGY** is full screen under the strip, in three columns:
+  - *Rules* (left): the same strategy builder as the drawer.
+  - *Glass box* (centre): its four parts stacked (English, rules, formulas, Python), for the strategy
+    that is running, or for the preview while it is edited, clamped exactly as START would clamp it,
+    so the generated Python changes as a field changes, before anything trades. One implementation
+    (`GlassBoxBody`) for both.
+  - *Results* (right): the live price small in the corner (a mini GP without the readout), the equity
+    curve, P&L, SHARPE, MAX DD, TRADES and N, and the strategy's own fills in BPS (FILLS filtered to
+    SRC = STRAT, without the all-orders totals, which would not be this subset's).
+- **The equity curve is the engine's record:** the strategy runner records equity (cash + shares × mid,
+  cents) at every whole sim second from its start, the series behind its Sharpe and drawdown. The
+  terminal fetches that record (`runData`) whenever the point count grows, in TRADE as well, and draws
+  it; it never samples on the wall clock. So the same seed and spec give the same curve: an e2e test
+  RERUNs twice and compares the first 40 points exactly.
+- **BACKTEST and F4** open (or toggle) the STRATEGY workspace; the full-screen glass box overlay is
+  removed in favour of it.

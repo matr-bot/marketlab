@@ -52,9 +52,9 @@ test("the demo: a strategy in plain English trades through FED, shows in EXR, an
   await expect(page.getByTestId("exr-src").first()).toHaveText("STRAT");
   await expect(page.getByTestId("exr-total")).toContainText("SPREAD");
 
-  // 4. REVEAL: English → rules → formulas with real numbers → Python.
+  // 4. REVEAL: BACKTEST opens the STRATEGY workspace (D-086): English → rules → formulas with real numbers → Python.
   await page.getByTestId("strat-reveal").click();
-  const glass = page.getByTestId("glass");
+  const glass = page.getByTestId("strategy-workspace").locator("[data-pane=glass]");
   await expect(glass).toBeVisible();
   await expect(page.getByTestId("glass-english")).toContainText(IDEA);
   await expect(page.getByTestId("glass-english")).toContainText("Panic selling overshoots fair value");
@@ -63,7 +63,7 @@ test("the demo: a strategy in plain English trades through FED, shows in EXR, an
   await expect(glass.locator("[data-formula=SHARPE]")).toContainText("one-second returns");
   await expect(page.getByTestId("glass-code")).toContainText("ENTRY_PCT = 0.03");
   await expect(page.getByTestId("glass-code")).toContainText("not written by an AI");
-  await page.keyboard.press("Escape");
+  await page.keyboard.press("Alt+Digit1"); // back to TRADE
   await expect(glass).toHaveCount(0);
   expect(errors).toEqual([]);
 });

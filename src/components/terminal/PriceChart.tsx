@@ -73,6 +73,7 @@ export function PriceChart({
   headlines,
   selected = null,
   onSelect,
+  readout = true,
 }: {
   candles: readonly Candle[];
   candleMs: number;
@@ -81,6 +82,8 @@ export function PriceChart({
   /** Start of the candle picked for WHO, or null. */
   selected?: number | null;
   onSelect?: (start: number | null) => void;
+  /** The OHLCV readout top-left; off for the small chart in the STRATEGY workspace's corner (D-086). */
+  readout?: boolean;
 }) {
   const boxRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -160,7 +163,7 @@ export function PriceChart({
       onMouseLeave={() => setHover(null)}
     >
       <canvas ref={canvasRef} aria-label="Price chart: click a candle to see who traded in it; double-click to zoom the price axis to the last two minutes" role="img" />
-      {shown !== null && (
+      {readout && shown !== null && (
         <div className={styles.ohlcv} data-testid="chart-ohlcv" data-start={shown.start}>
           <span className={styles.bigFigure}>{formatSimTime(shown.start).slice(0, 8)}</span>
           <span>

@@ -5,15 +5,16 @@ import panel from "../Panel.module.css";
 import styles from "./terminal.module.css";
 
 export type DrawerSide = "DESK" | "NEWS";
+export type DrawerMode = "closed" | "compact" | "full";
 
 /**
- * The bottom drawer (D-074): STRAT, CHAT and NEWS share it. Collapsed it is one row of tabs, so the
- * chart and tape get the screen; open, it shows two panes: the strategy on the left and DESK (the
- * narrator) or NEWS (scenario and headlines) on the right, so a strategy and the market's reaction are
- * on screen together. Unread counts sit on the side tab that is not showing.
+ * The bottom drawer (D-074, D-077): STRAT, CHAT and NEWS share it. Closed it is one row of tabs, so the
+ * chart and tape get the screen. Compact (what a headline opens) is DESK alone, full width, five lines,
+ * newest on top. Full (STRATEGY opened by hand, or NEWS) shows two panes: the strategy on the left and
+ * DESK or NEWS on the right. Unread counts sit on the side tab that is not showing.
  */
 export function Drawer({
-  open,
+  mode,
   side,
   unread,
   strategyRunning,
@@ -26,7 +27,7 @@ export function Drawer({
   desk,
   news,
 }: {
-  open: boolean;
+  mode: DrawerMode;
   side: DrawerSide;
   unread: Readonly<Record<DrawerSide, number>>;
   strategyRunning: boolean;
@@ -39,6 +40,8 @@ export function Drawer({
   desk: ReactNode;
   news: ReactNode;
 }) {
+  const open = mode !== "closed";
+  const full = mode === "full";
   const tab = (code: DrawerSide, label: string) => {
     const on = open && side === code;
     const count = on ? 0 : unread[code];
@@ -54,9 +57,9 @@ export function Drawer({
     );
   };
   return (
-    <section className={`${panel.panel} ${styles.drawer} ${active ? panel.active : ""}`} aria-label="Strategy, desk chat and news" data-panel="DRAWER" data-testid="drawer" data-open={open || undefined} data-active={active || undefined} onMouseDown={onActivate}>
+    <section className={`${panel.panel} ${styles.drawer} ${active ? panel.active : ""}`} aria-label="Strategy, desk chat and news" data-panel="DRAWER" data-testid="drawer" data-open={open || undefined} data-mode={mode} data-active={active || undefined} onMouseDown={onActivate}>
       <header className={styles.drawerHead} role="tablist">
-        <button type="button" role="tab" aria-selected={open} className={`${styles.drawerTab} ${open ? styles.drawerTabOn : ""}`} data-testid="drawer-tab-STRAT" onClick={onOpenStrategy} title="Your strategy (STRAT)">
+        <button type="button" role="tab" aria-selected={full} className={`${styles.drawerTab} ${full ? styles.drawerTabOn : ""}`} data-testid="drawer-tab-STRAT" onClick={onOpenStrategy} title="Your strategy (STRAT)">
           STRATEGY
           {strategyRunning && <span className={styles.drawerCount}>RUN</span>}
         </button>
@@ -68,7 +71,14 @@ export function Drawer({
           {open ? "▾" : "▴"}
         </button>
       </header>
-      {open && (
+      {mode === "compact" && (
+        <div className={`${styles.drawerBody} ${styles.drawerCompact}`}>
+          <div className={styles.drawerPane} data-pane="DESK">
+            {desk}
+          </div>
+        </div>
+      )}
+      {full && (
         <div className={styles.drawerBody}>
           <div className={styles.drawerPane} data-pane="STRAT">
             {strategy}

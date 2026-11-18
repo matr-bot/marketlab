@@ -22,7 +22,7 @@ import { BookPanel } from "./BookPanel";
 import { ChatPanel } from "./ChatPanel";
 import { CommandBar } from "./CommandBar";
 import { ExecPanel } from "./ExecPanel";
-import { Drawer, type DrawerSide } from "./Drawer";
+import { Drawer, type DrawerMode, type DrawerSide } from "./Drawer";
 import { download, GlassBox } from "./GlassBox";
 import { HelpOverlay } from "./HelpOverlay";
 import { LearnContext } from "./Learn";
@@ -129,7 +129,9 @@ export function Terminal() {
   const [fillsSeen, setFillsSeen] = useState(0);
   // The drawer: collapsed in free play; open on NEWS when a scenario opens (its brief, task and calendar).
   const scenarioOnLoad = initial !== null && initial.run.scenario.id !== FREE_PLAY.id;
-  const [drawerOpen, setDrawerOpen] = useState(scenarioOnLoad);
+  // closed: the tab row; compact: DESK alone, full width, five lines (what a headline opens); full: STRATEGY beside DESK or NEWS (D-077).
+  const [drawerMode, setDrawerMode] = useState<DrawerMode>(scenarioOnLoad ? "full" : "closed");
+  const drawerOpen = drawerMode !== "closed";
   const [drawerSide, setDrawerSide] = useState<DrawerSide>(scenarioOnLoad ? "NEWS" : "DESK");
   /** The student collapsed the drawer: only a headline reopens it (D-074). */
   const dismissed = useRef(false);
@@ -182,10 +184,15 @@ export function Terminal() {
   const lastChatSeq = market?.chat.at(-1)?.seq ?? -1;
   const headlineCount = market?.headlines.length ?? 0;
   const markSeen = useCallback((side: DrawerSide) => setSeen((s) => (side === "DESK" ? { ...s, desk: lastChatSeq } : { ...s, news: headlineCount })), [lastChatSeq, headlineCount]);
+  /**
+   * Open the drawer (D-077). "full" (the default) shows STRATEGY beside DESK or NEWS; "compact" is DESK
+   * alone and never shrinks a drawer that is already full. NEWS is always full: its brief needs room.
+   */
   const openDrawer = useCallback(
-    (side?: DrawerSide) => {
+    (side?: DrawerSide, mode: "compact" | "full" = "full") => {
       if (drawerOpen && side !== undefined && side !== drawerSide) markSeen(drawerSide);
-      setDrawerOpen(true);
+      const full = mode === "full" || side === "NEWS";
+      setDrawerMode((m) => (full ? "full" : m === "closed" ? "compact" : m));
       if (side !== undefined) setDrawerSide(side);
     },
     [drawerOpen, drawerSide, markSeen],
@@ -194,8 +201,8 @@ export function Terminal() {
     if (drawerOpen) {
       dismissed.current = true;
       markSeen(drawerSide);
-    }
-    setDrawerOpen((o) => !o);
+      setDrawerMode("closed");
+    } else setDrawerMode("full");
   };
 
   // FILLS counts as seen when the student opens it or leaves it.
@@ -215,7 +222,8 @@ export function Terminal() {
   const open = useCallback(
     (code: FunctionCode) => {
       if (code === "STRAT" || code === "CHAT" || code === "NEWS") {
-        openDrawer(code === "STRAT" ? undefined : code === "CHAT" ? "DESK" : "NEWS");
+        if (code === "STRAT") openDrawer();
+        else openDrawer(code === "CHAT" ? "DESK" : "NEWS", "compact");
         setActive("DRAWER");
         return;
       }
@@ -452,8 +460,9 @@ export function Terminal() {
     const fresh = chatLog.filter((c) => c.seq > from);
     const headline = fresh.some((c) => c.kind === "headline");
     if (headline) dismissed.current = false;
+    // Compact: DESK alone, full width, so the chart keeps its height during a shock (D-077).
     if (!drawerOpen && fresh.some((c) => DRAWER_KINDS.has(c.kind)) && !dismissed.current) {
-      setDrawerOpen(true);
+      setDrawerMode("compact");
       setDrawerSide("DESK");
     }
   }, [chatLog, drawerOpen]);
@@ -554,7 +563,7 @@ export function Terminal() {
         </div>
       </main>
       <Drawer
-        open={drawerOpen}
+        mode={drawerMode}
         side={drawerSide}
         unread={unread}
         strategyRunning={m.strategy?.status === "running"}
@@ -562,7 +571,7 @@ export function Terminal() {
         onActivate={() => setActive("DRAWER")}
         onToggle={toggleDrawer}
         onOpenStrategy={() => openDrawer()}
-        onSide={(side) => openDrawer(side)}
+        onSide={(side) => openDrawer(side, "compact")}
         strategy={fn("STRAT").body}
         desk={fn("CHAT").body}
         news={fn("NEWS").body}

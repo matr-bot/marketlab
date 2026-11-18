@@ -86,6 +86,7 @@ This section is the spec. It replaces the earlier amber-label design. The overha
 | 4b ✅ | 65-35 grid + two-pane drawer, auto-open rules, playback trimmed (D-074) |
 | 4c ✅ | Ticket tabs ORDER / FILLS (EXR) / OPEN, every code routed (D-075) |
 | 5 ✅ | Panel content: WHO fixed table with NET, FILLS totals, no overflowing text (D-076) |
+| 5b ✅ | Compact DESK drawer for shocks, DESK newest on top, chart ≥ 60% of its column (D-077) |
 | 5.5 | Detail pass (self-hosted mono font, decimal alignment, chart crosshair, keymap) |
 | 6 | Session launcher at `/`; the terminal at `/terminal` |
 
@@ -135,7 +136,8 @@ never uses a real company's name, logo or exact screens.
 ```
 - Panel titles are 11px gray uppercase (`TAPE`, `WHO · 60S`); no numbered boxes.
 - EXR is the ticket's FILLS tab (D-075); OPEN lists resting orders. STRAT,
-  CHAT and NEWS share the bottom drawer (D-074): open, it shows the strategy pane beside DESK or NEWS.
+  CHAT and NEWS share the bottom drawer (D-074, D-077): a shock opens it compact (DESK alone, five
+  lines, newest on top); STRATEGY opened by hand (or NEWS) shows the strategy pane beside DESK or NEWS.
   It opens on its code or a click, when a strategy starts, on a headline / panic / vacuum desk
   message, and (NEWS) when a non-free-play scenario loads. Once collapsed it stays shut until the next
   headline; the side not showing carries an unread count.

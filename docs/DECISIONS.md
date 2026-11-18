@@ -1992,3 +1992,18 @@ the ticket's last line was clipped.
 - Already in place from earlier steps: BOOK's muted side tints and gray SPREAD row (D-068), TKT's
   colored BUY/SELL toggle, one amber SEND and one-line estimate (D-068, D-072), TAPE's B/S (D-072).
 - Dictionary: MM and NET added.
+
+## D-077 · Step 5b: a compact drawer for shocks; DESK newest on top
+
+**Date:** 2026-11-18 · **Status:** Accepted (refines D-074)
+
+During a shock the two-pane drawer took about a third of the screen, and the chart lost most of it.
+- **Three drawer modes.** *closed*: the tab row. *compact*: DESK alone, full width, 110px (five lines).
+  This is what a headline, panic or vacuum message opens, and what CHAT or the DESK tab opens from
+  closed. *full*: STRATEGY beside DESK or NEWS. You get it from the STRATEGY tab or `STRAT`, by typing or
+  starting a strategy, from NEWS (its brief needs room), from the ▴ toggle, or when a scenario loads (the
+  macro demo's calendar beside STRAT). Compact never shrinks a full drawer; the NEWS badge still counts
+  headlines.
+- **DESK is newest on top**, so the latest event is the first line even at five lines.
+- **The chart keeps at least 60% of the left column** (chart, TAPE, WHO): the split is 62/38, which
+  stays at or above 60% with the 2px gap. An e2e check measures it after FED.

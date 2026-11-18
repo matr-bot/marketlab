@@ -25,10 +25,29 @@ test("a headline opens the drawer on DESK; collapsed, it stays shut until the ne
   const drawer = page.getByTestId("drawer");
   await command(page, "SPEED 8");
   await command(page, "FED");
-  await expect(drawer).toHaveAttribute("data-open", "true");
+  await expect(drawer).toHaveAttribute("data-mode", "compact");
   await expect(drawer.locator("[data-pane=DESK]")).toBeVisible();
+  // Compact (D-077): DESK alone, full width, about five lines, newest on top; no STRATEGY pane.
+  await expect(drawer.locator("[data-pane=STRAT]")).toHaveCount(0);
+  const desk = (await drawer.locator("[data-pane=DESK]").boundingBox())!;
+  expect(desk.height).toBeLessThanOrEqual(115);
+  expect(desk.width).toBeGreaterThan(0.95 * (await drawer.boundingBox())!.width);
   await expect(page.getByTestId("chat").locator("[data-kind=headline]")).toContainText("RATES"); // FED is the default RATES release
-  await expect(drawer.locator("[data-pane=STRAT]")).toBeVisible(); // the strategy pane sits beside it
+  const times = await page.getByTestId("chat").locator("> div span:first-child").allTextContents();
+  expect(times.length).toBeGreaterThan(1);
+  expect([...times].sort().reverse()).toEqual(times); // newest first
+  // During the shock the chart keeps at least 60% of the left column.
+  await page.waitForTimeout(3_000);
+  const share = await page.evaluate(() => {
+    const gp = document.querySelector("[data-panel=GP]")!.getBoundingClientRect().height;
+    return gp / document.querySelector("[data-panel=GP]")!.parentElement!.getBoundingClientRect().height;
+  });
+  expect(share).toBeGreaterThanOrEqual(0.6);
+  // The STRATEGY tab, opened by hand, gives the two-pane drawer.
+  await page.getByTestId("drawer-tab-STRAT").click();
+  await expect(drawer).toHaveAttribute("data-mode", "full");
+  await expect(drawer.locator("[data-pane=STRAT]")).toBeVisible();
+  await expect(drawer.locator("[data-pane=DESK]")).toBeVisible();
 
   // Collapse: panic and vacuum messages during the crash do not reopen it.
   await page.getByTestId("drawer-toggle").click();

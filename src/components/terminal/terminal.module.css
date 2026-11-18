@@ -29,11 +29,12 @@
 }
 
 .gp {
-  flex: 60 1 0;
+  /* At least 60% of the left column, gap included (D-077). */
+  flex: 62 1 0;
 }
 
 .lowRow {
-  flex: 40 1 0;
+  flex: 38 1 0;
   display: grid;
   grid-template-columns: minmax(0, 55fr) minmax(0, 45fr);
   gap: 2px;
@@ -144,6 +145,12 @@
   height: clamp(150px, 30vh, 330px);
   display: grid;
   grid-template-columns: minmax(320px, 40fr) minmax(0, 60fr);
+}
+
+/* Compact: DESK alone, full width, five lines (D-077). */
+.drawerBody.drawerCompact {
+  height: 110px;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .drawerPane {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bigFigureLength, formatAvgPrice, formatCompact, formatBps, formatCentsPerShare, formatChange, formatDollars, formatDollarsX2, formatElapsed, formatInterval, formatMid, formatMidX2, formatPercent, formatPrice, formatQty } from "./format";
+import { formatAvgPrice, formatCompact, formatBps, formatCentsPerShare, formatChange, formatDollars, formatDollarsX2, formatElapsed, formatInterval, formatMid, formatMidX2, formatPercent, formatPrice, formatQty } from "./format";
 
 describe("display formatting: exact cents, never rounded", () => {
   it.each([
@@ -98,15 +98,3 @@ describe("formatMidX2: one way to show a mid (QA #7)", () => {
     expect(formatMid(18_704, 18_705)).toBe(formatMidX2(37_409));
   });
 });
-
-describe("bigFigureLength (D-078)", () => {
-  it("is the prefix every price shares, leaving at least the last character", () => {
-    expect(bigFigureLength(["186.96", "186.95", "186.94"])).toBe(5);
-    expect(bigFigureLength(["187.01", "186.99"])).toBe(2);
-    expect(bigFigureLength(["186.96"])).toBe(5);
-    expect(bigFigureLength(["186.96", "186.96"])).toBe(5);
-    expect(bigFigureLength(["99.99", "100.01"])).toBe(0);
-    expect(bigFigureLength([])).toBe(0);
-  });
-});
-

@@ -2071,3 +2071,13 @@ During a shock the two-pane drawer took about a third of the screen, and the cha
   strategy's last decision. The status clock keeps whole seconds (D-073).
 - FILLS's content-sized columns (D-076) now actually apply: `.table` came later in the stylesheet with
   the same specificity, so its fixed layout had won.
+
+## D-081 · Step 5.5d: direction over the big figure on TAPE; BOOK cents bright
+
+**Date:** 2026-11-18 · **Status:** Accepted (refines D-078)
+
+- **TAPE:** no big-figure dimming. The whole price is green or red by its tick, because on the tape the
+  direction of each print matters more than which digits changed.
+- **BOOK:** a fixed split instead of the shared prefix: the dollars and the point are gray, the last two
+  digits (the cents) bright: `186.|96`. The levels' cents are what a trader scans. The shared-prefix
+  helper (`bigFigureLength`) is removed.

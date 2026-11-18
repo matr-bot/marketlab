@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Frame } from "@/engine/feed";
 import type { DepthLevel } from "@/engine/types";
-import { bigFigureLength, formatMid, formatPrice, formatQty } from "@/lib/format";
+import { formatMid, formatPrice, formatQty } from "@/lib/format";
 import { Explain } from "./Learn";
 import styles from "./terminal.module.css";
 import { flash } from "./useFlash";
@@ -40,8 +40,10 @@ export const BAR_MAX_PCT = 50;
  * shown, scaled to BAR_MAX_PCT. The tint is the side (D-068), so there is no SIDE column (D-071).
  * `mine`: the student's shares resting here (outlined row, tooltip).
  */
-function Level({ level, side, maxQty, mine, big }: { level: DepthLevel; side: "BID" | "ASK"; maxQty: number; mine: number; big: number }) {
+function Level({ level, side, maxQty, mine }: { level: DepthLevel; side: "BID" | "ASK"; maxQty: number; mine: number }) {
   const px = formatPrice(level.price);
+  // The cents bright, the dollars gray: 186.|96 (D-081).
+  const big = px.length - 2;
   return (
     <div className={`${styles.bookRow} ${mine > 0 ? styles.bookMine : ""}`} data-side={side} data-price={level.price} data-qty={level.qty} data-mine={mine > 0 || undefined} title={mine > 0 ? `Your order: ${formatQty(mine)} of these ${formatQty(level.qty)} shares` : undefined}>
       <span>{level.orderCount}</span>
@@ -98,8 +100,6 @@ export function BookPanel({ frame }: { frame: Frame }) {
   const mineAt = (side: "buy" | "sell", price: number) => open.reduce((t, o) => (o.side === side && o.price === price ? t + o.qty : t), 0);
   const spread = frame.bid !== null && frame.ask !== null ? frame.ask - frame.bid : null;
   const maxQty = Math.max(1, ...asks.map((l) => l.qty), ...bids.map((l) => l.qty));
-  // The big figure: the price prefix every level on screen shares, in gray (D-078).
-  const big = bigFigureLength([...asks, ...bids].map((l) => formatPrice(l.price)));
   return (
     <div ref={boxRef} className={styles.bookPanel} data-testid="book" data-levels={Math.min(n.asks, n.bids)}>
       <div className={`${styles.bookRow} ${styles.bookHead}`}>
@@ -110,7 +110,7 @@ export function BookPanel({ frame }: { frame: Frame }) {
       <div className={styles.bookAsks}>
         {frame.asks.length === 0 && height > 0 && <div className={`${styles.bookRow} ${styles.bookEmpty}`}>NO ASKS <Explain id="book.vacuum" inline /></div>}
         {asks.map((l) => (
-          <Level key={`a${l.price}`} level={l} side="ASK" maxQty={maxQty} mine={mineAt("sell", l.price)} big={big} />
+          <Level key={`a${l.price}`} level={l} side="ASK" maxQty={maxQty} mine={mineAt("sell", l.price)} />
         ))}
       </div>
       <div className={`${styles.bookRow} ${styles.bookSpread}`}>
@@ -121,7 +121,7 @@ export function BookPanel({ frame }: { frame: Frame }) {
       <div className={styles.bookBids}>
         {frame.bids.length === 0 && height > 0 && <div className={`${styles.bookRow} ${styles.bookEmpty}`}>NO BIDS <Explain id="book.vacuum" inline /></div>}
         {bids.map((l) => (
-          <Level key={`b${l.price}`} level={l} side="BID" maxQty={maxQty} mine={mineAt("buy", l.price)} big={big} />
+          <Level key={`b${l.price}`} level={l} side="BID" maxQty={maxQty} mine={mineAt("buy", l.price)} />
         ))}
       </div>
       {beyond.length > 0 && (

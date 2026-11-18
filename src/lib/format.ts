@@ -118,21 +118,3 @@ export function formatDollarsX2(x2: number): string {
   const cents = String(Math.floor(half / 2)).padStart(2, "0");
   return `${sign}$${qtyFormat.format(dollars)}.${cents}${half % 2 === 1 ? "5" : ""}`;
 }
-
-/**
- * The big figure (D-078): how many leading characters every price in `texts` shares, so a panel can
- * show that prefix in gray and the digits that change in white. Always leaves at least the last
- * character out: ["186.96", "186.95", "186.94"] → 5 ("186.9"); ["187.01", "186.99"] → 2 ("18").
- */
-export function bigFigureLength(texts: readonly string[]): number {
-  if (texts.length === 0) return 0;
-  let n = Math.min(...texts.map((t) => t.length)) - 1;
-  const first = texts[0];
-  for (const t of texts) {
-    let i = 0;
-    while (i < n && t[i] === first[i]) i++;
-    n = i;
-  }
-  return Math.max(0, n);
-}
-

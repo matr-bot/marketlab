@@ -90,7 +90,9 @@ This section is the spec. It replaces the earlier amber-label design. The overha
 | 5.5a ✅ | JetBrains Mono (tnum, zero), big figure, 150ms tick flash only, 4px scale, 20px rows (D-078) |
 | 5.5b ✅ | Chart: crosshair + OHLCV, dashed last, ~12 axis labels, markers with hover text, double-click zoom (D-079) |
 | 5.5c ✅ | Keymap (Space, F1-F4, TKT letters) with hints in controls, `.mmm` timestamps (D-080) |
-| 6 | Session launcher at `/`; the terminal at `/terminal` |
+| 5.5d ✅ | TAPE prices fully up/down; BOOK cents bright, dollars gray (D-081) |
+| 6 | Landing page at `/` (replay hero, problem, how it works, generated proof, launcher); terminal at `/terminal` |
+| 7 | Workspaces: TRADE · STRATEGY (rule builder, glass box, equity curve per sim second) |
 
 Functions that have not shipped are not drawn: no placeholder panels, never a blank or fake state.
 

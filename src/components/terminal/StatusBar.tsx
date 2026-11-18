@@ -73,7 +73,7 @@ export function StatusBar({ frame, openPrice, paused, controls }: { frame: Frame
       <Explain id="status.agents" inline>
         every trade from {formatQty(frame.agents)} agents
       </Explain>
-      <span className={styles.spacer} />
+      <span className={styles.spacer} data-testid="status-spacer" />
       {controls}
     </header>
   );

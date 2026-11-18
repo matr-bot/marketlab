@@ -16,15 +16,26 @@ const git = (cmd) => {
   }
 };
 
-// Unit tests, run now.
+// Unit tests, run now. A build machine can be far slower than a laptop (2 cores on Vercel), so the whole-
+// market tests get a generous per-test timeout: a slow machine is not a failing test.
 const unitOut = join(tmpdir(), `marketlab-vitest-${process.pid}.json`);
+let failedRun = false;
 try {
-  run(`npx vitest run --reporter=json --outputFile=${unitOut}`);
+  run(`npx vitest run --reporter=json --outputFile=${unitOut} --testTimeout=120000 --hookTimeout=120000`);
 } catch {
-  console.error("proof: unit tests failed; not building over red tests.");
+  failedRun = true;
+}
+if (!existsSync(unitOut)) {
+  console.error("proof: the unit tests did not run; not building.");
   process.exit(1);
 }
 const unitReport = JSON.parse(readFileSync(unitOut, "utf8"));
+if (failedRun || unitReport.numFailedTests > 0) {
+  // Name every failure, so the build log says what is red.
+  for (const f of unitReport.testResults) for (const a of f.assertionResults) if (a.status === "failed") console.error(`proof: FAILED ${relative(process.cwd(), f.name)} › ${a.fullName}\n  ${(a.failureMessages ?? []).join("\n").split("\n")[0]}`);
+  console.error("proof: unit tests failed; not building over red tests.");
+  process.exit(1);
+}
 rmSync(unitOut, { force: true });
 const unit = summarizeUnit(unitReport);
 const tests = unitReport.testResults.flatMap((f) => f.assertionResults.map((a) => ({ file: relative(process.cwd(), f.name), title: a.fullName, name: a.title, status: a.status })));

@@ -83,9 +83,13 @@ test("the strip stays one row with the workspace tabs, paused included: its last
   const fit = await page.getByTestId("status-bar").evaluate((bar) => {
     const box = bar.getBoundingClientRect();
     const last = [...bar.querySelectorAll("button")].at(-1)!.getBoundingClientRect();
-    return { inside: last.right <= box.right && last.top >= box.top && last.bottom <= box.bottom, height: box.height };
+    // Headroom, not a hairline fit: the spacer that takes the spare width keeps at least 24px, since text
+    // renders a little wider on some platforms (CI's Linux).
+    const spare = bar.querySelector("[data-testid=status-spacer]")!.getBoundingClientRect().width;
+    return { inside: last.right <= box.right && last.top >= box.top && last.bottom <= box.bottom, spare, height: box.height };
   });
   expect(fit.inside).toBe(true);
+  expect(fit.spare).toBeGreaterThanOrEqual(24);
   expect(fit.height).toBeLessThan(44);
 });
 

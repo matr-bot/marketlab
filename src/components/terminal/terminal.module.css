@@ -1488,12 +1488,22 @@
   height: 220px;
 }
 
-/* The strip also carries the workspace tabs (D-086): below 1600px the playback controls and the tabs
-   drop their key hints (HELP lists them) so the strip stays one row, paused included. */
-@media (max-width: 1599px) {
+/* The strip also carries the workspace tabs (D-086): below 1760px the playback controls and the tabs
+   drop their key hints (HELP lists them) so the strip keeps headroom, paused included, whatever the
+   platform's text rendering. */
+@media (max-width: 1759px) {
   .playback .keyHint,
   .workspaces .keyHint {
     display: none;
+  }
+
+  /* Tighter controls and gaps, so the strip keeps real headroom on every platform's text rendering. */
+  .status {
+    gap: 8px;
+  }
+
+  .playBtn {
+    padding: 0 4px;
   }
 }
 

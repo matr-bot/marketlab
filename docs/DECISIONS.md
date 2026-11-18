@@ -2240,3 +2240,17 @@ A judge should be able to check every figure on the landing page, so none of the
 - **`suppressHydrationWarning` on `<body>`:** browser extensions such as Grammarly add attributes to
   `<body>` before React hydrates, which React reported as a mismatch. It applies to `<body>`'s own
   attributes only, not to anything inside it.
+
+## D-090 · The first preview deploy: slow build machines, and headroom on the strip
+
+**Date:** 2026-11-18 · **Status:** Accepted (refines D-085 and D-086)
+
+- **Vercel's build failed in the proof step:** on its 2-core machine the unit tests took almost four
+  minutes and the heavy whole-market tests hit Vitest's 5 s per-test timeout (they pass in 24 s on two
+  local workers). `scripts/proof.mjs` now runs them with a 120 s per-test timeout (a slow machine is not
+  a failing test) and, if anything is red, names every failing test in the build log before stopping.
+- **CI's smoke job failed** on the "strip fits while paused" test at 1440px: locally the strip had only
+  3px to spare, and Linux's text rendering used it. The key hints on the playback controls and
+  workspace tabs now show only from 1760px (below that, HELP lists them), the strip's gap and control
+  padding tighten below that width, and the test measures the spacer that takes the spare width, which
+  must keep at least 24px. Paused, it keeps 133px at 1440, 203px at 1760 and 363px at 1920.

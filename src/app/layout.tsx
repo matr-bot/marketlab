@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
-import { Geist_Mono } from "next/font/google";
+import { JetBrains_Mono } from "next/font/google";
 import { cssVariables } from "@/components/terminal/tokens";
 import "./globals.css";
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+// One monospace font everywhere (D-078), self-hosted by next/font: served from this site, never fetched from Google.
+const mono = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
   subsets: ["latin"],
 });
 
@@ -16,7 +17,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={geistMono.variable} style={cssVariables()}>
+    <html lang="en" className={mono.variable} style={cssVariables()}>
       <body>{children}</body>
     </html>
   );

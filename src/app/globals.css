@@ -1,7 +1,7 @@
 /* Colors: every one comes from src/components/terminal/tokens.ts, set on <html> by layout.tsx (D-068).
    This file only uses them. */
 :root {
-  --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
   color-scheme: dark;
 }
 
@@ -22,7 +22,9 @@ body {
   font-family: var(--font-mono);
   font-size: var(--fs-data);
   line-height: 1.35;
-  font-variant-numeric: tabular-nums;
+  /* Tabular figures (every digit the same width, so numbers never jitter) and a slashed zero (D-078). */
+  font-variant-numeric: tabular-nums slashed-zero;
+  font-feature-settings: "tnum" 1, "zero" 1;
   -webkit-font-smoothing: antialiased;
 }
 

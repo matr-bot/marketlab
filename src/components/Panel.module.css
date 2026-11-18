@@ -10,8 +10,8 @@
 .head {
   display: flex;
   align-items: baseline;
-  gap: 6px;
-  padding: 2px 6px;
+  gap: 8px;
+  padding: 4px 8px;
   border-bottom: 1px solid var(--border);
   color: var(--label);
   font-size: var(--fs-label);

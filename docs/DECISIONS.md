@@ -2007,3 +2007,25 @@ During a shock the two-pane drawer took about a third of the screen, and the cha
 - **DESK is newest on top**, so the latest event is the first line even at five lines.
 - **The chart keeps at least 60% of the left column** (chart, TAPE, WHO): the split is 62/38, which
   stays at or above 60% with the 2px gap. An e2e check measures it after FED.
+
+## D-078 · Step 5.5a: font, figures, the tick flash, geometry
+
+**Date:** 2026-11-18 · **Status:** Accepted
+
+- **One font:** JetBrains Mono, self-hosted by `next/font` (served from this site at build time, never
+  fetched from Google), with tabular figures and a slashed zero (`tnum`, `zero`), so digits never
+  jitter and 0 never reads as O. Numbers stay right-aligned in fixed columns, so decimals line up.
+- **The big figure:** in BOOK and TAPE, the price prefix every visible row shares is gray and the
+  digits that change are white (TAPE keeps its tick color on them). `bigFigureLength` always leaves at
+  least the last digit.
+- **The tick flash is the only animation:** the last price, and any BOOK level whose size changed since
+  the last frame, flash a green (up / grew) or red (down / shrank) background for 150ms, then nothing,
+  with no fade. The neutral highlight for other numbers is gone. There are no CSS transitions; the drawer and
+  tabs open instantly. The one keyframe left is the delayed OPENING MARKET reveal (0s, it does not
+  move).
+- **Geometry:** 1px hairlines, square corners, no shadows, gradients or glow; padding, margin and gap
+  on a 4px scale (the panel gutters became 4px; -1px is allowed to overlap a hairline); table and
+  BOOK rows are 20px; hovered rows are `#141414`. `geometry.test.ts` checks the stylesheets (4px
+  scale, no radius, shadow, gradient or transition) and `e2e/geometry.spec.ts` checks what the
+  browser computes (radius 0 and no shadow on every element in the panels, strip, drawer and SESSION;
+  the font and its figures).

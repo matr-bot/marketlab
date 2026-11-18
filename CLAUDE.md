@@ -87,7 +87,8 @@ This section is the spec. It replaces the earlier amber-label design. The overha
 | 4c ✅ | Ticket tabs ORDER / FILLS (EXR) / OPEN, every code routed (D-075) |
 | 5 ✅ | Panel content: WHO fixed table with NET, FILLS totals, no overflowing text (D-076) |
 | 5b ✅ | Compact DESK drawer for shocks, DESK newest on top, chart ≥ 60% of its column (D-077) |
-| 5.5 | Detail pass (self-hosted mono font, decimal alignment, chart crosshair, keymap) |
+| 5.5a ✅ | JetBrains Mono (tnum, zero), big figure, 150ms tick flash only, 4px scale, 20px rows (D-078) |
+| 5.5b / 5.5c | Chart (crosshair, OHLCV, dashed last, markers, double-click zoom) / keymap and timestamps |
 | 6 | Session launcher at `/`; the terminal at `/terminal` |
 
 Functions that have not shipped are not drawn: no placeholder panels, never a blank or fake state.
@@ -166,9 +167,9 @@ old `/?scn=&seed=` links redirect there.
 ### Numbers must move like a real market
 - Price movement comes ONLY from engine trades, never from UI animation or fake data.
 - The stock starts around $187 with penny ticks.
-- The tick flash (last price, changed book levels, ~150ms, up/down) is the only animation in the
-  app. Other changing numbers get a brief neutral highlight. No sliding, counting-up, fades or
-  transitions; the drawer and tabs open instantly.
+- The tick flash (last price, changed book levels, 150ms, up/down background) is the only animation
+  in the app (D-078). No neutral highlights, sliding, counting-up, fades or transitions; the drawer
+  and tabs open instantly.
 - The tape and book update exactly when trades and orders happen; exact prices and sizes, never
   rounded.
 

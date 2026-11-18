@@ -29,8 +29,9 @@ export const TOKENS = {
   hover: "#141414",
   /** Chart gridlines. */
   grid: "#141414",
-  /** The brief neutral highlight for a changing non-price number. */
-  flash: "#2E2E2E",
+  /** The tick flash (D-078): the background behind a price or a book level that just moved up or down. */
+  upFlash: "rgba(38, 166, 91, 0.45)",
+  downFlash: "rgba(229, 72, 77, 0.45)",
   /** Horizontal percentage bars (WHO). */
   bar: "rgba(122, 122, 122, 0.22)",
   selection: "#3A3A3A",

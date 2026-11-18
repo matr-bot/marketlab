@@ -21,7 +21,7 @@ export function StatusBar({ frame, openPrice, paused, controls }: { frame: Frame
   const base = openPrice ?? frame.open;
   const last = frame.last ?? base;
   const change = last - base;
-  const lastRef = useFlash<HTMLSpanElement>(frame.last, "price");
+  const lastRef = useFlash<HTMLSpanElement>(frame.last);
   const direction = change > 0 ? styles.up : change < 0 ? styles.down : styles.num;
   const bidQty = frame.bids[0]?.qty ?? null;
   const askQty = frame.asks[0]?.qty ?? null;

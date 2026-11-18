@@ -30,6 +30,8 @@ function rules(css: string): Array<[string, string]> {
 const ACCENT_ALLOWED: Record<string, readonly string[]> = {
   "components/Panel.module.css": [".active"],
   "components/terminal/terminal.module.css": [".commandInput", ".sendBtn"],
+  // The landing page's one amber element: OPEN TERMINAL (D-083).
+  "components/landing/landing.module.css": [".openTerminal"],
 };
 
 describe("color tokens (D-068)", () => {

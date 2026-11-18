@@ -1,0 +1,256 @@
+/* The landing page (D-083): the terminal's tokens and font, anchored top-left, no gradients, no
+   illustrations, no cards. Amber only on OPEN TERMINAL. */
+.page {
+  max-width: 1120px;
+  padding: 16px 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.dim {
+  color: var(--label);
+  font-size: var(--fs-label);
+  letter-spacing: 0.04em;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 32px;
+  align-items: start;
+}
+
+.heroText {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 8px;
+}
+
+.h1 {
+  font-size: var(--fs-hero);
+  font-weight: 700;
+}
+
+.lede {
+  color: var(--data);
+}
+
+/* The one amber element on this page. */
+.openTerminal {
+  align-self: flex-start;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: var(--bg);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 4px 16px;
+  text-decoration: none;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.h2 {
+  font-size: var(--fs-label);
+  font-weight: 400;
+  color: var(--label);
+  letter-spacing: 0.08em;
+}
+
+.sentence,
+.lines {
+  max-width: 760px;
+}
+
+.lines {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* The technical layer: [+] / [−], opens in place, no animation. */
+.layer summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  color: var(--label);
+}
+
+.layer summary::-webkit-details-marker {
+  display: none;
+}
+
+.layer summary:hover {
+  background: var(--hover);
+}
+
+.plus::before {
+  content: "[+]";
+  color: var(--label);
+}
+
+.layer[open] .plus::before {
+  content: "[−]";
+}
+
+.layerBody {
+  max-width: 760px;
+  padding: 8px 0 8px 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  line-height: 1.5;
+}
+
+.flow {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  align-self: flex-start;
+  letter-spacing: 0.06em;
+}
+
+.agents {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border);
+}
+
+.agents > li {
+  border-bottom: 1px solid var(--border);
+  padding: 4px 0;
+}
+
+.agents summary {
+  color: var(--data);
+}
+
+.agentLabel {
+  width: 128px;
+  flex-shrink: 0;
+  color: var(--label);
+  font-size: var(--fs-label);
+  letter-spacing: 0.06em;
+}
+
+.agentCount {
+  width: 24px;
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.launcher {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 12px 16px;
+  align-items: start;
+}
+
+.fieldLabel {
+  color: var(--label);
+  font-size: var(--fs-label);
+  letter-spacing: 0.06em;
+  padding-top: 4px;
+}
+
+.scenarios {
+  list-style: none;
+  border: 1px solid var(--border);
+  align-self: stretch;
+  max-width: 520px;
+}
+
+.scenarios:focus-visible {
+  outline: 1px solid var(--data);
+}
+
+.scenarios li {
+  display: flex;
+  gap: 8px;
+  padding: 0 8px;
+  height: 20px;
+  align-items: center;
+  cursor: pointer;
+  color: var(--label);
+}
+
+.scenarios li:hover {
+  background: var(--hover);
+}
+
+.scenarios .scenarioOn {
+  color: var(--data);
+  background: var(--border);
+}
+
+.caret {
+  width: 12px;
+}
+
+.seedRow {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.check {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--label);
+  font-size: var(--fs-label);
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.check input {
+  accent-color: var(--data);
+}
+
+.launcher > a,
+.launcher > .disabled {
+  justify-self: start;
+  text-decoration: none;
+}
+
+.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+.link {
+  color: var(--data);
+}

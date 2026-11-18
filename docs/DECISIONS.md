@@ -2091,3 +2091,30 @@ During a shock the two-pane drawer took about a third of the screen, and the cha
 - A link from before (`/?scn=…&seed=…` or `/?seed=…`, what LINK used to copy, possibly handed out as
   assignments) redirects in `next.config.ts` with a 307, before rendering, with its query string carried
   over, so it opens the same run. The engine's `runLink` is unchanged.
+
+## D-083 · Step 6b: the landing page at "/"
+
+**Date:** 2026-11-18 · **Status:** Accepted
+
+Engineering paper, not a product page: the terminal's tokens and font, anchored top-left (max 1120px),
+no gradients, illustrations, adjectives or feature cards. Every section is one plain sentence plus a
+technical layer behind `[+]` (a native `<details>`: it opens in place, without animation).
+- **Hero:** "A stock market you can break." and "{N} trading agents, one real order book, every price
+  explainable." N is `demoAgents().length`, the crowd the worker runs. OPEN TERMINAL ↵ is the page's
+  one amber element and opens free play on the demo seed (187); ↵ anywhere outside a field or control
+  follows it. The replay beside it is step 6c.
+- **Problem:** the three lines, with a layer on what MarketLab does instead.
+- **How it works:** AGENTS ──► ORDER BOOK ──► PRICE ──► ATTRIBUTION, a layer on the book, the price and
+  attribution, then one row per trader type: label, count from the crowd, a plain sentence, and a
+  layer with the model, its citation and our parameters with their D-numbers (`src/lib/models.ts`):
+  Avellaneda & Stoikov (2008) for market makers, Chiarella & Iori (2002) for value traders,
+  Granovetter (1978) for panic sellers, Gode & Sunder (1993) for noise traders. A unit test checks
+  every trader type in the crowd has a model, a dated citation and a decision reference.
+- **Launcher:** the scenario list (a listbox: ↑ ↓ with it focused, ↵ starts), a seed drawn at random per
+  visit on the server (`connection()`, so no hydration mismatch) and editable, Learn mode, and START
+  SESSION (outlined, the secondary tier: one amber action per screen). It opens
+  `/terminal?scn=…&seed=…[&learn=1]`. An invalid seed disables START.
+- **Footer:** the crowd, and the build: `v{package version} · {short commit}`, injected at build time
+  (Vercel's commit, else git, else `dev`), and HELP (the keys line).
+- Keys follow the links themselves (a full page load), so the terminal always reads its run from the
+  address.

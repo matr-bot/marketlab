@@ -7,6 +7,7 @@ import { describeRules, pct, RULE_LABELS } from "@/lib/glassbox/english";
 import { formulas } from "@/lib/glassbox/formulas";
 import { strategyPython } from "@/lib/glassbox/python";
 import { SHARPE_NOTE, SOURCE_LABELS, type StratSource } from "./StrategyPanel";
+import { KeyHint } from "./KeyHint";
 import styles from "./terminal.module.css";
 
 /** Save text as a file in the browser. */
@@ -75,7 +76,8 @@ export function GlassBox({
         <header className={styles.dialogHead}>
           <span>WHAT YOU BUILT · ENGLISH → RULES → FORMULAS → PYTHON</span>
           <button type="button" className={styles.chip} onClick={onClose}>
-            CLOSE (ESC)
+            CLOSE
+            <KeyHint k="ESC" />
           </button>
         </header>
         <div className={styles.glassGrid}>

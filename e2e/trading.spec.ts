@@ -122,7 +122,7 @@ test("the status strip is one row with playback on it; SESSION and the speed seg
   await expect(page.getByTestId("playback-speed-4")).toHaveAttribute("aria-pressed", "true");
   await page.getByTestId("playback-pause").click();
   await expect(page.getByTestId("paused-tag")).toHaveText("● PAUSED");
-  await expect(page.getByTestId("playback-pause")).toHaveText("RUN");
+  await expect(page.getByTestId("playback-pause")).toHaveText(/^RUN/); // then its key hint
 
   await page.keyboard.type("SESSION");
   await page.keyboard.press("Enter");

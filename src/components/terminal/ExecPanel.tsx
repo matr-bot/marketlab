@@ -2,11 +2,11 @@
 
 import type { FrameExecution } from "@/engine/feed";
 import { perShareCents } from "@/engine/executionReport";
-import { formatSimTime } from "@/engine/simClock";
 import { formatAvgPrice, formatBps, formatCentsPerShare, formatDollarsX2, formatMidX2, formatQty } from "@/lib/format";
 import { costBps } from "@/lib/exrBps";
 import { Explain, useLearn } from "./Learn";
 import styles from "./terminal.module.css";
+import { Time } from "./Time";
 
 const per = (x2: number | null, qty: number) => (x2 === null ? null : perShareCents(x2, qty));
 
@@ -49,7 +49,9 @@ export function ExecPanel({ exr }: { exr: FrameExecution | null }) {
           <tbody>
             {rows.flatMap((r) => [
               <tr key={r.orderId} data-testid="exr-row">
-                <td title={formatSimTime(r.time)}>{formatSimTime(r.time).slice(0, 8)}</td>
+                <td>
+                  <Time ms={r.time} />
+                </td>
                 <td>{r.side === "buy" ? "B" : "S"}</td>
                 <td data-testid="exr-src">{r.source === "strategy" ? "STRAT" : "YOU"}</td>
                 <td>{formatQty(r.qty)}</td>

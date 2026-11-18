@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import panel from "../Panel.module.css";
+import { KeyHint } from "./KeyHint";
 import styles from "./terminal.module.css";
 
 export type DrawerSide = "DESK" | "NEWS";
@@ -69,6 +70,7 @@ export function Drawer({
         <span className={styles.spacer} />
         <button type="button" className={styles.drawerToggle} aria-expanded={open} data-testid="drawer-toggle" onClick={onToggle} title={open ? "Collapse the drawer" : "Open the drawer"}>
           {open ? "▾" : "▴"}
+          <KeyHint k="F3" />
         </button>
       </header>
       {mode === "compact" && (

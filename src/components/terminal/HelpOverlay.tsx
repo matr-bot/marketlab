@@ -4,6 +4,8 @@ import { useEffect, useRef } from "react";
 import { SCENARIOS } from "@/engine/scenarios";
 import { ABBREV } from "@/lib/abbrev";
 import { HELP_LINES } from "@/lib/command";
+import { KEYMAP } from "@/lib/keymap";
+import { KeyHint } from "./KeyHint";
 import styles from "./terminal.module.css";
 
 /** HELP: every command, what it does, and the scenarios. Closes on Esc, a click outside, or the button. */
@@ -25,7 +27,8 @@ export function HelpOverlay({ onClose }: { onClose: () => void }) {
         <header className={styles.dialogHead}>
           <span>HELP · COMMANDS</span>
           <button type="button" className={styles.chip} onClick={onClose}>
-            CLOSE (ESC)
+            CLOSE
+            <KeyHint k="ESC" />
           </button>
         </header>
         <div className={styles.dialogBody}>
@@ -38,6 +41,18 @@ export function HelpOverlay({ onClose }: { onClose: () => void }) {
                 <tr key={cmd}>
                   <td className={styles.helpCmd}>{cmd}</td>
                   <td>{what}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className={styles.sectionHead}>KEYS</div>
+          <table className={styles.helpTable} data-testid="help-keys">
+            <tbody>
+              {KEYMAP.map((k) => (
+                <tr key={`${k.scope} ${k.keys}`}>
+                  <td className={styles.helpCmd}>{k.keys}</td>
+                  <td className={styles.bigFigure}>{k.scope}</td>
+                  <td>{k.action}</td>
                 </tr>
               ))}
             </tbody>

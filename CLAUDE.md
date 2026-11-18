@@ -89,7 +89,7 @@ This section is the spec. It replaces the earlier amber-label design. The overha
 | 5b ✅ | Compact DESK drawer for shocks, DESK newest on top, chart ≥ 60% of its column (D-077) |
 | 5.5a ✅ | JetBrains Mono (tnum, zero), big figure, 150ms tick flash only, 4px scale, 20px rows (D-078) |
 | 5.5b ✅ | Chart: crosshair + OHLCV, dashed last, ~12 axis labels, markers with hover text, double-click zoom (D-079) |
-| 5.5c | Keymap and key hints, `.mmm` timestamps |
+| 5.5c ✅ | Keymap (Space, F1-F4, TKT letters) with hints in controls, `.mmm` timestamps (D-080) |
 | 6 | Session launcher at `/`; the terminal at `/terminal` |
 
 Functions that have not shipped are not drawn: no placeholder panels, never a blank or fake state.
@@ -151,8 +151,8 @@ never uses a real company's name, logo or exact screens.
   launcher, so any run can still be reproduced.
 - The GLASS BOX is a full-screen reveal opened from STRAT (`BACKTEST`), not a permanent panel.
 - No scrolling ticker crawl and no bottom hint bar: TAPE and the command line cover them.
-- Keyboard first: every primary action has a key (shown inside the control in label gray, e.g.
-  `SEND ↵`); HELP lists the keymap. The mouse still works.
+- Keyboard first (D-080): every primary action has a key, shown inside the control in label gray
+  (`SEND ↵`, `PAUSE ␣`, `HELP F1`); single letters only inside TKT; HELP lists the keymap.
 
 ### Learn mode
 `?learn=1` (a checkbox on the launcher). Every sentence removed from the default view lives in

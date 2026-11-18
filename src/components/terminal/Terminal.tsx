@@ -10,6 +10,7 @@ import { FREE_PLAY, resolveRun, SCENARIOS, scenarioById, type Scenario } from "@
 import type { UserQueueResult } from "@/engine/simulation";
 import { clampStrategy, type StrategySpec } from "@/engine/strategy";
 import { parseCommand, type FunctionCode } from "@/lib/command";
+import { globalAction } from "@/lib/keymap";
 import { formatSimTime } from "@/engine/simClock";
 import { formatInterval } from "@/lib/format";
 import type { RunData } from "@/lib/glassbox/python";
@@ -443,6 +444,27 @@ export function Terminal() {
         setWhoWindow(null);
       }
     };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Global keys (D-080): Space and F1-F4, never while typing in a field. The handler is refreshed each
+  // render (it reads the current state) and installed once.
+  const globalKeys = useRef<(e: KeyboardEvent) => void>(() => undefined);
+  useEffect(() => {
+    globalKeys.current = (e: KeyboardEvent) => {
+      const action = globalAction(e.key, e.target, { ctrl: e.ctrlKey, meta: e.metaKey, alt: e.altKey });
+      if (action === null || e.repeat) return;
+      e.preventDefault();
+      if (action === "pause") void onCommand(paused ? "RUN" : "PAUSE");
+      else if (action === "help") setHelpOpen((o) => !o);
+      else if (action === "session") setSessionOpen((o) => !o);
+      else if (action === "drawer") toggleDrawer();
+      else if (action === "backtest" && market?.strategy != null && built !== null) setGlassOpen((o) => !o);
+    };
+  });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => globalKeys.current(e);
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);

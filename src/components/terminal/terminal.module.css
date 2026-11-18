@@ -300,6 +300,21 @@
   color: var(--label);
 }
 
+/* A control's key, inside it in label gray (D-080). On the amber SEND it is the button's own dark text. */
+.keyHint {
+  margin-left: 8px;
+  color: var(--label);
+  font-size: var(--fs-label);
+  font-weight: 400;
+}
+
+.sendBtn .keyHint,
+.buyOn .keyHint,
+.sellOn .keyHint {
+  color: inherit;
+  opacity: 0.7;
+}
+
 .num {
   color: var(--data);
   text-align: right;
@@ -431,7 +446,7 @@
 
 .chatRow {
   display: grid;
-  grid-template-columns: 64px 1fr;
+  grid-template-columns: 96px 1fr;
   gap: 8px;
   padding: 0 0;
 }
@@ -499,16 +514,16 @@
 }
 
 /* FILLS: columns sized to their content, tight padding, so ten Learn-mode columns fit at 1280 (D-076). */
-.fillsTable {
+.table.fillsTable {
   table-layout: auto;
 }
 
-.fillsTable th,
-.fillsTable td {
+.table.fillsTable th,
+.table.fillsTable td {
   padding: 0 4px;
 }
 
-.fillsTable th {
+.table.fillsTable th {
   white-space: nowrap;
 }
 
@@ -1359,5 +1374,9 @@
 
   .playBtn {
     padding: 0 8px;
+  }
+
+  .playback .keyHint {
+    display: none;
   }
 }

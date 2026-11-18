@@ -33,7 +33,7 @@ test("a headline opens the drawer on DESK; collapsed, it stays shut until the ne
   expect(desk.height).toBeLessThanOrEqual(115);
   expect(desk.width).toBeGreaterThan(0.95 * (await drawer.boundingBox())!.width);
   await expect(page.getByTestId("chat").locator("[data-kind=headline]")).toContainText("RATES"); // FED is the default RATES release
-  const times = await page.getByTestId("chat").locator("> div span:first-child").allTextContents();
+  const times = await page.getByTestId("chat").locator("> div > span:first-child").allTextContents();
   expect(times.length).toBeGreaterThan(1);
   expect([...times].sort().reverse()).toEqual(times); // newest first
   // During the shock the chart keeps at least 60% of the left column.

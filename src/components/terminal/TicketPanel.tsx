@@ -4,9 +4,11 @@ import { useState, type ReactNode } from "react";
 import type { Frame } from "@/engine/feed";
 import type { UserEvent } from "@/engine/simulation";
 import { parseCommand } from "@/lib/command";
+import { isTyping, ticketAction } from "@/lib/keymap";
 import { estimateMarketFill } from "@/lib/estimate";
 import { formatAvgPrice, formatBps, formatCentsPerShare, formatDollars, formatMid, formatMidX2, formatPrice, formatQty } from "@/lib/format";
 import { formatUserEvent } from "@/lib/userMessages";
+import { KeyHint } from "./KeyHint";
 import { Explain } from "./Learn";
 import styles from "./terminal.module.css";
 
@@ -58,6 +60,22 @@ export function TicketPanel({ frame, lastEvent, paused, onCommand }: { frame: Fr
   const fillPrice = (cents: number | null) => {
     if (cents !== null) setPrice(formatPrice(cents).replace(/,/g, ""));
   };
+  const chooseSide = (s: "buy" | "sell") => {
+    setSide(s);
+    if (type === "limit") fillPrice(s === "buy" ? frame.bid : frame.ask);
+  };
+  // The ticket's letters (D-080), with focus anywhere inside TKT: B, S, M, L. They are not valid in QTY
+  // or PX, so they never take a character from a field. ↵ in a field sends, as before.
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const action = ticketAction(e.key, { ctrl: e.ctrlKey, meta: e.metaKey, alt: e.altKey });
+    if (action === null) return;
+    // In QTY, "K" is allowed (5K); none of B, S, M, L is a digit, a separator or K.
+    if (isTyping(e.target) && (e.target as HTMLElement).tagName === "TEXTAREA") return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (action === "buy" || action === "sell") chooseSide(action);
+    else chooseType(action);
+  };
 
   // What the order would do, from the book on screen: one line of data (D-072); slippage in basis
   // points of the mid. Learn mode adds the words and cents per share.
@@ -91,7 +109,7 @@ export function TicketPanel({ frame, lastEvent, paused, onCommand }: { frame: Fr
 
   const { desk } = frame;
   return (
-    <div className={styles.ticket} data-testid="ticket">
+    <div className={styles.ticket} data-testid="ticket" onKeyDown={onKeyDown}>
       <Explain id="tkt.simulated" />
       <div className={styles.quoteRow} data-testid="ticket-quote">
         <span className={styles.label}>BID</span>
@@ -128,12 +146,10 @@ export function TicketPanel({ frame, lastEvent, paused, onCommand }: { frame: Fr
               className={`${styles.segBtn} ${side === s ? (s === "buy" ? styles.buyOn : styles.sellOn) : ""}`}
               aria-pressed={side === s}
               data-testid={`ticket-${s}`}
-              onClick={() => {
-                setSide(s);
-                if (type === "limit") fillPrice(s === "buy" ? frame.bid : frame.ask);
-              }}
+              onClick={() => chooseSide(s)}
             >
               {s.toUpperCase()}
+              <KeyHint k={s === "buy" ? "B" : "S"} />
             </button>
           ))}
         </div>
@@ -149,6 +165,7 @@ export function TicketPanel({ frame, lastEvent, paused, onCommand }: { frame: Fr
               onClick={() => chooseType(t)}
             >
               {t === "market" ? "MKT" : "LMT"}
+              <KeyHint k={t === "market" ? "M" : "L"} />
             </button>
           ))}
         </div>
@@ -208,6 +225,7 @@ export function TicketPanel({ frame, lastEvent, paused, onCommand }: { frame: Fr
 
       <button type="button" className={styles.sendBtn} disabled={order === null} data-testid="ticket-send" title={blocked?.reason} onClick={send}>
         {order === null ? "SEND" : `SEND ${side.toUpperCase()} ${formatQty(order.qty)} ${order.type === "market" ? "MKT" : `@ ${formatPrice(order.price)}`}`}
+        <KeyHint k="↵" />
       </button>
       {paused && (
         <div className={styles.note} data-testid="ticket-paused">

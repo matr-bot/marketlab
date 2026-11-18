@@ -2052,3 +2052,22 @@ During a shock the two-pane drawer took about a third of the screen, and the cha
   `src/lib/chart.ts` (codes, the zoomed range, the axis step) is unit-tested; `e2e/chart.spec.ts`
   covers hover, the WHO click, the marker text and the zoom.
 - Two e2e checks from step 5 read WHO twice while the window rolled (flaky); each now reads one snapshot.
+
+## D-080 · Step 5.5c: the keymap, key hints, millisecond timestamps
+
+**Date:** 2026-11-18 · **Status:** Accepted
+
+- **Three key scopes** (`src/lib/keymap.ts`, listed in HELP under KEYS). Single letters cannot be global:
+  typing anywhere goes to the command bar, and BUY, SELL, SEED… start with them. *Anywhere* (never
+  while typing in a field): `Space` PAUSE/RUN, `F1` HELP, `F2` SESSION, `F3` drawer, `F4` BACKTEST,
+  plus the existing ↵, Esc and ↑↓. *TKT* (focus inside the ticket): `B` `S` `M` `L` for BUY, SELL,
+  market, limit (none is valid in QTY or PX, so a field never loses a character), ↵ SEND. *STRAT
+  preview*: ↵ START, Tab edit, Esc cancel. Space activates the terminal, not a focused button (buttons
+  take ↵).
+- **Hints inside the controls**, in label gray: `PAUSE ␣`, `SESSION F2`, `HELP F1`, `▴ F3`, `BUY B`,
+  `SELL S`, `MKT M`, `LMT L`, `SEND … ↵`, `START ↵`, `CANCEL ESC`, `BACKTEST F4`, `CLOSE ESC`. Below
+  1400px the strip's hints are hidden so it stays one row.
+- **Timestamps** are HH:MM:SS.mmm with `.mmm` in label gray (`Time`) in TAPE, FILLS, DESK and the
+  strategy's last decision. The status clock keeps whole seconds (D-073).
+- FILLS's content-sized columns (D-076) now actually apply: `.table` came later in the stylesheet with
+  the same specificity, so its fixed layout had won.

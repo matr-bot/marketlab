@@ -8,7 +8,9 @@ import { formatDollars, formatQty } from "@/lib/format";
 import { describeRules, RULE_LABELS } from "@/lib/glassbox/english";
 import { dollars } from "@/lib/glassbox/formulas";
 import { Explain } from "./Learn";
+import { KeyHint } from "./KeyHint";
 import styles from "./terminal.module.css";
+import { Time } from "./Time";
 
 /** What STRAT shows: typing an idea, waiting for the AI, a preview to check and edit, or the live strategy. */
 export type StratState =
@@ -52,6 +54,11 @@ const FIELDS: readonly NumField[] = [
 /** A field's text while typing: kept as typed until it parses, so "0." is not thrown away. */
 function viewOf(v: number | null): string {
   return v === null ? "" : String(Number(v.toFixed(4)));
+}
+
+/** A decision without its time: `STOP LOSS: SELL 500 · mid 179.94 vs level 180.03`. */
+export function decisionText(d: StrategyDecision): string {
+  return decisionLine(d).slice(formatSimTime(d.time).length + 1);
 }
 
 /** One line for a decision, with the numbers the rule compared. */
@@ -151,10 +158,12 @@ export function StrategyPanel({
         </div>
         <div className={styles.formRow}>
           <button type="button" className={styles.secondary} data-testid="strat-start" onClick={onStart}>
-            START (ENTER)
+            START
+            <KeyHint k="↵" />
           </button>
           <button type="button" className={styles.chip} onClick={onCancel}>
-            CANCEL (ESC)
+            CANCEL
+            <KeyHint k="ESC" />
           </button>
         </div>
         <ul className={styles.stratRules} data-testid="strat-rules">
@@ -187,6 +196,7 @@ export function StrategyPanel({
       <div className={styles.formRow}>
         <button type="button" className={styles.secondary} data-testid="strat-reveal" title="The glass box: your strategy as English, rules, formulas with real numbers, and Python" onClick={onReveal}>
           BACKTEST
+          <KeyHint k="F4" />
         </button>
         {strategy.status === "running" && (
           <button type="button" className={styles.secondary} data-testid="strat-stop" onClick={onStop}>
@@ -231,7 +241,13 @@ export function StrategyPanel({
       </div>
       <Explain id="strat.sharpe" />
       <div className={styles.lastMessage} data-testid="strat-last">
-        {lastDecision === null ? "—" : decisionLine(lastDecision)}
+        {lastDecision === null ? (
+          "—"
+        ) : (
+          <>
+            <Time ms={lastDecision.time} /> {decisionText(lastDecision)}
+          </>
+        )}
       </div>
       {lastDecision === null && <Explain id="strat.waiting" />}
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { SPEEDS } from "@/lib/command";
+import { KeyHint } from "./KeyHint";
 import styles from "./terminal.module.css";
 
 /**
@@ -13,6 +14,7 @@ export function Playback({ paused, speed, sessionOpen, onCommand }: { paused: bo
     <span className={styles.playback} role="group" aria-label="Playback" data-testid="playback">
       <button type="button" className={`${styles.segBtn} ${styles.playBtn}`} aria-pressed={paused} data-testid="playback-pause" onClick={() => onCommand(paused ? "RUN" : "PAUSE")} title={paused ? "Resume the market (RUN)" : "Pause the market (PAUSE)"}>
         {paused ? "RUN" : "PAUSE"}
+        <KeyHint k="␣" />
       </button>
       <span className={styles.segment} role="group" aria-label="Speed">
         {SPEEDS.map((n) => (
@@ -24,9 +26,11 @@ export function Playback({ paused, speed, sessionOpen, onCommand }: { paused: bo
       <span className={styles.statusSep} aria-hidden />
       <button type="button" className={`${styles.segBtn} ${styles.playBtn} ${sessionOpen ? styles.segOn : ""}`} aria-pressed={sessionOpen} aria-haspopup="dialog" data-testid="playback-session" onClick={() => onCommand("SESSION")} title="Scenario, seed, mode and link (SESSION)">
         SESSION
+        <KeyHint k="F2" />
       </button>
       <button type="button" className={`${styles.segBtn} ${styles.playBtn}`} onClick={() => onCommand("HELP")} title="Every command and abbreviation (HELP)">
         HELP
+        <KeyHint k="F1" />
       </button>
     </span>
   );

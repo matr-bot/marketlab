@@ -1,9 +1,9 @@
 "use client";
 
 import type { ChatMessage } from "@/engine/narrator";
-import { formatSimTime } from "@/engine/simClock";
 import { Explain } from "./Learn";
 import styles from "./terminal.module.css";
+import { Time } from "./Time";
 
 /**
  * Desk chat: the narrator's messages (D-055), every number from the engine. Newest on top (D-077), so
@@ -20,7 +20,9 @@ export function ChatPanel({ chat }: { chat: readonly ChatMessage[] }) {
       )}
       {[...chat].reverse().map((m) => (
         <div key={m.seq} className={styles.chatRow} data-kind={m.kind}>
-          <span className={styles.chatTime}>{formatSimTime(m.time).slice(0, 8)}</span>
+          <span className={styles.chatTime}>
+            <Time ms={m.time} />
+          </span>
           <span>{m.text}</span>
         </div>
       ))}

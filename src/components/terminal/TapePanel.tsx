@@ -1,9 +1,9 @@
 "use client";
 
 import type { FrameTrade } from "@/engine/feed";
-import { formatSimTime } from "@/engine/simClock";
 import { bigFigureLength, formatPrice, formatQty } from "@/lib/format";
 import styles from "./terminal.module.css";
+import { Time } from "./Time";
 
 const ROWS = 60;
 
@@ -36,7 +36,9 @@ export function TapePanel({ tape }: { tape: readonly FrameTrade[] }) {
             const tick = t.tick === "up" ? styles.up : styles.down;
             return (
               <tr key={t.seq} data-aggressor={t.aggressor} data-tick={t.tick}>
-                <td>{formatSimTime(t.time)}</td>
+                <td>
+                  <Time ms={t.time} />
+                </td>
                 <td className={tick}>
                   <span className={styles.bigFigure}>{px.slice(0, big)}</span>
                   {px.slice(big)}

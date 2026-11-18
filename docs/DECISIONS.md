@@ -2081,3 +2081,13 @@ During a shock the two-pane drawer took about a third of the screen, and the cha
 - **BOOK:** a fixed split instead of the shared prefix: the dollars and the point are gray, the last two
   digits (the cents) bright: `186.|96`. The levels' cents are what a trader scans. The shared-prefix
   helper (`bigFigureLength`) is removed.
+
+## D-082 · Step 6a: the terminal moves to /terminal; old run links still work
+
+**Date:** 2026-11-18 · **Status:** Accepted
+
+- The terminal is at `/terminal`; `/` becomes the landing page (D-083).
+- LINK, the address bar and SESSION use `/terminal?scn=…&seed=…[&learn=1]` (`sessionLink`).
+- A link from before (`/?scn=…&seed=…` or `/?seed=…`, what LINK used to copy, possibly handed out as
+  assignments) redirects in `next.config.ts` with a 307, before rendering, with its query string carried
+  over, so it opens the same run. The engine's `runLink` is unchanged.

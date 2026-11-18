@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 // panels, strip and drawer has border-radius 0 and no shadow, as the browser actually computes them.
 
 test("panels, status strip and drawer: border-radius 0 and no box-shadow anywhere", async ({ page }) => {
-  await page.goto("/?seed=187");
+  await page.goto("/terminal?seed=187");
   await expect(page.getByTestId("last-price")).toBeVisible();
   await page.getByTestId("drawer-tab-STRAT").click();
   await page.getByTestId("playback-session").click();
@@ -21,7 +21,7 @@ test("panels, status strip and drawer: border-radius 0 and no box-shadow anywher
 });
 
 test("numbers use tabular figures with a slashed zero in the self-hosted mono font", async ({ page }) => {
-  await page.goto("/?seed=187");
+  await page.goto("/terminal?seed=187");
   await expect(page.getByTestId("last-price")).toBeVisible();
   const style = await page.getByTestId("last-price").evaluate((el) => {
     const cs = getComputedStyle(el);

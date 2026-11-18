@@ -9,7 +9,7 @@ async function command(page: Page, text: string) {
 }
 
 test("hovering a candle shows its OHLCV; a click still picks it for WHO", async ({ page }) => {
-  await page.goto("/?seed=187");
+  await page.goto("/terminal?seed=187");
   await expect(page.getByTestId("last-price")).toBeVisible();
   await command(page, "PAUSE");
   const chart = page.getByTestId("chart");
@@ -26,7 +26,7 @@ test("hovering a candle shows its OHLCV; a click still picks it for WHO", async 
 });
 
 test("a headline marker shows its full headline on hover; double-click zooms the price axis, again resets", async ({ page }) => {
-  await page.goto("/?seed=187");
+  await page.goto("/terminal?seed=187");
   await expect(page.getByTestId("last-price")).toBeVisible();
   await command(page, "CEO");
   await expect(page.getByTestId("chart")).toHaveAttribute("data-markers", "CEO");

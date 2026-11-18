@@ -7,7 +7,7 @@ async function command(page: Page, value: string) {
 }
 
 test("RATES uses the FED calibration, shares its digest gate, and reports peak plus 30 s move", async ({ page }) => {
-  await page.goto("/?seed=187");
+  await page.goto("/terminal?seed=187");
   await expect(page.getByTestId("last-price")).toBeVisible();
   await command(page, "NEWS");
   await command(page, "RATES +0.75");
@@ -35,7 +35,7 @@ test("RATES uses the FED calibration, shares its digest gate, and reports peak p
 });
 
 test("macro-day hides actuals before release, then reveals a card and its 30 s price move", async ({ page }) => {
-  await page.goto("/?scn=macro-day&seed=4106");
+  await page.goto("/terminal?scn=macro-day&seed=4106");
   await expect(page.getByTestId("last-price")).toBeVisible();
   await command(page, "NEWS");
   const calendar = page.getByTestId("release-calendar");
@@ -56,7 +56,7 @@ test("macro-day hides actuals before release, then reveals a card and its 30 s p
 test("demo keeps STRAT usable beside a hidden-actual calendar, then reveals both releases", async ({ page }) => {
   test.setTimeout(45_000);
   await page.route("**/api/interpret", (route) => route.abort());
-  await page.goto("/?scn=demo&seed=4107");
+  await page.goto("/terminal?scn=demo&seed=4107");
   await expect(page.getByTestId("last-price")).toBeVisible();
   await command(page, "PAUSE");
   await expect(page.getByTestId("strat")).toBeVisible();
@@ -84,7 +84,7 @@ test("demo keeps STRAT usable beside a hidden-actual calendar, then reveals both
 });
 
 test("HELP and invalid release values give a concrete command example", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/terminal");
   await expect(page.getByTestId("last-price")).toBeVisible();
   await command(page, "HELP");
   await expect(page.getByTestId("help")).toContainText("CPI 3.4 · JOBS 150K · GDP 2.3 · RATES +0.75");

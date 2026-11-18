@@ -8,7 +8,7 @@ async function command(page: Page, text: string) {
 }
 
 test("free play opens with the drawer collapsed to its tab row", async ({ page }) => {
-  await page.goto("/?seed=187");
+  await page.goto("/terminal?seed=187");
   await expect(page.getByTestId("last-price")).toBeVisible();
   const drawer = page.getByTestId("drawer");
   await expect(drawer).not.toHaveAttribute("data-open", /.*/);
@@ -20,7 +20,7 @@ test("free play opens with the drawer collapsed to its tab row", async ({ page }
 });
 
 test("a headline opens the drawer on DESK; collapsed, it stays shut until the next headline", async ({ page }) => {
-  await page.goto("/?seed=187");
+  await page.goto("/terminal?seed=187");
   await expect(page.getByTestId("last-price")).toBeVisible();
   const drawer = page.getByTestId("drawer");
   await command(page, "SPEED 8");
@@ -67,7 +67,7 @@ test("a headline opens the drawer on DESK; collapsed, it stays shut until the ne
 });
 
 test("STRATEGY, DESK and NEWS tabs, and the function codes route to them", async ({ page }) => {
-  await page.goto("/?seed=187");
+  await page.goto("/terminal?seed=187");
   await expect(page.getByTestId("last-price")).toBeVisible();
   const drawer = page.getByTestId("drawer");
   await page.getByTestId("drawer-tab-STRAT").click();
@@ -83,7 +83,7 @@ test("STRATEGY, DESK and NEWS tabs, and the function codes route to them", async
 });
 
 test("a scenario opens the drawer on NEWS; a fill shows on the ticket's FILLS tab", async ({ page }) => {
-  await page.goto("/?scn=rate-shock&seed=4101");
+  await page.goto("/terminal?scn=rate-shock&seed=4101");
   await expect(page.getByTestId("last-price")).toBeVisible();
   await expect(page.getByTestId("drawer").locator("[data-pane=NEWS]")).toBeVisible();
   await expect(page.getByTestId("scenario-title")).toBeVisible();
@@ -95,7 +95,7 @@ test("a scenario opens the drawer on NEWS; a fill shows on the ticket's FILLS ta
 });
 
 test("TKT tabs: ORDER, FILLS (EXR) and OPEN, with resting orders and CANCEL ALL on OPEN (D-075)", async ({ page }) => {
-  await page.goto("/?seed=187");
+  await page.goto("/terminal?seed=187");
   await expect(page.getByTestId("last-price")).toBeVisible();
   await command(page, "PAUSE");
   await command(page, "BUY 100 @ 150.00"); // far below the market: rests
@@ -114,7 +114,7 @@ test("TKT tabs: ORDER, FILLS (EXR) and OPEN, with resting orders and CANCEL ALL 
 });
 
 test("WHO keeps its five rows at all times, zero rows gray, with NET colored by direction (D-076)", async ({ page }) => {
-  await page.goto("/?seed=187");
+  await page.goto("/terminal?seed=187");
   await expect(page.getByTestId("last-price")).toBeVisible();
   const who = page.getByTestId("who");
   await expect(who.locator("tbody tr")).toHaveCount(5);

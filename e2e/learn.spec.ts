@@ -8,7 +8,7 @@ async function command(page: Page, text: string) {
 }
 
 test("default view: no explanations, no panel descriptions", async ({ page }) => {
-  await page.goto("/?seed=187");
+  await page.goto("/terminal?seed=187");
   await expect(page.getByTestId("last-price")).toBeVisible();
   await expect(page.getByTestId("tape").locator("tbody tr").first()).toBeVisible();
   await expect(page.locator("[data-explain]")).toHaveCount(0);
@@ -17,7 +17,7 @@ test("default view: no explanations, no panel descriptions", async ({ page }) =>
 });
 
 test("Learn mode shows the explanations removed from the default view, and keeps them across a rerun", async ({ page }) => {
-  await page.goto("/?seed=187&learn=1");
+  await page.goto("/terminal?seed=187&learn=1");
   await expect(page.getByTestId("last-price")).toBeVisible();
   await expect(page.getByTestId("status-bar")).toContainText("every trade from 77 agents");
   await expect(page.locator("[data-panel=WHO] header")).toContainText("WHO MOVED THE PRICE");
@@ -40,7 +40,7 @@ test("Learn mode shows the explanations removed from the default view, and keeps
 });
 
 test("HELP lists the abbreviation dictionary and Learn mode", async ({ page }) => {
-  await page.goto("/?seed=187");
+  await page.goto("/terminal?seed=187");
   await command(page, "HELP");
   const help = page.getByTestId("help");
   await expect(help.getByTestId("help-abbrev")).toContainText("Basis points");

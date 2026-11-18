@@ -10,7 +10,7 @@ test("the market is alive on load: prices change within 5 seconds, with no conso
   });
   page.on("pageerror", (err) => errors.push(err.message));
 
-  await page.goto("/");
+  await page.goto("/terminal");
   const last = page.getByTestId("last-price");
   await expect(last).toBeVisible({ timeout: 5_000 });
   const opening = await last.textContent();
@@ -65,7 +65,7 @@ test("the offline headline FED, typed into the command bar, moves the market wit
   });
   page.on("pageerror", (err) => errors.push(err.message));
   const requests: string[] = [];
-  await page.goto("/");
+  await page.goto("/terminal");
   const last = page.getByTestId("last-price");
   await expect(last).toBeVisible({ timeout: 5_000 });
   page.on("request", (r) => requests.push(r.url()));
@@ -100,7 +100,7 @@ test("typing FED 30 times quickly never freezes the page (D-051)", async ({ page
     if (msg.type() === "error") errors.push(msg.text());
   });
   page.on("pageerror", (err) => errors.push(err.message));
-  await page.goto("/");
+  await page.goto("/terminal");
   await expect(page.getByTestId("last-price")).toBeVisible({ timeout: 5_000 });
 
   for (let i = 0; i < 30; i++) {
@@ -140,7 +140,7 @@ test("a custom headline: the AI's params preview, Enter applies, the price react
       },
     }),
   );
-  await page.goto("/?learn=1"); // Learn mode: WHO says in words who moved the price (D-072)
+  await page.goto("/terminal?learn=1"); // Learn mode: WHO says in words who moved the price (D-072)
   const last = page.getByTestId("last-price");
   await expect(last).toBeVisible({ timeout: 5_000 });
   const price = async () => Number((await last.textContent())!.replace(/,/g, ""));
@@ -179,7 +179,7 @@ test("a custom headline: the AI's params preview, Enter applies, the price react
 
 test("with the AI route down, a clear headline falls back to its offline preset and others have no effect (D-052)", async ({ page }) => {
   await page.route("**/api/interpret", (route) => route.abort());
-  await page.goto("/");
+  await page.goto("/terminal");
   await expect(page.getByTestId("last-price")).toBeVisible({ timeout: 5_000 });
   await page.keyboard.type("Aliens land in Ohio");
   await page.keyboard.press("Enter");

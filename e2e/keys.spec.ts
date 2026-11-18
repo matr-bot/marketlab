@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 // focus inside TKT, and the key shown inside each control.
 
 test("Space pauses and resumes; F1 HELP, F2 SESSION, F3 drawer", async ({ page }) => {
-  await page.goto("/?seed=187");
+  await page.goto("/terminal?seed=187");
   await expect(page.getByTestId("last-price")).toBeVisible();
   await page.locator("[data-panel=GP]").click({ position: { x: 5, y: 5 } }); // focus out of any field
   await page.keyboard.press(" ");
@@ -31,7 +31,7 @@ test("Space pauses and resumes; F1 HELP, F2 SESSION, F3 drawer", async ({ page }
 });
 
 test("Space types a space in the command bar instead of pausing", async ({ page }) => {
-  await page.goto("/?seed=187");
+  await page.goto("/terminal?seed=187");
   await expect(page.getByTestId("last-price")).toBeVisible();
   await page.getByTestId("command-input").click();
   await page.keyboard.type("BUY 1");
@@ -40,7 +40,7 @@ test("Space types a space in the command bar instead of pausing", async ({ page 
 });
 
 test("the ticket's letters: B S M L with focus in TKT, and each control shows its key", async ({ page }) => {
-  await page.goto("/?seed=187");
+  await page.goto("/terminal?seed=187");
   await expect(page.getByTestId("last-price")).toBeVisible();
   await expect(page.getByTestId("ticket-buy")).toHaveText("BUYB");
   await expect(page.getByTestId("ticket-send")).toContainText("↵");
@@ -60,7 +60,7 @@ test("the ticket's letters: B S M L with focus in TKT, and each control shows it
 });
 
 test("timestamps show milliseconds in gray", async ({ page }) => {
-  await page.goto("/?seed=187");
+  await page.goto("/terminal?seed=187");
   const cell = page.getByTestId("tape").locator("tbody tr").first().locator("td").first();
   await expect(cell).toHaveText(/^\d\d:\d\d:\d\d\.\d{3}$/);
   expect(await cell.locator("span").evaluate((el) => [el.textContent, getComputedStyle(el).color])).toEqual([expect.stringMatching(/^\.\d{3}$/), "rgb(122, 122, 122)"]);

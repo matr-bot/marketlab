@@ -12,14 +12,14 @@ function watchErrors(page: import("@playwright/test").Page) {
 
 test("a scenario link opens the assigned scenario and seed", async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto("/?scn=rate-shock&seed=4101");
+  await page.goto("/terminal?scn=rate-shock&seed=4101");
   await expect(page.getByTestId("last-price")).toBeVisible({ timeout: 8_000 });
   await expect(page.getByTestId("scenario-title")).toBeVisible();
   // Scenario and seed live in SESSION, off the status strip (D-073).
   await page.getByTestId("playback-session").click();
   await expect(page.getByTestId("status-scenario")).toContainText(/rate/i);
   await expect(page.getByTestId("session-seed")).toHaveText("4101");
-  await expect(page.getByTestId("session")).toContainText("/?scn=rate-shock&seed=4101");
+  await expect(page.getByTestId("session")).toContainText("/terminal?scn=rate-shock&seed=4101");
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("session")).toHaveCount(0);
   expect(errors).toEqual([]);
@@ -27,7 +27,7 @@ test("a scenario link opens the assigned scenario and seed", async ({ page }) =>
 
 test("a market order fills and the execution report splits its cost", async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto("/");
+  await page.goto("/terminal");
   await expect(page.getByTestId("last-price")).toBeVisible({ timeout: 8_000 });
   // EXR is the ticket's FILLS tab (D-075): no count before any fill.
   await expect(page.getByTestId("ticket-tab-FILLS")).toHaveText("FILLS");
@@ -49,7 +49,7 @@ test("a market order fills and the execution report splits its cost", async ({ p
 });
 
 test("PAUSE freezes the clock and RUN resumes it; the ticket shows the pause", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/terminal");
   await expect(page.getByTestId("last-price")).toBeVisible({ timeout: 8_000 });
   await page.keyboard.type("PAUSE");
   await page.keyboard.press("Enter");
@@ -64,7 +64,7 @@ test("PAUSE freezes the clock and RUN resumes it; the ticket shows the pause", a
 });
 
 test("HELP opens the command list and Close dismisses it", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/terminal");
   await expect(page.getByTestId("last-price")).toBeVisible({ timeout: 8_000 });
   await page.keyboard.type("HELP");
   await page.keyboard.press("Enter");
@@ -86,7 +86,7 @@ test("a headline that starts with a command word goes to the AI preview, and NEW
       },
     }),
   );
-  await page.goto("/");
+  await page.goto("/terminal");
   await expect(page.getByTestId("last-price")).toBeVisible({ timeout: 8_000 });
 
   await page.keyboard.type("Buy now, pay later lender collapses");
@@ -107,7 +107,7 @@ test("a headline that starts with a command word goes to the AI preview, and NEW
 });
 
 test("the status strip is one row with playback on it; SESSION and the speed segment work (D-073)", async ({ page }) => {
-  await page.goto("/?seed=187");
+  await page.goto("/terminal?seed=187");
   await expect(page.getByTestId("last-price")).toBeVisible({ timeout: 8_000 });
   const bar = page.getByTestId("status-bar");
   await expect(bar).toContainText(/^MLAB\s*[\d,.]+\s*[+-]?[\d.]+ \([+-]?[\d.]+%\)/);

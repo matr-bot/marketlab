@@ -14,7 +14,7 @@ async function quote(page: Page) {
 }
 
 test("QA #1: status and NEWS use the same scenario-open price", async ({ page }) => {
-  await page.goto("/?scn=quiet-buy&seed=4105");
+  await page.goto("/terminal?scn=quiet-buy&seed=4105");
   await expect(page.getByTestId("last-price")).toBeVisible();
   await command(page, "PAUSE");
   const title = await page.getByTestId("status-change").getAttribute("title");
@@ -31,7 +31,7 @@ test("QA #1: status and NEWS use the same scenario-open price", async ({ page })
 });
 
 test("QA #2 and #8: a student's resting order is marked in BOOK and its later fill is announced", async ({ page }) => {
-  await page.goto("/?seed=187");
+  await page.goto("/terminal?seed=187");
   await expect(page.getByTestId("last-price")).toBeVisible();
   await command(page, "PAUSE");
   const { ask } = await quote(page);
@@ -47,7 +47,7 @@ test("QA #2 and #8: a student's resting order is marked in BOOK and its later fi
 });
 
 test("QA #8: BOOK lists a student's order beyond the visible levels", async ({ page }) => {
-  await page.goto("/?seed=187");
+  await page.goto("/terminal?seed=187");
   await expect(page.getByTestId("last-price")).toBeVisible();
   const { bid } = await quote(page);
   const farBid = (Number(bid.replaceAll(",", "")) - 1).toFixed(2);
@@ -56,7 +56,7 @@ test("QA #8: BOOK lists a student's order beyond the visible levels", async ({ p
 });
 
 test("QA #3: CHAT does not invent a quiet-market rate at the open", async ({ page }) => {
-  await page.goto("/?seed=187");
+  await page.goto("/terminal?seed=187");
   await expect(page.getByTestId("last-price")).toBeVisible();
   await expect.poll(async () => page.getByTestId("sim-clock").innerText()).not.toBe("09:40:00");
   await command(page, "CHAT"); // the desk chat is in the drawer (D-074)
@@ -66,7 +66,7 @@ test("QA #3: CHAT does not invent a quiet-market rate at the open", async ({ pag
 
 test("QA #4: HELP explains offline scope; a CEO mention alone does not become fraud", async ({ page }) => {
   await page.route("**/api/interpret", (route) => route.abort());
-  await page.goto("/");
+  await page.goto("/terminal");
   await expect(page.getByTestId("last-price")).toBeVisible();
   await command(page, "HELP");
   await expect(page.getByTestId("help")).toContainText("only a clear event");
@@ -78,7 +78,7 @@ test("QA #4: HELP explains offline scope; a CEO mention alone does not become fr
 });
 
 test("QA #7: a half-cent mid is identical in BOOK, TKT and an executed order's EXR", async ({ page }) => {
-  await page.goto("/?seed=187&learn=1"); // ARR MID is a Learn-mode column (D-072)
+  await page.goto("/terminal?seed=187&learn=1"); // ARR MID is a Learn-mode column (D-072)
   await expect(page.getByTestId("last-price")).toBeVisible();
   await command(page, "SPEED 8");
   await expect.poll(async () => (await quote(page)).mid, { timeout: 8_000 }).toMatch(/\.\d{3}$/);
@@ -106,7 +106,7 @@ test("QA #9: an oversized positive SHOCK reports the engine's actual cap", async
       Reflect.apply(post, this, [message, options]);
     };
   });
-  await page.goto("/");
+  await page.goto("/terminal");
   await expect(page.getByTestId("last-price")).toBeVisible();
   await command(page, "SHOCK 999");
   expect(await page.evaluate(() => (window as Window & { __qaShock?: unknown }).__qaShock)).toMatchObject({ fairValuePct: 9.99, panicSensitivity: 1 });
@@ -115,7 +115,7 @@ test("QA #9: an oversized positive SHOCK reports the engine's actual cap", async
 });
 
 test("QA #10: the ticket explains blocked SEND, and SCN explains its seed change", async ({ page }) => {
-  await page.goto("/?seed=187");
+  await page.goto("/terminal?seed=187");
   await expect(page.getByTestId("last-price")).toBeVisible();
   await page.getByTestId("ticket-qty").fill("abc");
   await expect(page.getByTestId("ticket-send")).toBeDisabled();
@@ -131,7 +131,7 @@ test("QA #10: the ticket explains blocked SEND, and SCN explains its seed change
 for (const height of [720, 600]) {
   test(`QA #6: 1280x${height} keeps the quiet-buy tracker and SEND visible; clipped rows cut hard, no scrollbars`, async ({ page }) => {
     await page.setViewportSize({ width: 1280, height });
-    await page.goto("/?scn=quiet-buy&seed=4105");
+    await page.goto("/terminal?scn=quiet-buy&seed=4105");
     await expect(page.getByTestId("last-price")).toBeVisible();
     await expect(page.getByTestId("scenario-target")).toBeInViewport();
     await expect(page.getByTestId("ticket-send")).toBeInViewport();

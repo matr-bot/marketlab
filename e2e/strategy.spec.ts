@@ -20,7 +20,7 @@ test("the demo: a strategy in plain English trades through FED, shows in EXR, an
     if (body.kind !== "strategy") return route.abort(); // FED is an offline preset: no headline call expected
     await route.fulfill({ json: { ok: true, source: "ai", text: body.text, strategy: { spec: SPEC, reason: "Panic selling overshoots fair value, then the price recovers" } } });
   });
-  await page.goto("/");
+  await page.goto("/terminal");
   await expect(page.getByTestId("last-price")).toBeVisible({ timeout: 8_000 });
 
   // 1. IDEA: the drawer is collapsed in free play; its STRATEGY tab opens the strategy pane (D-074).
@@ -70,7 +70,7 @@ test("the demo: a strategy in plain English trades through FED, shows in EXR, an
 
 test("with no network, simple phrasing is understood offline and labelled so, never as the AI", async ({ page }) => {
   await page.route("**/api/interpret", (route) => route.abort());
-  await page.goto("/");
+  await page.goto("/terminal");
   await expect(page.getByTestId("last-price")).toBeVisible({ timeout: 8_000 });
   await page.keyboard.type(`STRAT ${IDEA}`); // the command bar works too
   await page.keyboard.press("Enter");

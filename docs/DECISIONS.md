@@ -2118,3 +2118,19 @@ technical layer behind `[+]` (a native `<details>`: it opens in place, without a
   (Vercel's commit, else git, else `dev`), and HELP (the keys line).
 - Keys follow the links themselves (a full page load), so the terminal always reads its run from the
   address.
+
+## D-084 · Step 6c: the hero is a deterministic replay of the Fed hike
+
+**Date:** 2026-11-18 · **Status:** Accepted
+
+- Beside the hero line, a framed mini GP over the WHO table replays the FED moment from the real
+  engine in a worker: the `rate-shock` scenario on seed 187, read-only (nothing is ever sent to it), at
+  4× speed. About 7.5 s of calm, the hike's marker, the crash candle, and WHO filling with panic sellers
+  and value traders; at 90 sim-seconds after the open it starts again (a new loop is a RERUN). Labeled
+  `REPLAY · SEED 187` with the sim clock.
+- It is a replay because it is deterministic: a seeded engine with a scheduled shock (sim time, not a UI
+  timer) and no inputs gives the same market on every loop and on every visitor's screen. A UI-sent
+  FED would land on whichever tick the message arrived, so it is not used here.
+- The marker reads **HIKE**, the code the engine logs for this scenario's headline ("Fed surprise hike
+  75bps", the same shock as the FED preset); the full headline shows on hover. The screen shows what the
+  engine did, so it is not relabeled FED.

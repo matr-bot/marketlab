@@ -161,8 +161,14 @@ test("a custom headline: the AI's params preview, Enter applies, the price react
 
   await expect(page.getByTestId("chat").locator("[data-kind=headline]")).toContainText("Chip supplier halts all deliveries to MLAB · fair value -4.0%");
   await expect(page.getByTestId("who-summary")).toHaveText(/^\d+% of (selling|buying) came from [a-z ]+\.$/);
-  const pcts = await page.getByTestId("who").locator("[data-type]").evaluateAll((rows) => rows.map((r) => Number(r.children[2].textContent!.replace("%", ""))));
-  expect(pcts.length).toBeGreaterThan(1);
+  // WHO (D-076): five fixed rows, % of all aggressive volume summing to 100, NET = buying − selling.
+  const rows = await page.getByTestId("who").locator("tbody tr").evaluateAll((trs) =>
+    (trs as HTMLTableRowElement[]).map((r) => ({ label: r.cells[0].textContent, sell: Number(r.cells[1].textContent!.replace(/,/g, "")), buy: Number(r.cells[2].textContent!.replace(/,/g, "")), pct: Number(r.cells[3].textContent) })),
+  );
+  expect(rows.map((r) => r.label)).toEqual(["MM", "NOISE", "VALUE", "PANIC", "YOU"]);
+  expect(rows.reduce((s, r) => s + r.pct, 0)).toBe(100);
+  const net = Number((await page.getByTestId("who-net").locator("td").nth(1).textContent())!.replace(/,/g, ""));
+  expect(net).toBe(rows.reduce((s, r) => s + r.buy - r.sell, 0));
   expect(errors).toEqual([]);
 });
 

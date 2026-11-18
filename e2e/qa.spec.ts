@@ -92,7 +92,7 @@ test("QA #7: a half-cent mid is identical in BOOK, TKT and an executed order's E
   await command(page, "BUY 100");
   await command(page, "RUN");
   await command(page, "EXR"); // the ticket's FILLS tab (D-075)
-  const arrivalMid = page.getByTestId("exr-row").first().locator("td").nth(5);
+  const arrivalMid = page.getByTestId("exr-arrival").first(); // Learn mode's line under the order (D-076)
   await expect(arrivalMid).toHaveText(mid);
 });
 

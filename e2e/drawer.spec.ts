@@ -93,3 +93,24 @@ test("TKT tabs: ORDER, FILLS (EXR) and OPEN, with resting orders and CANCEL ALL 
   await expect(page.getByTestId("ticket-tab-ORDER")).toHaveAttribute("aria-selected", "true");
   await expect(page.getByTestId("ticket-send")).toBeVisible();
 });
+
+test("WHO keeps its five rows at all times, zero rows gray, with NET colored by direction (D-076)", async ({ page }) => {
+  await page.goto("/?seed=187");
+  await expect(page.getByTestId("last-price")).toBeVisible();
+  const who = page.getByTestId("who");
+  await expect(who.locator("tbody tr")).toHaveCount(5);
+  await expect(who.locator("tbody tr td:first-child")).toHaveText(["MM", "NOISE", "VALUE", "PANIC", "YOU"]);
+  // YOU has not traded: a zero row, in label gray.
+  const you = who.locator("tr[data-type=user]");
+  await expect(you).toHaveAttribute("data-zero", "true");
+  expect(await you.locator("td").first().evaluate((el) => getComputedStyle(el).color)).toBe("rgb(122, 122, 122)");
+  const box = await who.locator("table").boundingBox();
+  await page.waitForTimeout(1_500);
+  expect(await who.locator("table").boundingBox()).toEqual(box); // no layout shift as the window rolls
+  // NET: green when buying exceeds selling, red when selling does.
+  const netCell = page.getByTestId("who-net").locator("td").nth(1);
+  const text = (await netCell.textContent())!;
+  const color = await netCell.evaluate((el) => getComputedStyle(el).color);
+  if (text.startsWith("+")) expect(color).toBe("rgb(38, 166, 91)");
+  else if (text.startsWith("-")) expect(color).toBe("rgb(229, 72, 77)");
+});

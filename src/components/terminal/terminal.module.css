@@ -443,43 +443,98 @@
   padding: 2px 8px;
 }
 
+/* WHO: a fixed table (D-076). */
+.whoTable td:first-child,
+.whoTable th:first-child {
+  text-align: left;
+  padding-left: 0;
+}
+
+.whoTable th:last-child,
+.whoTable td:last-child {
+  width: 96px;
+}
+
+.whoZero td {
+  color: var(--label);
+}
+
+.whoPct {
+  position: relative;
+}
+
+.whoBar {
+  position: absolute;
+  right: 0;
+  top: 2px;
+  bottom: 2px;
+  max-width: 100%;
+  background: var(--bar);
+}
+
+.whoPctText {
+  position: relative;
+}
+
+.whoNet td {
+  border-top: 1px solid var(--border);
+  padding-top: 2px;
+}
+
+.whoNet td:first-child {
+  color: var(--label);
+  font-size: var(--fs-label);
+}
+
+/* FILLS: columns sized to their content, tight padding, so ten Learn-mode columns fit at 1280 (D-076). */
+.fillsTable {
+  table-layout: auto;
+}
+
+.fillsTable th,
+.fillsTable td {
+  padding: 0 3px;
+}
+
+.fillsTable th {
+  white-space: nowrap;
+}
+
+.fillsLearn td {
+  text-align: left;
+  color: var(--label);
+  font-size: var(--fs-label);
+  padding-bottom: 2px;
+}
+
+/* FILLS totals: labels over values, one row (D-076). */
+.totals {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.totals dt {
+  color: var(--label);
+  font-size: var(--fs-label);
+  text-align: right;
+}
+
+.totals dd {
+  text-align: right;
+  white-space: nowrap;
+}
+
 .whoSummary {
   color: var(--data);
   font-weight: 700;
   padding: 2px 0 4px;
 }
 
-.whoSide {
-  margin-bottom: 4px;
-}
 
-.whoHead {
-  font-size: var(--fs-label);
-  display: flex;
-  justify-content: space-between;
-  color: var(--label);
-  border-bottom: 1px solid var(--border);
-}
 
-.whoRow {
-  position: relative;
-  display: grid;
-  grid-template-columns: 1fr 80px 44px;
-}
 
-.whoRow > span {
-  position: relative;
-  z-index: 1;
-}
 
-.whoRow > .whoBar {
-  position: absolute;
-  z-index: 0;
-  left: 0;
-  top: 1px;
-  bottom: 1px;
-  background: var(--bar);
-}
 
 .headlineItem {
   color: var(--label);
@@ -1043,16 +1098,6 @@
 }
 
 /* EXR: the first two columns are wider (a clock time, a side); the numbers share the rest. */
-.exrScroll .table th:nth-child(1),
-.exrScroll .table td:nth-child(1) {
-  width: 104px;
-}
-
-.exrScroll .table th:nth-child(2),
-.exrScroll .table td:nth-child(2) {
-  width: 52px;
-}
-
 /* ---------- STRAT (D-064) ---------- */
 .strat {
   position: absolute;

@@ -24,6 +24,8 @@ export const ABBREV = {
   MKT: "Market order: trades now at the best prices available.",
   LMT: "Limit order: trades only at your price or better; otherwise it rests in the book.",
   FV: "Fair value: what value traders believe the stock is worth.",
+  MM: "Market makers: quote both sides and earn the spread (Avellaneda–Stoikov).",
+  NET: "Aggressive buying minus aggressive selling, in shares.",
 } as const;
 
 /** Long forms and variants that a label must not use, with the dictionary term to use instead. */

@@ -85,7 +85,7 @@ This section is the spec. It replaces the earlier amber-label design. The overha
 | 4a ✅ | Status strip + playback + SESSION popover (D-073) |
 | 4b ✅ | 65-35 grid + two-pane drawer, auto-open rules, playback trimmed (D-074) |
 | 4c ✅ | Ticket tabs ORDER / FILLS (EXR) / OPEN, every code routed (D-075) |
-| 5 | Panel content (WHO table, TAPE B/S, BOOK tints, ticket one-line estimate) |
+| 5 ✅ | Panel content: WHO fixed table with NET, FILLS totals, no overflowing text (D-076) |
 | 5.5 | Detail pass (self-hosted mono font, decimal alignment, chart crosshair, keymap) |
 | 6 | Session launcher at `/`; the terminal at `/terminal` |
 

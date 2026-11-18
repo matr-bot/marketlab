@@ -1968,3 +1968,27 @@ the ticket's last line was clipped.
 - **Units once:** FILLS's cost columns are in basis points, said once in the TKT header (`BPS`), so the
   column is `SLIP`, not a wrapped `SLIP BPS`.
 - The Learn-mode estimate no longer runs under SEND: ORDER has the room the open-orders list used.
+
+## D-076 · Step 5: panel content (WHO table, FILLS totals, no overflowing text)
+
+**Date:** 2026-11-18 · **Status:** Accepted
+
+- **WHO is a fixed table** (`src/lib/who.ts`, `whoTable`): one row per trader type, always in this
+  order: MM, NOISE, VALUE, PANIC, YOU (YOU includes the student's strategy, which trades as the
+  student). Columns AGENT, SELL QTY (hit bids), BUY QTY (lifted asks), % (the type's share of all
+  aggressive volume in the window, both sides, whole percentages that add up to exactly 100 by the
+  engine's own `wholePercents`). A type with no trades is a gray zero row, so nothing shifts as types
+  come and go. An OTHER row appears only if a type outside the five ever trades (momentum and whale
+  traders are cut), so no volume is dropped. **NET** (buying minus selling) closes the table, green when
+  buyers dominated, red when sellers did. The % has a gray bar. The window stays in the header meta
+  (`60S`, or the clicked candle's window with `ESC`); the summary sentence is Learn-mode only.
+- **FILLS totals** are labels over values in one row (SLIP $, BPS, SPREAD $, IMPACT $, RESTING $ when
+  non-zero, QTY, ORDERS) instead of a sentence that wrapped. The table shows HH:MM:SS (full time in the
+  tooltip) and sizes its columns to their content. Learn mode adds a gray line under each order with
+  the arrival mid and the slippage in ¢/sh, so the table keeps eight columns at any width.
+- **No overflowing text:** an audit at 1280, 1440 and 1920, default and Learn mode, in the busiest
+  state (strategy running, FED hit, drawer open, FILLS showing) finds no text wider than its box
+  without a tooltip.
+- Already in place from earlier steps: BOOK's muted side tints and gray SPREAD row (D-068), TKT's
+  colored BUY/SELL toggle, one amber SEND and one-line estimate (D-068, D-072), TAPE's B/S (D-072).
+- Dictionary: MM and NET added.

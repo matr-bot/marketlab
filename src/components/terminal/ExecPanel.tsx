@@ -33,7 +33,7 @@ export function ExecPanel({ exr }: { exr: FrameExecution | null }) {
     <div className={styles.exrWrap} data-testid="exr">
       <Explain id="exr.what" />
       <div className={styles.exrScroll}>
-        <table className={styles.table}>
+        <table className={`${styles.table} ${styles.fillsTable}`}>
           <thead>
             <tr>
               <th title="Sim time of the order's first fill.">TIME</th>
@@ -41,51 +41,83 @@ export function ExecPanel({ exr }: { exr: FrameExecution | null }) {
               <th title="Who sent it: YOU by hand, or STRAT, your strategy.">SRC</th>
               <th title="Shares filled.">QTY</th>
               <th title="Average price you got.">AVG</th>
-              {learn && <th title="The mid price when your order arrived: the price you intended.">ARR MID</th>}
-              {learn && <th title="Total slippage, cents per share: average price vs the arrival mid. Positive is a cost.">SLIP ¢/SH</th>}
               <th title="Total slippage in basis points (hundredths of a percent) of the order's value at the arrival mid. Positive is a cost.">SLIP</th>
               <th title="Basis points paid just to cross from the mid to the best price on the other side.">SPREAD</th>
               <th title="Basis points your own size cost beyond the best price: the order pushing the price against itself.">IMPACT</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
+            {rows.flatMap((r) => [
               <tr key={r.orderId} data-testid="exr-row">
-                <td>{formatSimTime(r.time)}</td>
+                <td title={formatSimTime(r.time)}>{formatSimTime(r.time).slice(0, 8)}</td>
                 <td>{r.side === "buy" ? "B" : "S"}</td>
                 <td data-testid="exr-src">{r.source === "strategy" ? "STRAT" : "YOU"}</td>
                 <td>{formatQty(r.qty)}</td>
                 <td>{formatAvgPrice(r.avgPrice)}</td>
-                {learn && <td>{r.arrivalMidX2 === null ? "—" : formatMidX2(r.arrivalMidX2)}</td>}
-                {learn && <td>{formatCentsPerShare(per(r.slippageX2, r.qty))}</td>}
                 <td>{formatBps(costBps(r.slippageX2, r))}</td>
                 <td>{r.aggressiveQty === 0 ? "—" : formatBps(costBps(r.spreadX2, r))}</td>
                 <td>{r.aggressiveQty === 0 ? "—" : formatBps(costBps(r.impactX2, r))}</td>
-              </tr>
-            ))}
+              </tr>,
+              // Learn mode: the arrival mid and the cost in cents per share, on a line of their own so the table keeps its width.
+              ...(learn
+                ? [
+                    <tr key={`${r.orderId}-learn`} className={styles.fillsLearn} data-explain="exr.row">
+                      <td colSpan={8}>
+                        <span className={styles.label}>ARR MID</span> <span data-testid="exr-arrival">{r.arrivalMidX2 === null ? "—" : formatMidX2(r.arrivalMidX2)}</span> · <span className={styles.label}>SLIP ¢/SH</span> {formatCentsPerShare(per(r.slippageX2, r.qty))}
+                      </td>
+                    </tr>,
+                  ]
+                : []),
+            ])}
           </tbody>
         </table>
       </div>
       <div className={styles.exrTotal} data-testid="exr-total">
         {t.slippageX2 === null || t.spreadX2 === null || t.impactX2 === null || t.passiveX2 === null ? (
-          <span title="No order had an arrival mid (one side of the book was empty), so there is no intended price to measure slippage against.">
-            <span className={styles.label}>QTY</span> {formatQty(t.qty)} · NO ARRIVAL MID
-          </span>
+          <dl className={styles.totals} title="No order had an arrival mid (one side of the book was empty), so there is no intended price to measure slippage against.">
+            <div>
+              <dt>QTY</dt>
+              <dd>{formatQty(t.qty)}</dd>
+            </div>
+            <div>
+              <dt>SLIP</dt>
+              <dd>NO ARRIVAL MID</dd>
+            </div>
+          </dl>
         ) : (
-          <span>
-            <span className={styles.label}>SLIP</span> {formatDollarsX2(t.slippageX2)} · {formatBps(t.slippageBps)} <span className={styles.label}>BPS</span> <span className={styles.dim}>=</span> <span className={styles.label}>SPREAD</span>{" "}
-            {formatDollarsX2(t.spreadX2)} <span className={styles.dim}>+</span> <span className={styles.label}>IMPACT</span> {formatDollarsX2(t.impactX2)}
+          // Totals as labels over values (D-076): SLIP = SPREAD + IMPACT (+ RESTING), in dollars, and in BPS.
+          <dl className={styles.totals}>
+            <div title="Total slippage in dollars: the sum of every order's cost versus its arrival mid.">
+              <dt>SLIP</dt>
+              <dd>{formatDollarsX2(t.slippageX2)}</dd>
+            </div>
+            <div title="Total slippage in basis points of the orders' value at their arrival mids.">
+              <dt>BPS</dt>
+              <dd>{formatBps(t.slippageBps)}</dd>
+            </div>
+            <div title="Paid to cross from the mid to the best price.">
+              <dt>SPREAD</dt>
+              <dd>{formatDollarsX2(t.spreadX2)}</dd>
+            </div>
+            <div title="Paid for your own size beyond the best price.">
+              <dt>IMPACT</dt>
+              <dd>{formatDollarsX2(t.impactX2)}</dd>
+            </div>
             {t.passiveX2 !== 0 && (
-              <>
-                {" "}
-                <span className={styles.dim}>+</span> <span className={styles.label}>RESTING</span> {formatDollarsX2(t.passiveX2)}
-              </>
+              <div title="Resting fills versus their arrival mid; negative means you earned the spread.">
+                <dt>RESTING</dt>
+                <dd>{formatDollarsX2(t.passiveX2)}</dd>
+              </div>
             )}
-            <span className={styles.dim}>
-              {" "}
-              · <span className={styles.label}>QTY</span> {formatQty(t.qty)} · <span className={styles.label}>ORDERS</span> {t.orders}
-            </span>
-          </span>
+            <div>
+              <dt>QTY</dt>
+              <dd>{formatQty(t.qty)}</dd>
+            </div>
+            <div>
+              <dt>ORDERS</dt>
+              <dd>{t.orders}</dd>
+            </div>
+          </dl>
         )}
       </div>
     </div>

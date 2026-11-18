@@ -23,6 +23,7 @@ export const EXPLAIN = {
   "book.vacuum": "Liquidity vacuum: no one is quoting this side of the book.",
   // EXR
   "exr.what": "Cost versus the mid when your order arrived: the price you intended against the price you got. Slippage splits into spread (mid to the best price) and impact (your own size pushing past it). BPS is hundredths of a percent of the order's value; ¢/SH is cents per share.",
+  "exr.row": "Under each order: the arrival mid (the price you intended) and the slippage in cents per share (live text).",
   "exr.empty": "Send an order from ORDER, or type BUY 500. This report shows what each one really cost: the price you intended against the price you got.",
   // STRAT
   "strat.intro": "Describe a trading idea in plain English. It becomes rules from a fixed menu (buy or sell after a drop or rise, stop loss, take profit, time exit) that you check before it trades.",

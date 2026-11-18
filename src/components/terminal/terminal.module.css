@@ -1488,10 +1488,11 @@
   height: 220px;
 }
 
-/* The strip also carries the workspace tabs (D-086): below 1600px the playback controls drop their key
-   hints (HELP lists them) so the strip stays one row. */
+/* The strip also carries the workspace tabs (D-086): below 1600px the playback controls and the tabs
+   drop their key hints (HELP lists them) so the strip stays one row, paused included. */
 @media (max-width: 1599px) {
-  .playback .keyHint {
+  .playback .keyHint,
+  .workspaces .keyHint {
     display: none;
   }
 }

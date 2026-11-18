@@ -74,3 +74,18 @@ test("RERUN with the same seed gives an identical equity curve", async ({ page }
   const second = await firstPoints(page, 40);
   expect(second).toEqual(first);
 });
+
+test("the strip stays one row with the workspace tabs, paused included: its last control is inside it (D-086)", async ({ page }) => {
+  await page.goto("/terminal?seed=187");
+  await expect(page.getByTestId("last-price")).toBeVisible();
+  await command(page, "PAUSE");
+  await expect(page.getByTestId("paused-tag")).toBeVisible();
+  const fit = await page.getByTestId("status-bar").evaluate((bar) => {
+    const box = bar.getBoundingClientRect();
+    const last = [...bar.querySelectorAll("button")].at(-1)!.getBoundingClientRect();
+    return { inside: last.right <= box.right && last.top >= box.top && last.bottom <= box.bottom, height: box.height };
+  });
+  expect(fit.inside).toBe(true);
+  expect(fit.height).toBeLessThan(44);
+});
+

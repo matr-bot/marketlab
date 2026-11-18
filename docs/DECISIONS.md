@@ -2188,3 +2188,7 @@ A judge should be able to check every figure on the landing page, so none of the
   RERUNs twice and compares the first 40 points exactly.
 - **BACKTEST and F4** open (or toggle) the STRATEGY workspace; the full-screen glass box overlay is
   removed in favour of it.
+- (Follow-up) With ● PAUSED showing, the strip overflowed at 1440px: below 1600px the workspace tabs
+  drop their key hints too, and an e2e test checks the strip's last control is inside it while paused.
+  The chart's axis labels scale with its height (at most one per 24px), so the corner chart's labels
+  do not overlap.

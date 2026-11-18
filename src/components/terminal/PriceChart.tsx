@@ -200,8 +200,8 @@ function draw(g: CanvasRenderingContext2D, geo: Geometry, candleMs: number, last
   const xOf = (c: Candle) => plotW - slot / 2 - ((newest - c.start) / candleMs) * slot - 2;
   const yOf = (p: number) => 4 + ((hi - p) / (hi - lo)) * (priceH - 8);
 
-  // Grid and price labels at round steps (about 12).
-  const step = axisStep(lo, hi);
+  // Grid and price labels at round steps: about 12, fewer on a short chart.
+  const step = axisStep(lo, hi, Math.max(3, Math.floor(priceH / 24))); // at most one label per 24px of height
   g.strokeStyle = TOKENS.grid;
   g.lineWidth = 1;
   g.fillStyle = TOKENS.label;

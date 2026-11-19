@@ -6,8 +6,8 @@
   height: 100vh;
   min-height: 560px;
   min-width: 960px;
-  gap: 4px;
-  padding: 4px;
+  /* The 2px gutter (D-095): the page color between panels is what separates them. */
+  gap: 2px;
 }
 
 .grid {
@@ -15,7 +15,7 @@
   grid-row: 4;
   display: grid;
   grid-template-columns: minmax(0, 65fr) minmax(340px, 35fr);
-  gap: 4px;
+  gap: 2px;
   min-height: 0;
 }
 
@@ -23,7 +23,7 @@
 .rightCol {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   min-height: 0;
   min-width: 0;
 }
@@ -37,7 +37,7 @@
   flex: 38 1 0;
   display: grid;
   grid-template-columns: minmax(0, 55fr) minmax(0, 45fr);
-  gap: 4px;
+  gap: 2px;
   min-height: 0;
 }
 
@@ -96,10 +96,11 @@
   border-bottom: none;
 }
 
+/* The bottom drawer sits on the gutter like every panel; its open panes split by a gutter too. */
+
 .drawerTab {
   background: transparent;
   border: none;
-  border-right: 1px solid var(--border);
   color: var(--label);
   font-size: var(--fs-label);
   letter-spacing: 0.08em;
@@ -123,14 +124,12 @@
 }
 
 .drawerSep {
-  width: 6px;
-  border-right: 1px solid var(--border);
+  width: 8px;
 }
 
 .drawerToggle {
   background: transparent;
   border: none;
-  border-left: 1px solid var(--border);
   color: var(--label);
   padding: 0 12px;
   cursor: pointer;
@@ -145,6 +144,8 @@
   height: clamp(150px, 30vh, 330px);
   display: grid;
   grid-template-columns: minmax(320px, 40fr) minmax(0, 60fr);
+  gap: 2px;
+  background: var(--bg);
 }
 
 /* Compact: DESK alone, full width, five lines (D-077). */
@@ -158,10 +159,7 @@
   min-height: 0;
   min-width: 0;
   overflow: hidden;
-}
-
-.drawerPane + .drawerPane {
-  border-left: 1px solid var(--border);
+  background: var(--panel-bg);
 }
 
 /* ---------- status bar ---------- */
@@ -175,7 +173,7 @@
   align-items: center;
   gap: 8px;
   padding: 4px 8px;
-  border: 1px solid var(--border);
+  background: var(--panel-bg);
   white-space: nowrap;
   overflow: hidden;
 }
@@ -193,7 +191,7 @@
 .simTag {
   align-self: center;
   color: var(--label);
-  border: 1px solid var(--border);
+  background: var(--raised);
   font-size: var(--fs-label);
   line-height: 1;
   padding: 4px 4px 0;
@@ -262,8 +260,9 @@
   max-width: 520px;
   margin-top: 4px;
   padding: 8px 8px;
-  background: var(--panel-bg);
-  border: 1px solid var(--data);
+  /* A floating layer (D-095): one step up in tone, with a hairline edge instead of a shadow. */
+  background: var(--raised);
+  border: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -357,7 +356,7 @@
   align-items: baseline;
   gap: 8px;
   padding: 4px 8px;
-  border: 1px solid var(--border);
+  background: var(--panel-bg);
   white-space: nowrap;
   overflow: hidden;
 }
@@ -392,7 +391,7 @@
   flex-wrap: wrap;
   gap: 4px 16px;
   padding: 4px 8px;
-  border: 1px solid var(--border);
+  background: var(--panel-bg);
 }
 
 .newsHeadline {
@@ -584,7 +583,7 @@
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
-  background: var(--bg);
+  background: var(--panel-bg);
 }
 
 .table td {
@@ -739,8 +738,8 @@
   top: 40px;
   max-width: 320px;
   padding: 4px 8px;
-  background: var(--panel-bg);
-  border: 1px solid var(--data);
+  background: var(--raised);
+  border: 1px solid var(--border);
   font-size: var(--fs-label);
   white-space: normal;
   pointer-events: none;
@@ -974,7 +973,7 @@
 }
 
 .preview {
-  border: 1px solid var(--border);
+  background: var(--raised);
   padding: 4px 8px;
   min-height: 34px;
   color: var(--data);
@@ -1117,7 +1116,7 @@
   max-height: 86vh;
   display: flex;
   flex-direction: column;
-  background: var(--bg);
+  background: var(--raised);
   border: 1px solid var(--border);
 }
 
@@ -1253,8 +1252,9 @@
   padding: 4px;
 }
 
+/* A glass-box section: a rule above it, not a box around it (D-095). */
 .glassPart {
-  border: 1px solid var(--border);
+  border-top: 1px solid var(--border);
   padding: 4px 8px;
   overflow: auto;
   min-height: 0;
@@ -1288,7 +1288,7 @@
 .code {
   margin: 4px 0;
   padding: 4px 8px;
-  border: 1px solid var(--border);
+  background: var(--bg);
   color: var(--data);
   white-space: pre;
   overflow: auto;
@@ -1313,7 +1313,7 @@
 
 .releaseCalendar,
 .releaseCard {
-  border: 1px solid var(--border);
+  background: var(--raised);
   margin: 8px 0;
   padding: 4px 8px;
   color: var(--data);
@@ -1380,7 +1380,7 @@
   grid-row: 4;
   display: grid;
   grid-template-columns: minmax(300px, 26fr) minmax(0, 40fr) minmax(320px, 34fr);
-  gap: 4px;
+  gap: 2px;
   min-height: 0;
 }
 
@@ -1390,7 +1390,6 @@
   min-height: 0;
   min-width: 0;
   background: var(--panel-bg);
-  border: 1px solid var(--border);
 }
 
 .wsHead,
@@ -1398,7 +1397,6 @@
   display: flex;
   justify-content: space-between;
   padding: 4px 8px;
-  border-bottom: 1px solid var(--border);
   color: var(--label);
   font-size: var(--fs-label);
   letter-spacing: 0.08em;
@@ -1467,7 +1465,6 @@
 .equitySvg {
   width: 100%;
   height: 160px;
-  border: 1px solid var(--border);
 }
 
 .equityZero {
@@ -1541,8 +1538,8 @@
   min-width: 100%;
   margin-top: -1px;
   list-style: none;
-  background: var(--panel-bg);
-  border: 1px solid var(--data);
+  background: var(--raised);
+  border: 1px solid var(--border);
 }
 
 .menuList li {

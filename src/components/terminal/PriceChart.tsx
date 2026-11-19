@@ -115,7 +115,7 @@ export function PriceChart({
     const g = canvas.getContext("2d");
     if (g === null) return;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    g.fillStyle = TOKENS.bg;
+    g.fillStyle = TOKENS.panelBg; // borderless (D-095): the chart is the panel's own surface
     g.fillRect(0, 0, size.w, size.h);
     if (geometry !== null) draw(g, geometry, candleMs, last, selected, hover, getComputedStyle(canvas).fontFamily);
   }, [size, geometry, candleMs, last, selected, hover]);
@@ -326,12 +326,5 @@ function draw(g: CanvasRenderingContext2D, geo: Geometry, candleMs: number, last
       g.fillText(formatPrice(price), w - 4, hoverY);
     }
   }
-
-  // Axis border.
-  g.strokeStyle = TOKENS.border;
-  g.beginPath();
-  g.moveTo(plotW + 0.5, 0);
-  g.lineTo(plotW + 0.5, plotH);
-  g.lineTo(0, plotH + 0.5);
-  g.stroke();
+  // No axis box (D-095): the gridlines and the gray labels are the axes.
 }

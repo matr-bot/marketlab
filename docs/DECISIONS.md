@@ -2460,3 +2460,35 @@ This step changes only tokens and fonts; surfaces, copy and the landing follow i
   - The landing has zero amber elements.
 - **Unchanged:** the engine, the worker and the determinism pins (`git diff main -- src/engine
   src/worker src/lib/determinism*` is empty).
+
+## D-095 · Design v2, step 2: tone and gutters instead of boxes
+
+- **Panels have no border.** They sit on the page color with a **2px gutter**, the only spacing
+  value off the 4px scale, and `geometry.test.ts` allows it only on `gap`. This covers the status
+  strip, the command bar, the NEWS strip, every panel, the drawer and its two panes, and the STRATEGY
+  workspace's three panes. Panel headers lost their bottom rule.
+- **Active panel:** a 2px amber line on its top edge. The edge is always reserved (transparent), so
+  activating a panel moves nothing.
+- **The chart is borderless:** its canvas is the panel's surface and the axis box is gone. Gridlines
+  and gray labels are the axes.
+- **Floating layers** (SESSION popover, RULE menu, marker tip, dialogs) are one step up in tone
+  (`raised`) with a hairline edge instead of a white outline or a shadow.
+- **Boxes inside panels became rules or tone:** glass-box sections take a rule above, the code block
+  and inputs a recessed well (the page color), and the ticket's estimate and the NEWS release card
+  the raised tone. The equity chart lost its frame. Hairlines remain only where they aid scanning:
+  table header and total rows, BOOK's spread row, formula rows.
+- **Gutter contrast, judged at 1:1:** step 1's `#0C0B0A` / `#141311` (1.06:1) let the panels merge;
+  the TAPE/WHO split and the chart/BOOK edge did not read. The final values are 1.14:1, a clear dark
+  line at 1440 and 1920:
+
+  | Role | Hex |
+  | --- | --- |
+  | Gutter | `#080706` |
+  | Panel | `#1A1816` |
+  | Raised | `#24211E` |
+  | Hairline | `#34302B` |
+  | Gridlines | `#24211E` |
+
+  Label `#8D8982` measures 5.1:1 on a panel and 4.6:1 on raised; data text `#E8E6E1` measures
+  14.2:1.
+- **Unchanged:** the engine, the worker and the determinism pins.

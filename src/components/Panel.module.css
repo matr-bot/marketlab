@@ -4,7 +4,9 @@
   min-height: 0;
   min-width: 0;
   background: var(--panel-bg);
-  border: 1px solid var(--border);
+  /* Design v2 (D-095): panels are separated by tone and the 2px gutter, never a box. The top edge is
+     reserved for the active marker so activating a panel moves nothing. */
+  border-top: 2px solid transparent;
 }
 
 .head {
@@ -12,7 +14,6 @@
   align-items: baseline;
   gap: 8px;
   padding: 4px 8px;
-  border-bottom: 1px solid var(--border);
   color: var(--label);
   font-size: var(--fs-label);
   letter-spacing: 0.08em;
@@ -46,7 +47,8 @@
   overflow: hidden;
 }
 
-/* The active panel: where a typed code opens. One of the three places amber is allowed (D-068). */
+/* The active panel: where a typed code opens. A 2px amber line on its top edge, one of the two places
+   amber is allowed (D-094, D-095). */
 .active {
-  border-color: var(--accent);
+  border-top-color: var(--accent);
 }

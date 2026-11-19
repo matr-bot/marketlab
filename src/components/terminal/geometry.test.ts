@@ -33,11 +33,14 @@ describe("terminal geometry (D-078)", () => {
     expect(CSS.map(rel)).toEqual(expect.arrayContaining(["app/globals.css", "components/terminal/terminal.module.css"]));
   });
 
-  it("spaces on a 4px scale: every padding, margin and gap is a multiple of 4px (or -1px to overlap a hairline)", () => {
+  it("spaces on a 4px scale: every padding, margin and gap is a multiple of 4px (or -1px to overlap a hairline; a gap may be the 2px gutter, D-095)", () => {
     const off = declarations()
       .filter(([, , prop]) => /^(padding|margin|gap|row-gap|column-gap)(-|$)/.test(prop))
       .flatMap(([file, sel, prop, value]) =>
-        [...value.matchAll(/(-?\d+(?:\.\d+)?)px/g)].map((m) => Number(m[1])).filter((n) => n !== -1 && n % 4 !== 0).map((n) => `${file} ${sel} { ${prop}: ${value} } (${n}px)`),
+        [...value.matchAll(/(-?\d+(?:\.\d+)?)px/g)]
+          .map((m) => Number(m[1]))
+          .filter((n) => n !== -1 && n % 4 !== 0 && !(n === 2 && prop === "gap"))
+          .map((n) => `${file} ${sel} { ${prop}: ${value} } (${n}px)`),
       );
     expect(off).toEqual([]);
   });

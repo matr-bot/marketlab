@@ -16,16 +16,16 @@
  */
 export const TOKENS = {
   /** The gutter between panels, and the page behind them. */
-  bg: "#0C0B0A",
+  bg: "#080706",
   /** A panel's surface. */
-  panelBg: "#141311",
+  panelBg: "#1A1816",
   /** One step up from a panel: popovers, hover, the selected chip. */
-  raised: "#1D1B19",
+  raised: "#24211E",
   /** Hairlines, only where a rule aids scanning (table rows, the drawer's top edge). */
-  border: "#2A2724",
+  border: "#34302B",
   /** All numbers and data: a warm white. */
   data: "#E8E6E1",
-  /** Column headers, units, panel titles, secondary text (5.3:1 on a panel). */
+  /** Column headers, units, panel titles, secondary text (5.0:1 on a panel). */
   label: "#8D8982",
   /** Disabled controls only (not text that must be read). */
   disabled: "#5C5954",
@@ -38,7 +38,7 @@ export const TOKENS = {
   alert: "#A8322C",
   alertFg: "#FFFFFF",
   /** Chart gridlines. */
-  grid: "#1D1B19",
+  grid: "#24211E",
   /** The tick flash (D-078): the background behind a price or a book level that just moved up or down. */
   upFlash: "rgba(79, 163, 111, 0.45)",
   downFlash: "rgba(210, 96, 90, 0.45)",
@@ -49,7 +49,7 @@ export const TOKENS = {
   bar: "rgba(141, 137, 130, 0.22)",
   selection: "#3A3733",
   /** Behind a dialog. */
-  scrim: "rgba(12, 11, 10, 0.75)",
+  scrim: "rgba(8, 7, 6, 0.75)",
   /** The landing page (D-094): warm paper, ink text, rules, and price direction readable on paper. */
   paper: "#F4F0E8",
   ink: "#1C1A17",

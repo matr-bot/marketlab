@@ -2318,3 +2318,41 @@ WebKit (`src/lib/determinismPins.json`).
   24. CI `browser-determinism`: the check in Chromium, Firefox and WebKit, on every push.
 - The PROOF claim reads both from the commit's CI at build time: when they all passed, it becomes
   "DETERMINISTIC · identical on Linux/macOS · Chromium/Firefox/WebKit"; a failed job stops the build.
+
+## D-092 · Hardening the AI route (/api/interpret)
+
+**Date:** 2026-11-19 · **Status:** Accepted
+
+The route is the app's only network call and the only thing that costs money per use. Audit and
+changes:
+- **Model and cost.** `claude-haiku-5-5`, structured output, effort `low`, 6 s timeout, no retries, at
+  $0.10 per million input tokens and $0.50 per million output tokens (thinking is billed as output).
+  Estimated from the prompts and output size: about $0.0002 to $0.0005 per request, about $0.0012
+  at worst (`max_tokens` reached). Repeats within an hour on the same instance come from the cache.
+  The confirmation on the preview returned `"source": "ai"` once `ANTHROPIC_API_KEY` was set for Preview
+  and Production (Secret type).
+- **Rate limiting.** The route's own limiter (20/min and 100/h per IP, 300/h per instance) is in memory:
+  on Vercel each instance has its own counters, reset on a cold start and not shared between
+  instances, so it is best effort. In front of it now: a **Vercel WAF rate-limit rule**, "Rate limit AI
+  route": `POST` and path `/api/interpret`, 30 requests per 60 s per IP (fixed window), 429 above that,
+  for preview and production (no environment condition), published 2026-11-19. Counters are per
+  region, so N regions can let about N× through. Requests the firewall blocks are not billed. Checked on
+  the preview: requests 1 to 30 → 200, 31 to 35 → 429. The hard cap stays the Anthropic workspace spend
+  limit. A shared store (Upstash Redis) was not needed at this cost level.
+- **Rate-limited replies say so.** The route's limiter and the firewall's 429 now give the same reply:
+  `AI rate-limited · understood offline from simple phrasing. Check every rule before you start it.` for
+  a strategy, `AI rate-limited · …` with the offline preset match for a headline. The wording lives in
+  one place (`offlineHeadline`, `offlineStrategy` in `src/lib/interpret.ts`), used by the route and by
+  the terminal, which recognises a 429 (the firewall answers before the route) and otherwise keeps
+  "AI unavailable" for a network failure. Unit tests for both answers; an e2e test with a mocked 429.
+- **Input caps kept:** a headline is 1 to 200 characters, a strategy 1 to 300 (Zod), and the raw body
+  at most 1,024 bytes before parsing (413 above).
+- **`max_tokens` stays 2,048 for now:** the JSON needs well under 200 tokens; the rest is room for
+  thinking, which counts toward `max_tokens` on this model. A truncated answer (`max_tokens`) falls
+  back offline. Each model call now logs one line, `interpret_usage` with the tag, `input_tokens`,
+  `output_tokens` and `stop_reason` (never the user's text, the answer or the key), to set the cap from
+  real use later.
+- **The same-origin check is not a security boundary.** It compares the `Origin` header with the host,
+  which any script outside a browser can send (the checks above did). It only keeps other web pages from
+  calling the route from a visitor's browser. The limits that hold are the firewall rule, the input
+  caps and the spend limit.

@@ -97,7 +97,7 @@ describe("interpretHeadline: every failure falls back, the demo never dies", () 
     const { d, calls, now } = deps(always({ kind: "ok", output: OUT }));
     for (let i = 0; i < 25; i++) await interpretHeadline(`Fed hikes ${"!".repeat(i)}`, "wifi", d);
     expect(calls()).toBe(20);
-    expect(await interpretHeadline("Fed hikes again", "wifi", d)).toMatchObject({ source: "offline", message: "AI busy (too many headlines from this network) · “Fed hikes” matched the offline preset FED." });
+    expect(await interpretHeadline("Fed hikes again", "wifi", d)).toMatchObject({ source: "offline", message: "AI rate-limited · “Fed hikes” matched the offline preset FED." });
     expect(await interpretHeadline("Fed hikes, other network", "other", d)).toMatchObject({ source: "ai" }); // other visitors unaffected
     for (let m = 1; m <= 5; m++) {
       now.t = m * 61_000;

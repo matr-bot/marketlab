@@ -189,3 +189,16 @@ test("with the AI route down, a clear headline falls back to its offline preset 
   await expect(page.getByTestId("command-reply")).toHaveText("AI unavailable · “miss” matched the offline preset DOWNGRADE.");
   await expect(page.getByTestId("news")).toHaveAttribute("data-phase", "preview");
 });
+
+test("a firewall 429 on the AI route says rate-limited and still understands simple phrasing offline (D-092)", async ({ page }) => {
+  await page.route("**/api/interpret", (route) => route.fulfill({ status: 429, contentType: "text/plain", body: "Too Many Requests" }));
+  await page.goto("/terminal?seed=187");
+  await expect(page.getByTestId("last-price")).toBeVisible({ timeout: 5_000 });
+  await page.getByTestId("command-input").fill("STRAT Buy after a 3% drop within 60 seconds, stop loss 2%");
+  await page.getByTestId("command-input").press("Enter");
+  await expect(page.getByTestId("command-reply")).toHaveText("AI rate-limited · understood offline from simple phrasing. Check every rule before you start it.");
+  await expect(page.getByTestId("strat-start")).toBeVisible(); // understood offline: the preview is ready
+  await page.getByTestId("command-input").fill("Fed hikes rates by 75bps");
+  await page.getByTestId("command-input").press("Enter");
+  await expect(page.getByTestId("command-reply")).toHaveText(/^AI rate-limited · /);
+});

@@ -135,12 +135,12 @@ describe("interpretStrategy: every path (D-064)", () => {
     expect(await interpretStrategy(DEMO, "ip", deps(always({ kind: "ok", output: { ...OUT, entryPercent: Number.NaN } })).d)).toMatchObject({ source: "offline" });
   });
 
-  it("over the rate limit, says the AI is busy and still understands simple phrasing offline", async () => {
+  it("over the rate limit, says the AI is rate-limited and still understands simple phrasing offline (D-092)", async () => {
     const { d, calls } = deps(always({ kind: "ok", output: OUT }));
     for (let i = 0; i < LIMITS.perIpPerMinute; i++) await interpretStrategy(`buy after a ${i + 1}% drop`, "ip", d);
     const r = await interpretStrategy("sell after a 2% rise", "ip", d);
     expect(r).toMatchObject({ source: "offline", strategy: { spec: { entry: { rule: "sellAfterRise" } } } });
-    expect((r as { message: string }).message).toMatch(/^AI busy/);
+    expect((r as { message: string }).message).toMatch(/^AI rate-limited · understood offline/);
     expect(calls()).toBe(LIMITS.perIpPerMinute);
   });
 });

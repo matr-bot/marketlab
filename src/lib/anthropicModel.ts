@@ -13,6 +13,14 @@ import { ModelOutput, StrategyModelOutput } from "./schemas";
 export const TIMEOUT_MS = 6_000;
 
 /** One structured-output call: the user's text goes inside `<tag>` tags (angle brackets removed) as data. */
+/**
+ * One log line per model call (D-092): token counts and why it stopped, to size max_tokens from real
+ * use. Never the user's text, the model's answer or the key.
+ */
+export function usageLine(tag: string, usage: { input_tokens: number; output_tokens: number }, stopReason: string | null): string {
+  return JSON.stringify({ event: "interpret_usage", tag, input_tokens: usage.input_tokens, output_tokens: usage.output_tokens, stop_reason: stopReason });
+}
+
 function createParseCall<S extends z.ZodType>(apiKey: string, system: string, schema: S, tag: string): (text: string) => Promise<ModelResult<z.infer<S>>> {
   const client = new Anthropic({ apiKey, timeout: TIMEOUT_MS, maxRetries: 0 });
   return async (text) => {
@@ -24,6 +32,7 @@ function createParseCall<S extends z.ZodType>(apiKey: string, system: string, sc
         system,
         messages: [{ role: "user", content: `<${tag}>${text.replace(/[<>]/g, "")}</${tag}>` }],
       });
+      console.log(usageLine(tag, response.usage, response.stop_reason));
       if (response.stop_reason === "refusal") return { kind: "refusal" };
       if (response.stop_reason === "max_tokens") return { kind: "truncated" };
       if (response.parsed_output === null) return { kind: "invalid" };

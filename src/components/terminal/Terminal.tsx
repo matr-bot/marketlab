@@ -5,7 +5,6 @@ import { Panel } from "@/components/Panel";
 import type { Attribution } from "@/engine/attribution";
 import type { PresetResult } from "@/engine/feed";
 import { clampShock, type ShockParams } from "@/engine/fundamental";
-import { presetByCode } from "@/engine/presets";
 import { FREE_PLAY, resolveRun, SCENARIOS, scenarioById, type Scenario } from "@/engine/scenarios";
 import type { UserQueueResult } from "@/engine/simulation";
 import { clampStrategy, type StrategySpec } from "@/engine/strategy";
@@ -14,8 +13,9 @@ import { globalAction, workspaceKey, type Workspace } from "@/lib/keymap";
 import { formatSimTime } from "@/engine/simClock";
 import { formatInterval } from "@/lib/format";
 import type { RunData } from "@/lib/glassbox/python";
-import { offlineFallback, OFFLINE_HELP } from "@/lib/offlineMatch";
-import { OFFLINE_STRATEGY_HELP, parseStrategyOffline } from "@/lib/offlineStrategy";
+import { OFFLINE_HELP } from "@/lib/offlineMatch";
+import { OFFLINE_STRATEGY_HELP } from "@/lib/offlineStrategy";
+import { offlineHeadline, offlineStrategy } from "@/lib/interpret";
 import type { InterpretResponse, StrategyResponse } from "@/lib/schemas";
 import { EXAMPLE_SPEC, EXAMPLE_TEXT } from "@/lib/exampleStrategy";
 import { learnFromQuery, sessionLink } from "@/lib/sessionLink";
@@ -61,7 +61,10 @@ type PanelId = "GP" | "TAPE" | "WHO" | "BOOK" | "TKT" | "DRAWER";
 const DRAWER_KINDS: ReadonlySet<string> = new Set(["headline", "panic", "vacuum"]);
 
 
-/** Ask /api/interpret; if the route itself is unreachable (no Wi-Fi), fall back here the same way. */
+/**
+ * Ask /api/interpret; if the route is unreachable (no Wi-Fi) fall back here the same way, and if the
+ * firewall's rate limit answered 429 before the route (D-092), say so with the route's own wording.
+ */
 async function interpret(headline: string): Promise<InterpretResponse> {
   try {
     const res = await fetch("/api/interpret", {
@@ -70,15 +73,14 @@ async function interpret(headline: string): Promise<InterpretResponse> {
       body: JSON.stringify({ headline }),
       signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS),
     });
+    if (res.status === 429) return offlineHeadline(headline, "rate-limited");
     return (await res.json()) as InterpretResponse;
   } catch {
-    const { code, message } = offlineFallback(headline);
-    if (code === null) return { ok: true, source: "offline", headline, preset: null, scenario: null, message };
-    return { ok: true, source: "offline", headline, preset: code, scenario: { shock: presetByCode(code)!.shock, reason: "" }, message };
+    return offlineHeadline(headline, "unavailable");
   }
 }
 
-/** Ask /api/interpret for a strategy (D-064); with the route unreachable, understand simple phrasing here. */
+/** Ask /api/interpret for a strategy (D-064); the same fallbacks as headlines (D-092). */
 async function interpretStrategyText(text: string): Promise<StrategyResponse> {
   try {
     const res = await fetch("/api/interpret", {
@@ -87,11 +89,10 @@ async function interpretStrategyText(text: string): Promise<StrategyResponse> {
       body: JSON.stringify({ kind: "strategy", text }),
       signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS),
     });
+    if (res.status === 429) return offlineStrategy(text, "rate-limited");
     return (await res.json()) as StrategyResponse;
   } catch {
-    const spec = parseStrategyOffline(text);
-    if (spec === null) return { ok: true, source: "offline", text, strategy: null, message: OFFLINE_STRATEGY_HELP };
-    return { ok: true, source: "offline", text, strategy: { spec, reason: "" }, message: "AI unavailable · understood offline from simple phrasing. Check every rule before you start it." };
+    return offlineStrategy(text, "unavailable");
   }
 }
 

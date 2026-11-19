@@ -44,8 +44,16 @@ Fields:
 - liquidityMultiplier: how much market makers keep quoting, 0.25 (they pull back sharply) to 2; 1 is normal. Shocking uncertain news is 0.5 to 0.8.
 - reason: one short plain sentence explaining the economic logic, under 15 words, with no numbers.`;
 
-const fallback = (headline: string, why: "unavailable" | "busy"): InterpretResponse => {
-  const { code, message } = offlineFallback(headline, why === "busy" ? "AI busy (too many headlines from this network)" : "AI unavailable");
+/**
+ * Why a reply is offline (D-092): the AI is unavailable (no key, timeout, error, bad output), or this
+ * network hit a rate limit (the route's own limiter, or the Vercel firewall's 429 before the route).
+ */
+export type OfflineWhy = "unavailable" | "rate-limited";
+const PREFIX: Record<OfflineWhy, string> = { unavailable: "AI unavailable", "rate-limited": "AI rate-limited" };
+
+/** The offline answer to a headline, the same on the server and in the browser (D-092). */
+export const offlineHeadline = (headline: string, why: OfflineWhy): InterpretResponse => {
+  const { code, message } = offlineFallback(headline, PREFIX[why]);
   if (code === null) return { ok: true, source: "offline", headline, preset: null, scenario: null, message };
   const p = presetByCode(code)!;
   return { ok: true, source: "offline", headline, preset: code, scenario: { shock: p.shock, reason: p.headline }, message };
@@ -56,17 +64,17 @@ export async function interpretHeadline(headline: string, ip: string, deps: Inte
   const key = normalizeHeadline(headline);
   const cached = deps.cache.get(key, deps.now());
   if (cached !== undefined) return { ok: true, source: "cache", headline, scenario: cached };
-  if (deps.callModel === null) return fallback(headline, "unavailable");
-  if (!deps.limiter.allow(ip, deps.now())) return fallback(headline, "busy");
+  if (deps.callModel === null) return offlineHeadline(headline, "unavailable");
+  if (!deps.limiter.allow(ip, deps.now())) return offlineHeadline(headline, "rate-limited");
   let result: ModelResult;
   try {
     result = await deps.callModel(headline);
   } catch {
-    return fallback(headline, "unavailable");
+    return offlineHeadline(headline, "unavailable");
   }
-  if (result.kind !== "ok") return fallback(headline, "unavailable");
+  if (result.kind !== "ok") return offlineHeadline(headline, "unavailable");
   const scenario = toScenario(result.output);
-  if (scenario === null) return fallback(headline, "unavailable");
+  if (scenario === null) return offlineHeadline(headline, "unavailable");
   deps.cache.set(key, scenario, deps.now());
   return { ok: true, source: "ai", headline, scenario };
 }
@@ -104,10 +112,11 @@ export interface StrategyDeps {
   readonly now: () => number;
 }
 
-const strategyFallback = (text: string, why: "unavailable" | "busy"): StrategyResponse => {
+/** The offline answer to a strategy, the same on the server and in the browser (D-092). */
+export const offlineStrategy = (text: string, why: OfflineWhy): StrategyResponse => {
   const spec = parseStrategyOffline(text);
-  const prefix = why === "busy" ? "AI busy (too many requests from this network)" : "AI unavailable";
-  if (spec === null) return { ok: true, source: "offline", text, strategy: null, message: why === "busy" ? `${prefix} · ${OFFLINE_STRATEGY_HELP.replace(/^AI unavailable · /, "")}` : OFFLINE_STRATEGY_HELP };
+  const prefix = PREFIX[why];
+  if (spec === null) return { ok: true, source: "offline", text, strategy: null, message: `${prefix} · ${OFFLINE_STRATEGY_HELP.replace(/^AI unavailable · /, "")}` };
   return { ok: true, source: "offline", text, strategy: { spec, reason: "" }, message: `${prefix} · understood offline from simple phrasing. Check every rule before you start it.` };
 };
 
@@ -116,17 +125,17 @@ export async function interpretStrategy(text: string, ip: string, deps: Strategy
   const key = normalizeHeadline(text);
   const cached = deps.cache.get(key, deps.now());
   if (cached !== undefined) return { ok: true, source: "cache", text, strategy: cached };
-  if (deps.callModel === null) return strategyFallback(text, "unavailable");
-  if (!deps.limiter.allow(ip, deps.now())) return strategyFallback(text, "busy");
+  if (deps.callModel === null) return offlineStrategy(text, "unavailable");
+  if (!deps.limiter.allow(ip, deps.now())) return offlineStrategy(text, "rate-limited");
   let result: ModelResult<StrategyModelOutput>;
   try {
     result = await deps.callModel(text);
   } catch {
-    return strategyFallback(text, "unavailable");
+    return offlineStrategy(text, "unavailable");
   }
-  if (result.kind !== "ok") return strategyFallback(text, "unavailable");
+  if (result.kind !== "ok") return offlineStrategy(text, "unavailable");
   const converted = toStrategy(result.output);
-  if (converted === null) return strategyFallback(text, "unavailable");
+  if (converted === null) return offlineStrategy(text, "unavailable");
   if (converted.kind === "unsupported") {
     const why = converted.reason ? `${converted.reason.replace(/\.$/, "")}. ` : "";
     return { ok: true, source: "ai", text, strategy: null, message: `The rule menu can't express that yet. ${why}Try: buy (or sell) after a drop (or rise) of X% within N seconds, with a stop loss, take profit or time exit.` };

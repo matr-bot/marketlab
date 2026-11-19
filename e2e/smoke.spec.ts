@@ -41,7 +41,9 @@ test("the market is alive on load: prices change within 5 seconds, with no conso
   // The same number of levels on each side, centered on the spread.
   const book = page.getByTestId("book");
   const levels = Number(await book.getAttribute("data-levels"));
-  expect(levels).toBeGreaterThan(0); // responsive layouts may fit fewer levels
+  // At the default 1440×900 BOOK shows more than five levels a side; only the small 1280×720 run
+  // (E2E_VIEWPORT=1280x720) may fit fewer.
+  expect(levels).toBeGreaterThan(process.env.E2E_VIEWPORT === "1280x720" ? 0 : 5);
   await expect(book.locator("[data-side=ASK]")).toHaveCount(levels);
   await expect(book.locator("[data-side=BID]")).toHaveCount(levels);
   // Depth bars: one per level; the largest level's bar is the widest, half the row (D-071).
@@ -75,8 +77,8 @@ test("the offline headline FED, typed into the command bar, moves the market wit
   await page.keyboard.type("FED"); // keyboard first: typing anywhere goes to the command bar
   await page.keyboard.press("Enter");
 
-  await expect(page.getByTestId("command-reply")).toHaveText("FED · Fed surprise hike 75bps");
-  await expect(page.getByTestId("chart")).toHaveAttribute("data-markers", "FED");
+  await expect(page.getByTestId("command-reply")).toHaveText("RATES · Fed surprise hike 75bps");
+  await expect(page.getByTestId("chart")).toHaveAttribute("data-markers", "RATES");
   await expect.poll(price, { timeout: 10_000, intervals: [250] }).toBeLessThanOrEqual(before * 0.99);
   // In the crash, BOOK is never blank: levels on at least one side (an empty side says NO BIDS / NO ASKS).
   for (let i = 0; i < 10; i++) {
@@ -89,7 +91,7 @@ test("the offline headline FED, typed into the command bar, moves the market wit
 
   await page.keyboard.type("MOON");
   await page.keyboard.press("Enter");
-  await expect(page.getByTestId("command-reply")).not.toHaveText("FED · Fed surprise hike 75bps"); // answered, whatever the AI says
+  await expect(page.getByTestId("command-reply")).not.toHaveText("RATES · Fed surprise hike 75bps"); // answered, whatever the AI says
   await expect(last).toBeVisible(); // an unknown word never stops the market
   expect(errors).toEqual([]);
 });

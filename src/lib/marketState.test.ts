@@ -61,7 +61,7 @@ describe("applyFrame: headlines", () => {
     feed.applyPreset("FED");
     feed.advance(1);
     state = applyFrame(state, feed.frame());
-    expect(state.headlines.map((h) => [h.code, h.pnlByType])).toEqual([["FED", null]]);
+    expect(state.headlines.map((h) => [h.code, h.pnlByType])).toEqual([["RATES", null]]);
     for (let i = 0; i < 61; i++) {
       feed.advance(10);
       state = applyFrame(state, feed.frame());

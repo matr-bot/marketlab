@@ -13,7 +13,7 @@ import type { Side } from "./types";
 export interface ScenarioShock {
   /** Sim seconds after the scenario starts (the market is already open and warmed up). */
   readonly atSec: number;
-  /** Short code for the chart marker, e.g. "HIKE". */
+  /** Short code for the chart marker, e.g. "RATES". */
   readonly code: string;
   readonly headline: string;
   readonly shock: ShockParams;
@@ -72,7 +72,7 @@ export const SCENARIOS: readonly Scenario[] = [
     task: "Before the news, decide whether to hold, sell or stay out. Trade through the headline, then explain who sold, why the price overshot, and what your trades cost you.",
     teaches: "News, fair value, overreaction",
     seed: 4101,
-    shocks: [{ atSec: 30, code: "HIKE", headline: "Fed surprise hike 75bps", shock: ratesRelease.shock, release: ratesRelease }],
+    shocks: [{ atSec: 30, code: "RATES", headline: "Fed surprise hike 75bps", shock: ratesRelease.shock, release: ratesRelease }],
     durationSec: 420,
   },
   {
@@ -124,7 +124,7 @@ export const SCENARIOS: readonly Scenario[] = [
   },
   {
     id: "macro-day",
-    title: "Hypothetical macro day",
+    title: "Macro day · CPI, jobs, GDP, rates",
     brief: "Four hypothetical releases arrive at 09:40:30 (CPI), 09:46:30 (JOBS), 09:52:30 (GDP), and 09:58:30 (RATES). Each stress window lasts 5 minutes, with a 1-minute gap before the next release.",
     task: "Before each print, compare the forecast with your expectation. After it lands, compare the fair-value change with MLAB's executed-price move after 30 seconds. Identify any overshoot and explain what the crowd did; you may trade and inspect your execution cost.",
     teaches: "Economic surprises, price discovery, overshoot",
@@ -134,7 +134,7 @@ export const SCENARIOS: readonly Scenario[] = [
   },
   {
     id: "demo",
-    title: "Hypothetical macro demo",
+    title: "CPI then rates · 4 min",
     brief: "A short MLAB session has CPI at 09:40:10 and RATES at 09:42:00. Both releases are hypothetical; their 30-second price reactions do not overlap.",
     task: "Build a strategy before CPI lands. Compare each forecast with the actual, then compare fair value with the peak and 30-second executed-price moves. Identify any overshoot beyond 0.3 percentage points and inspect your strategy's trades and execution cost.",
     teaches: "Economic surprises, strategy execution, overshoot",

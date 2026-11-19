@@ -51,18 +51,18 @@ test("an invalid seed cannot start a session; Enter outside the launcher opens t
   await expect(page).toHaveURL(/\/terminal\?scn=free&seed=187$/);
 });
 
-test("the hero replays the Fed hike from the real engine: calm, HIKE, panic in WHO, then loops (D-084)", async ({ page }) => {
+test("the hero replays the Fed hike from the real engine: calm, RATES, panic in WHO, then loops (D-084)", async ({ page }) => {
   test.setTimeout(60_000);
   await page.goto("/");
   const replay = page.getByTestId("replay");
   await expect(replay).toContainText("REPLAY · SEED 187");
   const chart = replay.getByTestId("chart");
   await expect(chart).toHaveAttribute("data-markers", "", { timeout: 5_000 }); // calm before the hike
-  await expect(chart).toHaveAttribute("data-markers", "HIKE", { timeout: 15_000 });
+  await expect(chart).toHaveAttribute("data-markers", "RATES", { timeout: 15_000 });
   // The log beside it is the desk's own lines for this run, and the chart shows about three minutes.
   await expect(page.getByTestId("replay-log")).toContainText("RATES +0.75", { timeout: 5_000 });
   const span = await chart.getAttribute("data-markers");
-  expect(span).toBe("HIKE");
+  expect(span).toBe("RATES");
   const panic = replay.locator("tr[data-type=panic]");
   await expect(panic).not.toHaveAttribute("data-zero", /.*/, { timeout: 10_000 }); // panic sellers traded
   await expect(replay).toHaveAttribute("data-loop", "1", { timeout: 30_000 }); // a new loop: a RERUN

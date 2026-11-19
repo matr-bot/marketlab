@@ -2356,3 +2356,66 @@ changes:
   which any script outside a browser can send (the checks above did). It only keeps other web pages from
   calling the route from a visitor's browser. The limits that hold are the firewall rule, the input
   caps and the spend limit.
+
+## D-093 · Economic release calibration; the Fed hike is marked RATES
+
+The hypothetical releases (`CPI`, `JOBS`, `GDP`, `RATES`; commits 1104c93 and 82ded99) shipped
+without a decision entry. This records what the code does, `src/engine/economicReleases.ts`.
+
+**Surprise in typical misses.** z = (actual − forecast) ÷ typical miss, rounded to 4 decimals.
+
+| Indicator | Forecast | Default actual | Typical miss | Direction | Fair value per z |
+| --- | --- | --- | --- | --- | --- |
+| CPI (y/y, pp) | 3.1 | 3.4 | 0.2 pp | higher hurts | 80 bps |
+| JOBS (payrolls, K) | 180 | 150 | 50K | higher helps | 100 bps |
+| GDP (annualized, pp) | 2.0 | 1.4 | 0.5 pp | higher helps | 80 bps |
+| RATES (change, pp) | +0.25 | +0.75 | 0.25 pp | higher hurts | 150 bps |
+
+- **Source of the typical-miss sizes: none recorded.** They are authored round numbers, a fixed
+  teaching calibration and not a measured market response (the code says so). Reasoning:
+  - CPI: headline prints usually land within a tenth or two of consensus, so 0.2 pp makes the
+    default 0.3 pp miss a large but plausible 1.5.
+  - JOBS: payroll misses run from tens of thousands to around 100K, and 50K is a round middle.
+  - GDP: advance (annualized) GDP misses are often several tenths.
+  - RATES: 0.25 pp is the Fed's standard step, so one surprise step is the unit.
+
+  Replacing these with sizes measured from historical consensus misses is open (docs/LATER.md).
+- **Sensitivities** are chosen so that the RATES default (+0.75 against +0.25, z = 2) is exactly the
+  existing FED preset: −3% fair value, panic 1.5×, volatility 1×, liquidity 1×, 300 s
+  (`economicReleases.test.ts` proves it, field for field). FED is now built from that release.
+
+**3× cap.** z is clamped to ±3 before it moves anything, so a typo or an absurd print cannot
+produce an absurd market. The largest moves are CPI and GDP ±2.4%, JOBS ±3.0% and RATES ±4.5%. The
+card still shows the uncapped z.
+
+**Panic threshold.** Panic sensitivity goes above 1 only for bad news of at least one typical miss:
+1 + 0.25·|z|, so 1.25× at z = 1 and 1.75× at the cap. A good surprise never adds panic.
+Volatility (1 + 0.2·s) and liquidity (1 − 0.1·s) scale with stress s = |z|. For RATES, s = |z| − 2
+(floored at 0), so its default is the unchanged FED signature.
+
+**Overshoot rule (0.3 pp).** The card's PEAK is the largest executed-price move in the reaction
+window. It is called an overshoot only if it has the same sign as the fair-value change and goes
+more than 0.3 percentage points past it. The 0.3 pp margin is authored: it keeps a peak that merely
+reaches fair value from being labelled an overshoot. Checking it against calm-market 30 s noise on
+the scenario seeds is open.
+
+**The Fed hike is marked RATES.** Since 1104c93 the desk line for the Fed hike reads like a
+release ("RATES +0.75 vs +0.25 expected → fair value −3.0%"). The marker now matches it everywhere
+the event appears:
+- the rate-shock scenario (and so the landing replay) is coded `RATES`, not `HIKE`;
+- a typed `FED` is marked with its indicator, so `MarketFeed.applyPreset` labels any preset that
+  is a release by its indicator.
+
+`FED` still works as a command, and the headline text stays "Fed surprise hike 75bps". Only labels
+changed. No shock value, time or random stream did. The determinism pins (`determinismPins.json`,
+fills and both book sides for free play and the rate-shock run, seed 187) pass unchanged, as does
+the rest of the unit suite.
+
+**Smoke check restored.** BOOK must show more than five levels a side at the default 1440×900.
+Fewer are allowed only for `E2E_VIEWPORT=1280x720`. 1104c93 had loosened this to "more than 0" for
+every viewport.
+
+**Scenario names describe themselves.** "Hypothetical macro day" → "Macro day · CPI, jobs, GDP,
+rates"; "Hypothetical macro demo" → "CPI then rates · 4 min". Both briefs still say the releases are
+hypothetical. The demo stays out of the launcher list (D-087: it is the contest script);
+`SCN demo` and `?scn=demo` still open it, and SESSION and HELP now show the two distinct names.

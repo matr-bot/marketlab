@@ -135,7 +135,7 @@ describe("scenario headlines in the frame", () => {
     expect(feed.frame().headlines).toEqual([]); // 29 s: not yet
     feed.advance(20);
     const frame = feed.frame();
-    expect(frame.headlines).toEqual([expect.objectContaining({ code: "HIKE", headline: "Fed surprise hike 75bps", fairValuePct: -0.03 })]);
+    expect(frame.headlines).toEqual([expect.objectContaining({ code: "RATES", headline: "Fed surprise hike 75bps", fairValuePct: -0.03 })]);
     expect(frame.headlines[0].time - first.time).toBe(30_000);
     feed.advance(10);
     expect(feed.frame().headlines).toEqual([]);

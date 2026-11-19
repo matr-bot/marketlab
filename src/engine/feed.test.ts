@@ -241,10 +241,10 @@ describe("MarketFeed: headlines (D-048, D-051)", () => {
   it("applies a preset at the next tick, sends it once, then sends its P&L once after 60 s", () => {
     const feed = feedOf();
     feed.advance(600);
-    expect(feed.applyPreset("fed")).toEqual({ ok: true, code: "FED", headline: "Fed surprise hike 75bps" }); // case-insensitive
+    expect(feed.applyPreset("fed")).toEqual({ ok: true, code: "RATES", headline: "Fed surprise hike 75bps" }); // case-insensitive
     expect(feed.frame().headlines).toEqual([]); // queued, not applied until the next tick
     feed.advance(1);
-    expect(feed.frame().headlines).toEqual([expect.objectContaining({ seq: 0, time: 60_000, code: "FED", headline: "Fed surprise hike 75bps", fairValuePct: -0.03, release: expect.objectContaining({ indicator: "RATES", forecast: 0.25, actual: 0.75 }) })]);
+    expect(feed.frame().headlines).toEqual([expect.objectContaining({ seq: 0, time: 60_000, code: "RATES", headline: "Fed surprise hike 75bps", fairValuePct: -0.03, release: expect.objectContaining({ indicator: "RATES", forecast: 0.25, actual: 0.75 }) })]);
     expect(feed.frame().headlines).toEqual([]); // sent exactly once
     feed.advance(598);
     expect(feed.frame().impacts).toEqual([]); // 59.9 s: not final yet
@@ -266,7 +266,7 @@ describe("MarketFeed: headlines (D-048, D-051)", () => {
     feed.advance(19); // 3.0 s: the next tick starts exactly 3 s after FED
     expect(feed.applyPreset("CEO").ok).toBe(true);
     feed.advance(1);
-    expect(feed.sim.shocks.map((s) => [s.label, s.time])).toEqual([["FED", 0], ["CEO", 3_000]]);
+    expect(feed.sim.shocks.map((s) => [s.label, s.time])).toEqual([["RATES", 0], ["CEO", 3_000]]);
   });
 
   it("refuses as data with a reason code; a waiting headline blocks the next even late in the session", () => {

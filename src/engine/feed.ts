@@ -255,8 +255,10 @@ export class MarketFeed {
   applyPreset(code: string): PresetResult {
     const preset = presetByCode(code);
     if (preset === undefined) return { ok: false, message: `Unknown headline code "${code.slice(0, 20)}".` };
-    const r = this.sim.applyShock(preset.shock, preset.code, preset.release === undefined ? undefined : preset.headline, preset.release);
-    return r.ok ? { ok: true, code: preset.code, headline: preset.headline } : { ok: false, message: r.message };
+    // A preset that is a release (FED is RATES +0.75 vs +0.25) is marked with its indicator, as the desk line names it (D-093).
+    const label = preset.release?.indicator ?? preset.code;
+    const r = this.sim.applyShock(preset.shock, label, preset.release === undefined ? undefined : preset.headline, preset.release);
+    return r.ok ? { ok: true, code: label, headline: preset.headline } : { ok: false, message: r.message };
   }
 
   /** A hypothetical release uses the same pending slot and 3 s digest rule as FED. */

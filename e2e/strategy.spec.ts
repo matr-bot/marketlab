@@ -43,7 +43,7 @@ test("the demo: a strategy in plain English trades through FED, shows in EXR, an
   // 2. MARKET: a headline hits; the strategy buys the drop.
   await page.keyboard.type("FED");
   await page.keyboard.press("Enter");
-  await expect(page.getByTestId("command-reply")).toHaveText("FED · Fed surprise hike 75bps");
+  await expect(page.getByTestId("command-reply")).toHaveText("RATES · Fed surprise hike 75bps");
   await expect(page.getByTestId("strat-last")).toContainText("ENTRY: BUY 500", { timeout: 20_000 });
   await expect(page.getByTestId("strat-position")).toHaveText("+500");
 

@@ -111,7 +111,7 @@
 }
 
 .drawerTab:hover {
-  background: var(--hover);
+  background: var(--raised);
 }
 
 .drawerTabOn {
@@ -137,7 +137,7 @@
 }
 
 .drawerToggle:hover {
-  background: var(--hover);
+  background: var(--raised);
   color: var(--data);
 }
 
@@ -375,7 +375,7 @@
   color: var(--data);
   font: inherit;
   text-transform: uppercase;
-  caret-color: var(--accent);
+  caret-color: var(--data);
 }
 
 .commandReply {
@@ -598,7 +598,7 @@
 .table tbody tr:hover td,
 .bookAsks > .bookRow:hover,
 .bookBids > .bookRow:hover {
-  background-color: var(--hover);
+  background-color: var(--raised);
 }
 
 .table th:first-child,
@@ -817,7 +817,7 @@
 }
 
 .chip:hover {
-  background: var(--hover);
+  background: var(--raised);
   border-color: var(--label);
 }
 
@@ -834,7 +834,7 @@
 }
 
 .secondary:hover {
-  background: var(--border);
+  background: var(--raised);
 }
 
 .segOn {
@@ -955,7 +955,7 @@
 }
 
 .segBtn:hover {
-  background: var(--hover);
+  background: var(--raised);
 }
 
 .input {
@@ -1560,6 +1560,6 @@
 }
 
 .menuList .menuHi {
-  background: var(--hover);
+  background: var(--raised);
   color: var(--data);
 }

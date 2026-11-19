@@ -2419,3 +2419,44 @@ every viewport.
 rates"; "Hypothetical macro demo" → "CPI then rates · 4 min". Both briefs still say the releases are
 hypothetical. The demo stays out of the launcher list (D-087: it is the contest script);
 `SCN demo` and `?scn=demo` still open it, and SESSION and HELP now show the two distinct names.
+
+## D-094 · Design v2, step 1: tokens and fonts
+
+Design v2 replaces "terminal cosplay" (mono everywhere, caps labels, a box around every panel, an
+amber outline) with a quiet desk tool inside and a financial-press landing page outside. The spec was
+approved on 2026-11-18 together with four changes to the first direction:
+- the landing's primary action is ink, not amber (amber on paper is about 2:1);
+- the drawer stays instant;
+- function codes stay as gray hints beside sentence-case titles;
+- numbers are IBM Plex Mono.
+
+This step changes only tokens and fonts; surfaces, copy and the landing follow in D-095 to D-098.
+
+- **Tokens** (`tokens.ts`, still the only place a color, font or type size is written):
+  - Terminal grays shifted warm to sit with the `#E8E6E1` text: gutter `#0C0B0A`, panel `#141311`,
+    raised `#1D1B19` (replaces `hover`), hairline `#2A2724`, label `#8D8982` (5.3:1 on a panel),
+    disabled `#5C5954`.
+  - Muted direction colors: up `#4FA36F`, down `#D2605A`, tints at 16%.
+  - Accent `#E8A33D`; PAUSED `#A8322C`.
+  - Landing paper `#F4F0E8`, ink `#1C1A17`, secondary ink `#5E5A53` (6.1:1), rule `#D8D2C6`, and up
+    `#2E7D4F` / down `#B23A32` for use on paper.
+- **Type scale:** 11 / 13 / 22 for the terminal; 15 / 22 / 56 (36 at phone width) for the landing.
+  28 is gone (the proof figures move to 22).
+- **Fonts, one per job,** self-hosted with next/font:
+  - IBM Plex Sans (interface; it takes over labels in step 3);
+  - IBM Plex Mono (data; replaces JetBrains Mono);
+  - Newsreader (display; landing headline only, not preloaded).
+
+  `FONTS` emits `--font-display`, `--font-sans` and `--font-mono`.
+- **Amber** is now allowed only on SEND and the active panel's marker. It came off the command
+  cursor (now warm white) and the landing's OPEN TERMINAL, which is outlined until it becomes ink on
+  paper in step 4.
+- **Tests:**
+  - `tokens.test.ts` adds two checks: any font family or font size written outside the tokens fails,
+    including the chart canvas's `g.font`; and any font import other than the three faces fails (no
+    Inter, Geist, Roboto or JetBrains).
+  - The e2e color checks now read the tokens through `e2e/colors.ts` instead of repeating RGB values.
+  - `geometry.spec` checks that Plex Mono actually loads.
+  - The landing has zero amber elements.
+- **Unchanged:** the engine, the worker and the determinism pins (`git diff main -- src/engine
+  src/worker src/lib/determinism*` is empty).

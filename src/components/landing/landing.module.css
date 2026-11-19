@@ -44,7 +44,7 @@
 }
 
 .h1 {
-  font-size: var(--fs-display);
+  font-size: var(--fs-display-mobile);
   line-height: 1.15;
   font-weight: 700;
 }
@@ -115,9 +115,10 @@
 
 .openTerminal {
   align-self: flex-start;
-  background: var(--accent);
-  border: 1px solid var(--accent);
-  color: var(--bg);
+  /* Design v2 (D-094): no accent on the landing page. Outlined until it becomes ink on paper (step 4). */
+  background: transparent;
+  border: 1px solid var(--data);
+  color: var(--data);
   font-weight: 700;
   letter-spacing: 0.1em;
   padding: 4px 16px;
@@ -194,7 +195,7 @@
 }
 
 .layer summary:hover {
-  background: var(--hover);
+  background: var(--raised);
 }
 
 .plus::before {
@@ -291,7 +292,7 @@
 }
 
 .scenarios li:hover {
-  background: var(--hover);
+  background: var(--raised);
 }
 
 .scenarios .scenarioOn {
@@ -346,7 +347,7 @@
 
 .stats b {
   color: var(--data);
-  font-size: var(--fs-stat);
+  font-size: var(--fs-hero);
   font-weight: 700;
 }
 

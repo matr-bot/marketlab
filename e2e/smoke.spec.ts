@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { computed } from "./colors";
 
 // The live-site promise (CLAUDE.md): the market is already running when the page loads, prices
 // move on their own, and nothing is broken. Runs in CI on every push.
@@ -22,9 +23,9 @@ test("the market is alive on load: prices change within 5 seconds, with no conso
   await expect(page.getByTestId("tape").locator("tbody tr").first()).toBeVisible();
   // TAPE (D-067, refined by D-068): a price is green when it ticked up and red when it ticked down;
   // the side label is neutral label gray, never green or red.
-  const GREEN = "rgb(38, 166, 91)";
-  const RED = "rgb(229, 72, 77)";
-  const LABEL = "rgb(122, 122, 122)";
+  const GREEN = computed("up");
+  const RED = computed("down");
+  const LABEL = computed("label");
   const rows = await page.getByTestId("tape").locator("tbody tr").evaluateAll((trs) =>
     (trs as HTMLTableRowElement[]).map((r) => ({ aggressor: r.getAttribute("data-aggressor"), tick: r.getAttribute("data-tick"), price: getComputedStyle(r.cells[1]).color, labelColor: getComputedStyle(r.cells[3]).color, label: r.cells[3].textContent })),
   );
@@ -37,7 +38,7 @@ test("the market is alive on load: prices change within 5 seconds, with no conso
   // BOOK's depth bars are the side of the book in muted tints: bids green, asks red (D-068).
   const barColors = await page.getByTestId("book").locator("[data-side] [aria-hidden]").evaluateAll((els) => els.map((e) => [e.parentElement!.getAttribute("data-side"), getComputedStyle(e).backgroundColor]));
   expect(barColors.length).toBeGreaterThan(0);
-  for (const [side, c] of barColors) expect(c).toBe(side === "BID" ? "rgba(38, 166, 91, 0.18)" : "rgba(229, 72, 77, 0.18)");
+  for (const [side, c] of barColors) expect(c).toBe(side === "BID" ? computed("upTint") : computed("downTint"));
   // The same number of levels on each side, centered on the spread.
   const book = page.getByTestId("book");
   const levels = Number(await book.getAttribute("data-levels"));

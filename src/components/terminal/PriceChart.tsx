@@ -6,7 +6,7 @@ import { formatSimTime } from "@/engine/simClock";
 import { axisStep, markerCode, priceRange } from "@/lib/chart";
 import { formatPrice, formatQty } from "@/lib/format";
 import styles from "./terminal.module.css";
-import { TOKENS } from "./tokens";
+import { TOKENS, TYPE } from "./tokens";
 
 const AXIS_W = 62;
 const TIME_H = 16;
@@ -198,7 +198,7 @@ export function PriceChart({
 
 function draw(g: CanvasRenderingContext2D, geo: Geometry, candleMs: number, last: number | null, selected: number | null, hover: Hover | null, font: string) {
   const { w, h, newest, slot, body, plotW, plotH, fits, visible, lo, hi, priceH, markers } = geo;
-  g.font = `11px ${font}`;
+  g.font = `${TYPE.fsLabel} ${font}`;
   g.textBaseline = "middle";
   const xOf = (c: Candle) => plotW - slot / 2 - ((newest - c.start) / candleMs) * slot - 2;
   const yOf = (p: number) => 4 + ((hi - p) / (hi - lo)) * (priceH - 8);

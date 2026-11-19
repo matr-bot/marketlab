@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { computed } from "./colors";
 
 // D-078: sharp and flat on screen, not only in the stylesheets: every element inside the terminal's
 // panels, strip and drawer has border-radius 0 and no shadow, as the browser actually computes them.
@@ -27,7 +28,8 @@ test("numbers use tabular figures with a slashed zero in the self-hosted mono fo
     const cs = getComputedStyle(el);
     return { family: cs.fontFamily, numeric: cs.fontVariantNumeric };
   });
-  expect(style.family).toMatch(/JetBrains Mono/i);
+  expect(style.family).toMatch(/IBM Plex Mono/i); // D-094
+  expect(await page.evaluate(async () => { await document.fonts.ready; return document.fonts.check(`13px "IBM Plex Mono"`); })).toBe(true);
   expect(style.numeric).toContain("tabular-nums");
   expect(style.numeric).toContain("slashed-zero");
 });
@@ -47,5 +49,5 @@ test("BOOK levels flash a 25% tint, the last price the full flash, for 150ms (D-
         }),
       { timeout: 10_000, intervals: [20] },
     )
-    .toMatchObject({ color: expect.stringMatching(/^rgba\((38, 166, 91|229, 72, 77), 0\.25\)$/), ms: 150 });
+    .toMatchObject({ color: expect.stringMatching(new RegExp(`^(${[computed("upFlashSoft"), computed("downFlashSoft")].map((c) => c.replace(/[().]/g, "\\$&")).join("|")})$`)), ms: 150 });
 });

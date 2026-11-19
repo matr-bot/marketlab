@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { computed } from "./colors";
 
 // D-080: the keymap. Space and F-keys anywhere (not while typing in a field), the ticket's letters with
 // focus inside TKT, and the key shown inside each control.
@@ -63,5 +64,5 @@ test("timestamps show milliseconds in gray", async ({ page }) => {
   await page.goto("/terminal?seed=187");
   const cell = page.getByTestId("tape").locator("tbody tr").first().locator("td").first();
   await expect(cell).toHaveText(/^\d\d:\d\d:\d\d\.\d{3}$/);
-  expect(await cell.locator("span").evaluate((el) => [el.textContent, getComputedStyle(el).color])).toEqual([expect.stringMatching(/^\.\d{3}$/), "rgb(122, 122, 122)"]);
+  expect(await cell.locator("span").evaluate((el) => [el.textContent, getComputedStyle(el).color])).toEqual([expect.stringMatching(/^\.\d{3}$/), computed("label")]);
 });

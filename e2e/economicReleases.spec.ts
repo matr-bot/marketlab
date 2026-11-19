@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { computed } from "./colors";
 
 async function command(page: Page, value: string) {
   const input = page.getByTestId("command-input");
@@ -30,8 +31,8 @@ test("RATES uses the FED calibration, shares its digest gate, and reports peak p
   expect(Number(moves![1])).toBeLessThan(-3.3);
   expect(Number(moves![2])).toBeLessThan(0);
   const color = await card.locator("p").first().evaluate((el) => getComputedStyle(el).color);
-  expect(color).not.toBe("rgb(38, 166, 91)");
-  expect(color).not.toBe("rgb(229, 72, 77)");
+  expect(color).not.toBe(computed("up"));
+  expect(color).not.toBe(computed("down"));
 });
 
 test("macro-day hides actuals before release, then reveals a card and its 30 s price move", async ({ page }) => {

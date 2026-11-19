@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { computed } from "./colors";
 
 // D-083: the landing page at "/": one amber action, layers that open in place, a keyboard launcher.
 
@@ -9,9 +10,10 @@ test("the landing page: hero line from the crowd, layers open in place, no conso
   await page.goto("/");
   await expect(page.getByTestId("hero-line")).toHaveText("77 trading agents, one real order book, every price explainable.");
   await expect(page.getByTestId("open-terminal")).toHaveAttribute("href", "/terminal?scn=free&seed=187");
-  // Amber appears once on the page: OPEN TERMINAL.
-  const amber = await page.evaluate(() => [...document.querySelectorAll("body *")].filter((e) => { const cs = getComputedStyle(e); return cs.backgroundColor === "rgb(245, 166, 35)" || cs.color === "rgb(245, 166, 35)"; }).length);
-  expect(amber).toBe(1);
+  // No amber on the landing page (D-094): its primary action is ink, not the accent.
+  const accent = computed("accent");
+  const amber = await page.evaluate((a) => [...document.querySelectorAll("body *")].filter((e) => { const cs = getComputedStyle(e); return cs.backgroundColor === a || cs.color === a || cs.borderTopColor === a; }).length, accent);
+  expect(amber).toBe(0);
   // The model behind each trader type, with its citation, opens in place.
   const panic = page.getByTestId("agents").locator("li[data-type=panic] details");
   await expect(panic).not.toHaveAttribute("open", /.*/);

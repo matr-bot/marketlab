@@ -1,9 +1,10 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
-import { cssVar, cssVariables, SECONDARY_BUTTON, TOKENS, TYPE, type Token } from "./tokens";
+import { cssVar, cssVariables, FONTS, SECONDARY_BUTTON, TOKENS, TYPE, type Token } from "./tokens";
 
-// D-068: every color comes from tokens.ts, and amber (`accent`) appears only in the allowed places.
+// D-068, D-094: every color, font and type size comes from tokens.ts, and amber (`accent`) appears only
+// in the allowed places.
 
 const ROOT = join(__dirname, "..", "..");
 const DIRS = ["app", "components"].map((d) => join(ROOT, d));
@@ -26,20 +27,19 @@ function rules(css: string): Array<[string, string]> {
   return [...plain.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => [m[1].trim(), m[2]]);
 }
 
-/** The only selectors that may use the accent: the active panel, the command-line cursor, the primary action. */
+/** The only selectors that may use the accent (D-094): the active panel's marker and the ticket's SEND. */
 const ACCENT_ALLOWED: Record<string, readonly string[]> = {
   "components/Panel.module.css": [".active"],
-  "components/terminal/terminal.module.css": [".commandInput", ".sendBtn"],
-  // The landing page's one amber element: OPEN TERMINAL (D-083).
-  "components/landing/landing.module.css": [".openTerminal"],
+  "components/terminal/terminal.module.css": [".sendBtn"],
 };
 
 describe("color tokens (D-068)", () => {
   it("maps every token to a CSS custom property", () => {
     expect(cssVar("panelBg")).toBe("--panel-bg");
     expect(cssVar("upTint")).toBe("--up-tint");
-    expect(Object.keys(cssVariables())).toHaveLength(Object.keys(TOKENS).length + Object.keys(TYPE).length);
+    expect(Object.keys(cssVariables())).toHaveLength(Object.keys(TOKENS).length + Object.keys(TYPE).length + Object.keys(FONTS).length);
     expect(cssVariables()["--fs-hero"]).toBe("22px");
+    expect(cssVariables()["--font-mono"]).toContain("var(--font-plex-mono)");
   });
 
   it("finds the UI files", () => {
@@ -60,14 +60,44 @@ describe("color tokens (D-068)", () => {
   });
 
   it("uses only CSS variables that a token (or the font) defines", () => {
-    const known = new Set([...(Object.keys(TOKENS) as Token[]).map(cssVar), ...(Object.keys(TYPE) as Array<keyof typeof TYPE>).map(cssVar)]);
+    const known = new Set([...(Object.keys(TOKENS) as Token[]).map(cssVar), ...(Object.keys(TYPE) as Array<keyof typeof TYPE>).map(cssVar), ...(Object.keys(FONTS) as Array<keyof typeof FONTS>).map(cssVar)]);
     const unknown = UI.filter((p) => p.endsWith(".css")).flatMap((p) =>
-      [...readFileSync(p, "utf8").matchAll(/var\((--[a-z0-9-]+)\)/g)].map((m) => m[1]).filter((v) => !known.has(v) && !v.startsWith("--font-")).map((v) => `${rel(p)} ${v}`),
+      [...readFileSync(p, "utf8").matchAll(/var\((--[a-z0-9-]+)\)/g)].map((m) => m[1]).filter((v) => !known.has(v)).map((v) => `${rel(p)} ${v}`),
     );
     expect(unknown).toEqual([]);
   });
 
-  it("uses the accent only on the active panel, the command cursor and the primary action", () => {
+  it("writes every font family and font size as a token, nowhere else (D-094)", () => {
+    const off: string[] = [];
+    for (const p of UI.filter((f) => rel(f) !== TOKEN_FILE)) {
+      readFileSync(p, "utf8")
+        .split("\n")
+        .forEach((raw, i) => {
+          const line = raw.replace(/\/\/.*$|\/\*.*?\*\//g, "");
+          const at = `${rel(p)}:${i + 1}  ${line.trim()}`;
+          if (p.endsWith(".css")) {
+            const family = /font-family\s*:\s*([^;]+)/.exec(line);
+            if (family && !/^(var\(--font-(display|sans|mono)\)|inherit)$/.test(family[1].trim())) off.push(at);
+            const size = /font-size\s*:\s*([^;]+)/.exec(line);
+            if (size && !/^(var\(--fs-[a-z-]+\)|inherit)$/.test(size[1].trim())) off.push(at);
+            if (/(^|[\s{;])font\s*:(?!\s*inherit)/.test(line)) off.push(at);
+          } else if (!/^\s*\*/.test(line) && /\bfont(Size|Family)?\s*[:=]\s*[`"'](?!var\(--(fs|font)-|\$\{TYPE\.)|`\d+px\s/.test(line)) {
+            off.push(at);
+          }
+        });
+    }
+    expect(off).toEqual([]);
+  });
+
+  it("loads only the three faces of D-094 (no Inter, Geist, Roboto or JetBrains Mono)", () => {
+    const layout = readFileSync(join(ROOT, "app", "layout.tsx"), "utf8");
+    const imported = /import\s*\{([^}]*)\}\s*from\s*"next\/font\/google"/.exec(layout)![1].split(",").map((s) => s.trim()).sort();
+    expect(imported).toEqual(["IBM_Plex_Mono", "IBM_Plex_Sans", "Newsreader"]);
+    const everywhere = UI.filter((p) => !/\.test\./.test(p)).filter((p) => /\b(Inter|Geist|Roboto|JetBrains)\b/.test(readFileSync(p, "utf8")));
+    expect(everywhere.map(rel)).toEqual([]);
+  });
+
+  it("uses the accent only on the active panel and the ticket's SEND (D-094)", () => {
     const misuse: string[] = [];
     for (const p of UI) {
       const name = rel(p);

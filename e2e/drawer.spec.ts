@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { computed } from "./colors";
 
 // D-074: fixed grid + bottom drawer (STRATEGY | DESK NEWS). Nothing on screen is an empty box.
 
@@ -122,12 +123,12 @@ test("WHO keeps its five rows at all times, zero rows gray, with NET colored by 
   // YOU has not traded: a zero row, in label gray.
   const you = who.locator("tr[data-type=user]");
   await expect(you).toHaveAttribute("data-zero", "true");
-  expect(await you.locator("td").first().evaluate((el) => getComputedStyle(el).color)).toBe("rgb(122, 122, 122)");
+  expect(await you.locator("td").first().evaluate((el) => getComputedStyle(el).color)).toBe(computed("label"));
   const box = await who.locator("table").boundingBox();
   await page.waitForTimeout(1_500);
   expect(await who.locator("table").boundingBox()).toEqual(box); // no layout shift as the window rolls
   // NET: green when buying exceeds selling, red when selling does.
   const { text, color } = await page.getByTestId("who-net").locator("td").nth(1).evaluate((el) => ({ text: el.textContent!, color: getComputedStyle(el).color })); // one read: the window rolls
-  if (text.startsWith("+")) expect(color).toBe("rgb(38, 166, 91)");
-  else if (text.startsWith("-")) expect(color).toBe("rgb(229, 72, 77)");
+  if (text.startsWith("+")) expect(color).toBe(computed("up"));
+  else if (text.startsWith("-")) expect(color).toBe(computed("down"));
 });

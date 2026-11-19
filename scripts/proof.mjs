@@ -5,7 +5,7 @@ import { execSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
-import { backedClaims, summarizeUnit } from "./proofLib.mjs";
+import { backedClaims, crossPlatformVerdict, summarizeUnit, withCrossPlatform } from "./proofLib.mjs";
 
 const run = (cmd) => execSync(cmd, { stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024 }).toString();
 const git = (cmd) => {
@@ -62,7 +62,41 @@ const mutation = existsSync("data/proof/mutation.json") ? JSON.parse(readFileSyn
 const remote = process.env.VERCEL_GIT_REPO_OWNER && process.env.VERCEL_GIT_REPO_SLUG ? `https://github.com/${process.env.VERCEL_GIT_REPO_OWNER}/${process.env.VERCEL_GIT_REPO_SLUG}` : (git("remote get-url origin")?.replace(/^git@github\.com:/, "https://github.com/").replace(/\.git$/, "") ?? null);
 const commit = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? git("rev-parse --short HEAD");
 
-const proof = { generatedAt: new Date().toISOString(), commit, repo: remote, unit, browser, mutation, claims: backedClaims(tests) };
+// Cross-platform determinism (D-091), from this commit's CI: the determinism matrix (Linux x64, macOS
+// arm64, Node 22 and 24) and browser-determinism (Chromium, Firefox, WebKit). On Vercel the build waits
+// for them (CI and the deploy start together); a failed job stops the build; if they never finish, the
+// claim stays the unit-backed one, never the cross-platform one.
+let claims = backedClaims(tests);
+const fullSha = process.env.VERCEL_GIT_COMMIT_SHA ?? git("rev-parse HEAD");
+const slug = remote?.replace(/^https:\/\/github\.com\//, "") ?? null;
+if (fullSha !== null && slug !== null) {
+  const deadline = Date.now() + (process.env.VERCEL ? 20 * 60_000 : 0);
+  let verdict = "pending";
+  let runUrl = `https://github.com/${slug}/commit/${fullSha}/checks`;
+  for (;;) {
+    try {
+      const res = await fetch(`https://api.github.com/repos/${slug}/commits/${fullSha}/check-runs?per_page=100`, { headers: { accept: "application/vnd.github+json", ...(process.env.GITHUB_TOKEN ? { authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}) } });
+      if (res.ok) {
+        const body = await res.json();
+        verdict = crossPlatformVerdict(body.check_runs.map((r) => ({ name: r.name, status: r.status, conclusion: r.conclusion })));
+        const run = body.check_runs.find((r) => r.name === "browser-determinism");
+        if (run?.html_url) runUrl = run.html_url;
+      }
+    } catch {
+      verdict = "pending";
+    }
+    if (verdict !== "pending" || Date.now() >= deadline) break;
+    await new Promise((r) => setTimeout(r, 20_000));
+  }
+  if (verdict === "failed") {
+    console.error(`proof: CI's cross-platform determinism failed for ${fullSha.slice(0, 7)}; not building (${runUrl}).`);
+    process.exit(1);
+  }
+  if (verdict === "passed") claims = withCrossPlatform(claims, runUrl);
+  console.log(`proof: cross-platform determinism ${verdict}`);
+}
+
+const proof = { generatedAt: new Date().toISOString(), commit, repo: remote, unit, browser, mutation, claims };
 mkdirSync("public", { recursive: true });
 writeFileSync("public/proof.json", `${JSON.stringify(proof, null, 2)}\n`);
 console.log(`proof: ${unit.passed}/${unit.total} unit tests passed, ${browser?.listed ?? "?"} browser tests listed, mutation ${mutation?.score ?? "none"}, ${proof.claims.length} claims backed → public/proof.json`);

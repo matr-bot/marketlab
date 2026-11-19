@@ -23,6 +23,43 @@ jobs:
       - run: npm run lint
       - run: npm test
 
+  # Determinism across platforms and Node versions (D-091): the engine's tests, including detMath's
+  # pinned bit fingerprints and the same-seed / frame-timing checks, on Linux x64 and macOS arm64, on the
+  # pinned Node (22) and the next one (24). A result that differs anywhere fails here, before a deploy.
+  determinism:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node: [22, 24]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: node -p "process.version + ' ' + process.platform + '-' + process.arch + ' v8 ' + process.versions.v8"
+      - run: npx vitest run src/engine src/lib/determinism.test.ts --testTimeout=120000
+
+  # Cross-browser determinism (D-091): the same market, bit for bit, in Chromium, Firefox and WebKit
+  # (V8, SpiderMonkey, JavaScriptCore), against the pins Node reproduces in the determinism job.
+  browser-determinism:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - run: npm run build
+      - run: npx playwright test e2e/determinism.spec.ts --project=chromium --project=firefox --project=webkit
+
   # Browser smoke test against the production build: the page loads, prices change within 5 s,
   # and there are no console errors (CLAUDE.md, Daily process).
   smoke:
@@ -37,7 +74,7 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run build
-      - run: npm run test:e2e
+      - run: npm run test:e2e -- --project=chromium
       - uses: actions/upload-artifact@v7
         if: failure()
         with:

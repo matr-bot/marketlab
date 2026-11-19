@@ -55,3 +55,34 @@ export function backedClaims(tests) {
     return [{ id: c.id, label: c.label, tests: found.map((f) => ({ file: f.file, title: f.title, name: f.name ?? f.title })) }];
   });
 }
+
+/** The CI jobs that prove cross-platform determinism (D-091): .github/workflows/ci.yml. */
+export const CROSS_PLATFORM_JOBS = ["determinism (ubuntu-latest, 22)", "determinism (ubuntu-latest, 24)", "determinism (macos-latest, 22)", "determinism (macos-latest, 24)", "browser-determinism"];
+export const CROSS_PLATFORM_LABEL = "DETERMINISTIC · identical on Linux/macOS · Chromium/Firefox/WebKit";
+
+/**
+ * The cross-platform verdict from a commit's GitHub check runs: "passed" when every required job
+ * finished successfully, "failed" when any finished otherwise, "pending" when any is missing or running.
+ * @param {Array<{ name: string, status: string, conclusion: string | null }>} runs
+ */
+export function crossPlatformVerdict(runs) {
+  let pending = false;
+  for (const job of CROSS_PLATFORM_JOBS) {
+    // A job re-run leaves several runs with one name: the latest (last listed by the API first) decides.
+    const run = runs.find((r) => r.name === job);
+    if (run === undefined || run.status !== "completed") pending = true;
+    else if (run.conclusion !== "success") return "failed";
+  }
+  return pending ? "pending" : "passed";
+}
+
+/**
+ * The replay claim with the cross-platform evidence folded in, when CI passed: the label becomes
+ * CROSS_PLATFORM_LABEL and the CI jobs join the unit tests behind it.
+ * @param {Array<{ id: string, label: string, tests: Array<{ file: string, title: string, name: string }> }>} claims
+ * @param {string} runUrl
+ */
+export function withCrossPlatform(claims, runUrl) {
+  return claims.map((c) => (c.id !== "replay" ? c : { ...c, label: CROSS_PLATFORM_LABEL, tests: [...c.tests, ...CROSS_PLATFORM_JOBS.map((j) => ({ file: runUrl, title: `CI job: ${j}`, name: `CI ${j}` }))] }));
+}
+

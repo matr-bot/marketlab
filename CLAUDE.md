@@ -238,6 +238,10 @@ Browser UI (Next.js)
 - The worker sends one batched snapshot per frame to React, never individual trades. The
   engine may produce thousands of events per second; the worker coalesces them and posts at
   most one message per animation frame (quotes, depth, new candles, fills since last frame).
+- Determinism is checked across Node 22/24 × Linux x64/macOS arm64 and in Chromium, Firefox and WebKit
+  (D-091, CI jobs `determinism` and `browser-determinism`). Test inputs that feed pinned bits are built
+  from integer bit words, never `Math.pow`/`**`; a NaN's payload is not part of a pin; the market must
+  never hold NaN or ±Infinity. Node is pinned to 22.x (`engines`).
 - The real clock only decides HOW MANY ticks run, never what happens in them. A test pins it:
   two runs of the worker's tick loop with different frame timings give the identical fill log
   for the same number of ticks.

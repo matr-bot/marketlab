@@ -2254,3 +2254,67 @@ A judge should be able to check every figure on the landing page, so none of the
   workspace tabs now show only from 1760px (below that, HELP lists them), the strip's gap and control
   padding tighten below that width, and the test measures the spacer that takes the spare width, which
   must keep at least 24px. Paused, it keeps 133px at 1440, 203px at 1760 and 363px at 1920.
+
+## D-091 · Determinism across Node versions, platforms and browsers
+
+**Date:** 2026-11-18 · **Status:** Accepted
+
+**What happened.** The first Vercel preview build failed in its proof step on
+`detMath › bit fingerprint › ln and exp give exactly the pinned bits` (expected `f5f6a921c5d58dec…`,
+got `8f04663484d37c79…`). Treated as a determinism bug until proven otherwise; the test was neither
+skipped nor loosened.
+
+**Diagnosis.**
+- *Where it failed:* Vercel builds with Node 24 (V8 13.6). Local (macOS arm64, v22.22.0) and GitHub CI
+  (Linux x64, v22.23.4) passed. A diagnostic matrix (Linux x64 and macOS arm64 × Node 22 and 24) failed on
+  **Node 24 on both platforms** and passed on Node 22 on both: the variable was the V8 version.
+- *Audit:* `detMath.ts` imports nothing and calls only `Math.trunc` and `Math.sqrt` (exact by spec). The
+  test's RNG (`Math.imul`, `Math.floor`, shifts, ÷ 2³²) and its hash (JSON + BigInt FNV-1a) are exact. The
+  input generator used `Math.pow(2, (next() − 0.5) × 2000) × (1 + next())`: a fractional-exponent pow,
+  which the spec leaves implementation-approximated.
+- *Evidence:* on Node 24, 4,387 of 104,502 `ln` inputs differed (all from that line, ≤ 2 ulp); for 50 of
+  them `ln`'s output bits differed with the input. First diverging input, ln #6: `0x320b717e706306f3` on
+  Node 22 vs `0x320b717e706306f2` on Node 24, both giving `ln = 0xc06341087dfa5ad6`. Linux and macOS on
+  Node 22 already differed on 22 inputs (1 ulp), by luck with identical outputs. For identical input bits,
+  detMath's outputs were identical on all four (0 differences in 228,506 inputs), and 400,000 inputs built
+  only from integer bit words fingerprinted identically on all of them.
+- **Cause (a): the test's input generator, not detMath.**
+
+**Fix.** Every input is now built from integer bit words and exact IEEE arithmetic (`fromWords`, an exact
+`pow2(k)`), shared as `src/engine/testing/detMathInputs.ts`; a guard test fails if the generator (or its
+helpers) ever uses `Math.pow`, `**`, or another implementation-approximated built-in.
+
+**Browsers: NaN payloads.** A new check (`src/lib/determinism.ts`, the `/determinism` page, its worker,
+`e2e/determinism.spec.ts`) runs seed 187 in the browser's own worker: free play for 10 sim-minutes and the
+Fed-hike scenario through 90 sim-seconds, hashing every fill and both sides of the book after every tick,
+plus detMath's fingerprint. The markets were bit-identical in Chromium, Firefox and WebKit (no diverging
+tick: finals `650e40e5740c6166`, `01ee047579e009a6`). The detMath fingerprint differed in Firefox and
+WebKit only, on 399 inputs, all NaNs with payloads:
+- ln **#102100**: Node/Chromium input `0x7ff8000000000001` → `ln` `0x7ff8000000000001`; Firefox and WebKit
+  input `0x7ff8000000000000` → `0x7ff8000000000000`.
+- exp **#123204**: Node/Chromium input `0x7ff80000b184e32f` → `exp` `0x7ff80000b184e32f`; Firefox and
+  WebKit input `0x7ff8000000000000` → `0x7ff8000000000000` (398 such exp inputs).
+- *Cause:* SpiderMonkey and JavaScriptCore NaN-box values and canonicalize a NaN's payload when it is
+  stored as a JS value; V8 keeps the payload. ECMAScript allows both (a NaN's bit pattern is
+  implementation-defined, observable only through a typed array). For every non-NaN input the outputs
+  were identical in all three.
+- *Fix:* the fingerprint hashes every NaN as the canonical `0x7ff8000000000000`; all other bits stay
+  exact. The NaN inputs stay in the set, and a separate exact test checks NaN in → NaN out (and that no
+  non-NaN input except ln of a negative gives NaN).
+
+**Engine NaN guard.** Since NaN payloads are the one thing that legitimately differs across engines, the
+market must never hold one: the check deep-walks every agent object (kept by wrapping each demo agent's
+`create`, which leaves the market identical, as the unchanged final hashes prove) and every value fed into
+the state hash after every tick of both runs, and asserts no NaN or ±Infinity, in Node and in all three
+browsers. None was found.
+
+**Pins**, set only after all agreed: detMath `285d50bb7e7d1a0e` / `60c7d8d7a1f90633` (canonical NaN) and the
+market finals above, identical on Node 22 and 24 × Linux x64 and macOS arm64, and in Chromium, Firefox and
+WebKit (`src/lib/determinismPins.json`).
+
+**So it cannot ship silently again.**
+- `package.json` `engines.node` is `22.x`, matching CI (Vercel uses it over its project setting).
+- CI `determinism`: the engine tests and the determinism check on Linux x64 and macOS arm64 × Node 22 and
+  24. CI `browser-determinism`: the check in Chromium, Firefox and WebKit, on every push.
+- The PROOF claim reads both from the commit's CI at build time: when they all passed, it becomes
+  "DETERMINISTIC · identical on Linux/macOS · Chromium/Firefox/WebKit"; a failed job stops the build.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 // A plain .mjs build script (typed by its JSDoc), tested here so its arithmetic is pinned.
-import { backedClaims, CLAIMS, summarizeMutants, summarizeUnit } from "../../scripts/proofLib.mjs";
+import { backedClaims, CLAIMS, CROSS_PLATFORM_JOBS, CROSS_PLATFORM_LABEL, crossPlatformVerdict, summarizeMutants, summarizeUnit, withCrossPlatform } from "../../scripts/proofLib.mjs";
 
 describe("proof numbers are computed from reports (D-085)", () => {
   it("scores mutants as Stryker does: detected over valid", () => {
@@ -22,4 +22,25 @@ describe("proof numbers are computed from reports (D-085)", () => {
     expect(backedClaims(oneFailed).map((c) => c.id)).toEqual(["money", "network"]);
     expect(backedClaims(all.slice(1)).map((c) => c.id)).toEqual(["money", "network"]);
   });
+
+  it("reads the cross-platform verdict from CI check runs (D-091)", () => {
+    const ok = CROSS_PLATFORM_JOBS.map((name) => ({ name, status: "completed", conclusion: "success" }));
+    expect(crossPlatformVerdict(ok)).toBe("passed");
+    expect(crossPlatformVerdict(ok.slice(1))).toBe("pending"); // a job missing
+    expect(crossPlatformVerdict(ok.map((r, i) => (i === 2 ? { ...r, status: "in_progress", conclusion: null } : r)))).toBe("pending");
+    expect(crossPlatformVerdict(ok.map((r, i) => (i === 4 ? { ...r, conclusion: "failure" } : r)))).toBe("failed");
+    expect(crossPlatformVerdict([...ok.slice(0, 4), { name: "browser-determinism", status: "completed", conclusion: "cancelled" }])).toBe("failed");
+  });
+
+  it("folds the CI evidence into the replay claim only", () => {
+    const claims = [
+      { id: "replay", label: "DETERMINISTIC REPLAY", tests: [{ file: "a", title: "t", name: "t" }] },
+      { id: "money", label: "INTEGER-CENT MONEY", tests: [] },
+    ];
+    const out = withCrossPlatform(claims, "https://ci/run/1");
+    expect(out[0].label).toBe(CROSS_PLATFORM_LABEL);
+    expect(out[0].tests).toHaveLength(1 + CROSS_PLATFORM_JOBS.length);
+    expect(out[1]).toEqual(claims[1]);
+  });
 });
+

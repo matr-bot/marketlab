@@ -11,7 +11,13 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["github"], ["list"]] : "list",
   use: { baseURL: `http://localhost:${PORT}` },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"], viewport } }],
+  // Every spec in Chromium; the determinism check also in Firefox and WebKit (D-091), whose JavaScript
+  // engines (SpiderMonkey, JavaScriptCore) must reproduce the same market bit for bit.
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"], viewport } },
+    { name: "firefox", testMatch: /determinism\.spec\.ts/, use: { ...devices["Desktop Firefox"], viewport } },
+    { name: "webkit", testMatch: /determinism\.spec\.ts/, use: { ...devices["Desktop Safari"], viewport } },
+  ],
   webServer: {
     command: `npm run start -- -p ${PORT}`,
     url: `http://localhost:${PORT}`,

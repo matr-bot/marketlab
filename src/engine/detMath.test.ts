@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { exp, ln, nextUp, pow } from "./detMath";
 import { fingerprint } from "./testing/fingerprint";
+import { detMathInputs as inputs, fromWords, pow2 } from "./testing/detMathInputs";
 import { rng } from "./testing/shadow";
 
 // Bits of a double as a hex string, so golden values pin the exact result.
@@ -175,55 +176,37 @@ describe("detMath: special values", () => {
 });
 
 describe("detMath: bit fingerprint over every branch region", () => {
-  // Builds a double from its high and low 32-bit words.
-  const fromWords = (hi: number, lo: number) => {
-    u32[1] = hi >>> 0;
-    u32[0] = lo >>> 0;
-    return f64[0];
-  };
 
-  function inputs() {
-    const { next, int } = rng(2026);
-    const lnIn: number[] = [];
-    const expIn: number[] = [];
-    for (let i = 0; i < 50_000; i++) lnIn.push(Math.pow(2, (next() - 0.5) * 2_000) * (1 + next())); // whole range
-    for (let i = 0; i < 20_000; i++) lnIn.push(1 + (next() - 0.5) * 2 ** -19); // |x − 1| < 2^-20 fast path
-    for (let i = 0; i < 20_000; i++) lnIn.push(1 + (next() - 0.5) * 0.2); // near 1, main path
-    for (let i = 0; i < 5_000; i++) lnIn.push(next() * 2.2e-308); // subnormals
-    for (let k = -1074; k <= 1023; k++) lnIn.push(2 ** k); // exact powers of two
-    for (let i = 0; i < 5_000; i++) lnIn.push(fromWords(0x3ff00000 + int(0, 0xfffff), int(0, 0xffffffff))); // every mantissa top bit pattern in [1, 2)
-    lnIn.push(fromWords(0x00100000, 0), fromWords(0x000fffff, 0xffffffff), fromWords(0x7ff00000, 1), fromWords(0x3ff00000, 1));
-    // Mantissa top bits at the edges of the |f| < 2^-20 shortcut (hx = 0, 1, 2 and the wrap-around
-    // just below 2: 0xffffd … 0xfffff), across several exponents.
-    for (const top of [0, 1, 2, 3, 0xffffc, 0xffffd, 0xffffe, 0xfffff]) {
-      for (const exponent of [0x3fe, 0x3ff, 0x400, 0x401, 0x3f0, 0x410]) {
-        for (let i = 0; i < 50; i++) lnIn.push(fromWords((exponent << 20) | top, i === 0 ? 0 : int(0, 0xffffffff)));
-      }
-    }
-
-    for (let i = 0; i < 50_000; i++) expIn.push(-745 + next() * 1_454.8); // whole range
-    for (let i = 0; i < 20_000; i++) expIn.push((next() - 0.5) * 2 ** -27); // |x| < 2^-28
-    for (let i = 0; i < 20_000; i++) expIn.push((next() < 0.5 ? -1 : 1) * (0.34 + next() * 0.72)); // 0.5 ln2 … 1.5 ln2 and around it
-    for (let i = 0; i < 20_000; i++) expIn.push((next() - 0.5) * 0.69); // |x| < 0.5 ln2
-    for (let i = 0; i < 10_000; i++) expIn.push(-745.2 + next() * 37.5); // subnormal results (k < −1021)
-    // Inputs whose high word sits exactly on each branch boundary, both signs, random low words.
-    for (const hi of [0x40862e42, 0x3fd62e42, 0x3ff0a2b2, 0x3e300000, 0x7ff00000]) {
-      for (let i = 0; i < 200; i++) {
-        const lo = i === 0 ? 0 : int(0, 0xffffffff);
-        expIn.push(fromWords(hi, lo), fromWords(hi | 0x80000000, lo));
-        expIn.push(fromWords(hi - 1, lo), fromWords((hi - 1) | 0x80000000, lo));
-      }
-    }
-    expIn.push(7.09782712893383973096e2, -7.45133219101941108420e2, 709.782712893384, -745.1332191019411);
-    return { lnIn, expIn };
-  }
+  it("builds its inputs without an implementation-approximated built-in (D-091)", () => {
+    const approximated = /Math\.(pow|exp|expm1|log|log1p|log2|log10|sin|cos|tan|asin|acos|atan|atan2|sinh|cosh|tanh|asinh|acosh|atanh|cbrt|hypot)\b|\*\*/;
+    expect(inputs.toString()).not.toMatch(approximated);
+    expect(pow2.toString()).not.toMatch(approximated);
+    expect(fromWords.toString()).not.toMatch(approximated);
+    // pow2 is exact: every power of two, normal and subnormal.
+    expect([pow2(0), pow2(-1), pow2(10), pow2(-1022), pow2(-1074), pow2(-1050), pow2(1023)]).toEqual([1, 0.5, 1024, 2.2250738585072014e-308, 5e-324, 2 ** -1050, 2 ** 1023]);
+  });
 
   it("ln and exp give exactly the pinned bits for more than 225,000 inputs", () => {
     const { lnIn, expIn } = inputs();
     expect(lnIn.length + expIn.length).toBeGreaterThan(225_000);
-    const lnBits = fingerprint(lnIn.map((x) => bits(ln(x))));
-    const expBits = fingerprint(expIn.map((x) => bits(exp(x))));
+    // Every NaN hashes as the canonical 0x7ff8000000000000 (D-091): a NaN's payload is implementation-
+    // defined (V8 keeps it, SpiderMonkey and JavaScriptCore canonicalize it). All other bits are exact.
+    const canonical = (y: number) => (Number.isNaN(y) ? "0x7ff8000000000000" : bits(y));
+    const lnBits = fingerprint(lnIn.map((x) => canonical(ln(x))));
+    const expBits = fingerprint(expIn.map((x) => canonical(exp(x))));
     expect([lnBits, expBits]).toEqual(PINNED);
+  });
+
+  it("NaN in, NaN out: every NaN input (payloads included) gives NaN, and nothing else does (D-091)", () => {
+    const { lnIn, expIn } = inputs();
+    const lnNaN = lnIn.filter((x) => Number.isNaN(x));
+    const expNaN = expIn.filter((x) => Number.isNaN(x));
+    expect(lnNaN.length + expNaN.length).toBeGreaterThan(300); // the payload NaNs are still in the set
+    for (const x of lnNaN) expect(ln(x)).toBeNaN();
+    for (const x of expNaN) expect(exp(x)).toBeNaN();
+    // A finite or infinite input never gives NaN, except ln of a negative number (by definition).
+    for (const x of lnIn) if (!Number.isNaN(x) && x >= 0) expect(Number.isNaN(ln(x))).toBe(false);
+    for (const x of expIn) if (!Number.isNaN(x)) expect(Number.isNaN(exp(x))).toBe(false);
   });
 
   it("stays within 1 ulp of the built-ins on those same inputs (where the built-in is finite)", () => {
@@ -245,8 +228,9 @@ describe("detMath: bit fingerprint over every branch region", () => {
   });
 });
 
-// FNV-1a fingerprints of every result's bits, generated once by this implementation.
-const PINNED: string[] = ["f5f6a921c5d58dec", "34d8d8fb92f2678e"];
+// FNV-1a fingerprints of every result's bits (NaN canonical), on the bit-built inputs (D-091): identical
+// on Linux x64 and macOS arm64 under Node 22 (V8 12.4) and 24 (V8 13.6), and in Chromium, Firefox, WebKit.
+const PINNED: string[] = ["285d50bb7e7d1a0e", "60c7d8d7a1f90633"];
 
 describe("detMath: nextUp", () => {
   it.each([
